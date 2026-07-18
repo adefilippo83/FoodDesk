@@ -1,1 +1,1 @@
-{"root":["./src/app.tsx","./src/api.ts","./src/auth.tsx","./src/main.tsx","./src/pages/adminmenu.tsx","./src/pages/adminusers.tsx","./src/pages/login.tsx","./src/pages/neworder.tsx","./src/pages/orders.tsx","./vite.config.ts"],"version":"5.9.3"}
+{"root":["./src/app.tsx","./src/api.ts","./src/auth.tsx","./src/i18n.tsx","./src/main.tsx","./src/pages/adminmenu.tsx","./src/pages/adminusers.tsx","./src/pages/login.tsx","./src/pages/neworder.tsx","./src/pages/orders.tsx","./src/pages/reports.tsx","./vite.config.ts"],"version":"5.9.3"}

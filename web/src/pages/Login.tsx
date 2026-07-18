@@ -1,9 +1,11 @@
 import { useState, type FormEvent } from 'react'
 import { ApiError } from '../api'
 import { useAuth } from '../auth'
+import { LangToggle, useI18n } from '../i18n'
 
 export default function Login() {
   const { login } = useAuth()
+  const { t } = useI18n()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -18,8 +20,8 @@ export default function Login() {
     } catch (err) {
       setError(
         err instanceof ApiError && err.code === 'invalid_credentials'
-          ? 'Wrong username or password.'
-          : 'Could not reach the server. Check the Wi-Fi connection.',
+          ? t('errWrongCredentials')
+          : t('errServerUnreachable'),
       )
     } finally {
       setBusy(false)
@@ -29,17 +31,20 @@ export default function Login() {
   return (
     <div className="login-wrap">
       <form className="card login-card" onSubmit={onSubmit}>
-        <div className="logo">
-          Food<span>Desk</span>
+        <div className="row" style={{ alignItems: 'flex-start' }}>
+          <div className="logo" style={{ marginRight: 'auto' }}>
+            Food<span>Desk</span>
+          </div>
+          <LangToggle />
         </div>
         <p className="muted" style={{ marginTop: 0, marginBottom: 20 }}>
-          Sign in to take orders.
+          {t('loginTagline')}
         </p>
 
         {error && <div className="error">{error}</div>}
 
         <label className="field">
-          <span>Username</span>
+          <span>{t('username')}</span>
           <input
             className="input"
             value={username}
@@ -52,7 +57,7 @@ export default function Login() {
         </label>
 
         <label className="field">
-          <span>Password</span>
+          <span>{t('password')}</span>
           <input
             className="input"
             type="password"
@@ -64,7 +69,7 @@ export default function Login() {
         </label>
 
         <button className="btn primary" style={{ width: '100%' }} disabled={busy}>
-          {busy ? 'Signing in…' : 'Sign in'}
+          {busy ? t('signingIn') : t('signIn')}
         </button>
       </form>
     </div>

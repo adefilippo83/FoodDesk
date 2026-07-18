@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { ApiError, api, type Role, type User } from '../api'
 import { useAuth } from '../auth'
+import { useI18n } from '../i18n'
 
 export default function AdminUsers() {
   const { user: me } = useAuth()
+  const { t } = useI18n()
   const [users, setUsers] = useState<User[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -18,7 +20,7 @@ export default function AdminUsers() {
       setUsers(await api.users())
       setError(null)
     } catch {
-      setError('Could not load staff.')
+      setError(t('errLoadStaff'))
     } finally {
       setLoading(false)
     }
@@ -26,11 +28,12 @@ export default function AdminUsers() {
 
   useEffect(() => {
     void load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function add() {
-    if (!username.trim()) return setError('Username is required.')
-    if (password.length < 8) return setError('Password must be at least 8 characters.')
+    if (!username.trim()) return setError(t('errUsernameRequired'))
+    if (password.length < 8) return setError(t('errPasswordShort'))
     try {
       await api.createUser({
         username: username.trim(),
@@ -46,8 +49,8 @@ export default function AdminUsers() {
     } catch (err) {
       setError(
         err instanceof ApiError && err.code === 'username_taken'
-          ? 'That username is already taken.'
-          : 'Could not create the account.',
+          ? t('errUsernameTaken')
+          : t('errCreateAccount'),
       )
     }
   }
@@ -60,26 +63,26 @@ export default function AdminUsers() {
     } catch (err) {
       setError(
         err instanceof ApiError && err.code === 'last_admin'
-          ? 'This is the last admin — promote someone else first.'
-          : 'Could not update the account.',
+          ? t('errLastAdmin')
+          : t('errUpdateAccount'),
       )
     }
   }
 
-  if (loading) return <div className="empty">Loading…</div>
+  if (loading) return <div className="empty">{t('loading')}</div>
 
   return (
     <>
-      <h1>Staff</h1>
+      <h1>{t('navStaff')}</h1>
       {error && <div className="error">{error}</div>}
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <h2>Add someone</h2>
+        <h2>{t('addSomeone')}</h2>
         <div className="row" style={{ flexWrap: 'wrap' }}>
           <input
             className="input"
             style={{ flex: '1 1 130px', width: 'auto' }}
-            placeholder="username"
+            placeholder={t('usernamePlaceholder')}
             autoCapitalize="none"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
@@ -87,7 +90,7 @@ export default function AdminUsers() {
           <input
             className="input"
             style={{ flex: '1 1 130px', width: 'auto' }}
-            placeholder="Display name"
+            placeholder={t('displayNamePlaceholder')}
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
           />
@@ -95,26 +98,25 @@ export default function AdminUsers() {
             className="input"
             style={{ flex: '1 1 130px', width: 'auto' }}
             type="password"
-            placeholder="password (8+ chars)"
+            placeholder={t('passwordPlaceholder')}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
           <select
             className="input"
-            style={{ flex: '0 1 130px', width: 'auto' }}
+            style={{ flex: '0 1 150px', width: 'auto' }}
             value={role}
             onChange={(e) => setRole(e.target.value as Role)}
           >
-            <option value="operator">Waiter</option>
-            <option value="admin">Admin</option>
+            <option value="operator">{t('optionWaiter')}</option>
+            <option value="admin">{t('optionAdmin')}</option>
           </select>
           <button className="btn primary" onClick={() => void add()}>
-            Add
+            {t('add')}
           </button>
         </div>
         <p className="muted" style={{ fontSize: 13, marginBottom: 0 }}>
-          Waiters can take and view their own orders. Admins can also change the menu, prices and
-          staff.
+          {t('staffHint')}
         </p>
       </div>
 
@@ -122,9 +124,9 @@ export default function AdminUsers() {
         <table>
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Username</th>
-              <th>Role</th>
+              <th>{t('name')}</th>
+              <th>{t('username')}</th>
+              <th>{t('role')}</th>
               <th />
             </tr>
           </thead>
@@ -133,12 +135,12 @@ export default function AdminUsers() {
               <tr key={u.id} className={u.active ? '' : 'inactive'}>
                 <td>
                   {u.displayName}
-                  {u.id === me?.id && <span className="muted"> (you)</span>}
+                  {u.id === me?.id && <span className="muted"> {t('you')}</span>}
                 </td>
                 <td className="muted">{u.username}</td>
                 <td>
                   <span className={`badge ${u.role === 'admin' ? 'admin' : ''}`}>
-                    {u.role === 'admin' ? 'admin' : 'waiter'}
+                    {u.role === 'admin' ? t('roleAdmin') : t('roleWaiter')}
                   </span>
                 </td>
                 <td className="num">
@@ -146,14 +148,14 @@ export default function AdminUsers() {
                     <button
                       className="btn small danger"
                       disabled={u.id === me?.id}
-                      title={u.id === me?.id ? 'You cannot disable your own account' : undefined}
+                      title={u.id === me?.id ? t('cantDisableSelf') : undefined}
                       onClick={() => void setActive(u, false)}
                     >
-                      Disable
+                      {t('disable')}
                     </button>
                   ) : (
                     <button className="btn small" onClick={() => void setActive(u, true)}>
-                      Enable
+                      {t('enable')}
                     </button>
                   )}
                 </td>

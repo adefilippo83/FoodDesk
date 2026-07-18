@@ -1,0 +1,7 @@
+[Unit]
+Description=FoodDesk database backup
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/fooddesk/env
+ExecStart=/opt/fooddesk/deploy/fooddesk-backup.sh

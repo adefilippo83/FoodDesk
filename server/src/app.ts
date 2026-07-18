@@ -9,6 +9,7 @@ import type { Db } from './db/index.js'
 import { authRoutes } from './routes/auth.js'
 import { menuRoutes } from './routes/menu.js'
 import { orderRoutes } from './routes/orders.js'
+import { reportRoutes } from './routes/reports.js'
 import { userRoutes } from './routes/users.js'
 
 const PUBLIC_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../public')
@@ -36,6 +37,7 @@ export async function buildApp(
   await app.register(userRoutes(db))
   await app.register(menuRoutes(db))
   await app.register(orderRoutes(db))
+  await app.register(reportRoutes(db))
 
   // In production the built React app is served from the same origin as the
   // API, so waiters only ever need one address on the venue Wi-Fi.

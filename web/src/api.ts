@@ -44,6 +44,16 @@ export type User = {
   active: boolean
 }
 
+export type DailyReport = {
+  serviceDay: string
+  ordersCount: number
+  revenueCents: number
+  avgOrderCents: number
+  byProduct: { name: string; qty: number; revenueCents: number }[]
+  byCategory: { name: string; qty: number; revenueCents: number }[]
+  byWaiter: { name: string; ordersCount: number; revenueCents: number }[]
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -125,6 +135,15 @@ export const api = {
   receiptUrl: (id: number) => `/api/orders/${id}/receipt.pdf`,
   kitchenPdfUrl: (id: number) => `/api/orders/${id}/kitchen.pdf`,
 
+  reportDays: () =>
+    request<{ serviceDay: string; ordersCount: number; revenueCents: number }[]>(
+      'GET',
+      '/api/reports/days',
+    ),
+  dailyReport: (day?: string) =>
+    request<DailyReport>('GET', day ? `/api/reports/daily?day=${day}` : '/api/reports/daily'),
+  dailyCsvUrl: (day: string) => `/api/reports/daily.csv?day=${day}`,
+
   users: () => request<User[]>('GET', '/api/users'),
   createUser: (input: { username: string; password: string; displayName: string; role: Role }) =>
     request<User>('POST', '/api/users', input),
@@ -134,8 +153,17 @@ export const api = {
   ) => request<User>('PATCH', `/api/users/${id}`, patch),
 }
 
+// Set by the language provider so amounts follow the UI language (12,50 vs 12.50).
+let moneyLocale = 'it-IT'
+export function setMoneyLocale(locale: string) {
+  moneyLocale = locale
+}
+
 export function formatMoney(cents: number): string {
-  return (cents / 100).toFixed(2)
+  return new Intl.NumberFormat(moneyLocale, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(cents / 100)
 }
 
 /** Accepts "12", "12.5", "12,50" — returns cents, or null if unparseable. */

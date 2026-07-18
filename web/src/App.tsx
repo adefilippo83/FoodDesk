@@ -1,10 +1,12 @@
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from './auth'
+import { LangToggle, useI18n } from './i18n'
 import Login from './pages/Login'
 import NewOrder from './pages/NewOrder'
 import Orders from './pages/Orders'
 import AdminMenu from './pages/AdminMenu'
 import AdminUsers from './pages/AdminUsers'
+import Reports from './pages/Reports'
 import type { ReactNode } from 'react'
 
 /**
@@ -18,8 +20,9 @@ function AdminOnly({ children }: { children: ReactNode }) {
 
 export default function App() {
   const { user, loading, logout } = useAuth()
+  const { t } = useI18n()
 
-  if (loading) return <div className="empty">Loading…</div>
+  if (loading) return <div className="empty">{t('loading')}</div>
   if (!user) return <Login />
 
   const isAdmin = user.role === 'admin'
@@ -32,28 +35,32 @@ export default function App() {
         </div>
         <nav className="nav">
           <NavLink to="/" end className={({ isActive }) => (isActive ? 'active' : '')}>
-            New order
+            {t('navNewOrder')}
           </NavLink>
           <NavLink to="/orders" className={({ isActive }) => (isActive ? 'active' : '')}>
-            Orders
+            {t('navOrders')}
           </NavLink>
           {isAdmin && (
             <>
               <NavLink to="/menu" className={({ isActive }) => (isActive ? 'active' : '')}>
-                Menu
+                {t('navMenu')}
               </NavLink>
               <NavLink to="/users" className={({ isActive }) => (isActive ? 'active' : '')}>
-                Staff
+                {t('navStaff')}
+              </NavLink>
+              <NavLink to="/reports" className={({ isActive }) => (isActive ? 'active' : '')}>
+                {t('navReports')}
               </NavLink>
             </>
           )}
         </nav>
         <div className="who">
           <strong>{user.displayName}</strong>
-          {isAdmin ? 'admin' : 'waiter'}
+          {isAdmin ? t('roleAdmin') : t('roleWaiter')}
         </div>
+        <LangToggle />
         <button className="btn small" onClick={() => void logout()}>
-          Sign out
+          {t('signOut')}
         </button>
       </header>
 
@@ -74,6 +81,14 @@ export default function App() {
             element={
               <AdminOnly>
                 <AdminUsers />
+              </AdminOnly>
+            }
+          />
+          <Route
+            path="/reports"
+            element={
+              <AdminOnly>
+                <Reports />
               </AdminOnly>
             }
           />

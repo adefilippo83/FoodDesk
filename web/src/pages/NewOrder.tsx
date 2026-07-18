@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, formatMoney, type MenuCategory } from '../api'
+import { useI18n } from '../i18n'
 
 type Line = { productId: number; name: string; priceCents: number; qty: number }
 
 export default function NewOrder() {
+  const { t } = useI18n()
   const [menu, setMenu] = useState<MenuCategory[] | null>(null)
   const [activeCat, setActiveCat] = useState<number | null>(null)
   const [lines, setLines] = useState<Line[]>([])
@@ -20,19 +22,17 @@ export default function NewOrder() {
         setMenu(m)
         setActiveCat((c) => c ?? m[0]?.id ?? null)
       })
-      .catch(() => setError('Could not load the menu.'))
+      .catch(() => setError(t('errLoadMenu')))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
     if (!toast) return
-    const t = setTimeout(() => setToast(null), 2500)
-    return () => clearTimeout(t)
+    const timer = setTimeout(() => setToast(null), 2500)
+    return () => clearTimeout(timer)
   }, [toast])
 
-  const total = useMemo(
-    () => lines.reduce((sum, l) => sum + l.priceCents * l.qty, 0),
-    [lines],
-  )
+  const total = useMemo(() => lines.reduce((sum, l) => sum + l.priceCents * l.qty, 0), [lines])
 
   function add(product: { id: number; name: string; priceCents: number }) {
     setLines((prev) => {
@@ -69,25 +69,25 @@ export default function NewOrder() {
       setLines([])
       setTableLabel('')
       setNote('')
-      setToast(`Order #${order.dailyNumber} sent`)
+      setToast(t('orderSent', { n: order.dailyNumber }))
     } catch (err) {
       setError(
         err && typeof err === 'object' && 'code' in err && err.code === 'products_unavailable'
-          ? 'Something in this order was just taken off the menu. Refresh and re-add it.'
-          : 'Could not send the order. Check the connection and try again.',
+          ? t('errProductGone')
+          : t('errSendOrder'),
       )
     } finally {
       setSubmitting(false)
     }
   }
 
-  if (!menu) return <div className="empty">Loading menu…</div>
+  if (!menu) return <div className="empty">{t('loadingMenu')}</div>
 
   if (menu.length === 0) {
     return (
       <div className="empty">
-        <p>The menu is empty.</p>
-        <p className="muted">An admin needs to add categories and products first.</p>
+        <p>{t('menuEmpty')}</p>
+        <p className="muted">{t('menuEmptyHint')}</p>
       </div>
     )
   }
@@ -113,7 +113,7 @@ export default function NewOrder() {
           </div>
 
           {current.products.length === 0 ? (
-            <div className="empty">Nothing in {current.name} yet.</div>
+            <div className="empty">{t('nothingInCategory', { name: current.name })}</div>
           ) : (
             <div className="product-grid">
               {current.products.map((p) => (
@@ -127,20 +127,20 @@ export default function NewOrder() {
         </div>
 
         <aside className="card cart">
-          <h2>Order</h2>
+          <h2>{t('cartTitle')}</h2>
 
           <label className="field">
-            <span>Table</span>
+            <span>{t('table')}</span>
             <input
               className="input"
               value={tableLabel}
               onChange={(e) => setTableLabel(e.target.value)}
-              placeholder="e.g. 12 or Bar"
+              placeholder={t('tablePlaceholder')}
             />
           </label>
 
           {lines.length === 0 ? (
-            <p className="muted">Tap a product to add it.</p>
+            <p className="muted">{t('tapToAdd')}</p>
           ) : (
             <div>
               {lines.map((l) => (
@@ -148,7 +148,7 @@ export default function NewOrder() {
                   <div>
                     <div style={{ fontWeight: 600 }}>{l.name}</div>
                     <div className="muted" style={{ fontSize: 13 }}>
-                      €{formatMoney(l.priceCents)} each
+                      €{formatMoney(l.priceCents)} {t('each')}
                     </div>
                   </div>
                   <div className="line-total">€{formatMoney(l.priceCents * l.qty)}</div>
@@ -156,7 +156,7 @@ export default function NewOrder() {
                     <button
                       className="qty-btn"
                       onClick={() => changeQty(l.productId, -1)}
-                      aria-label={`One less ${l.name}`}
+                      aria-label={t('oneLess', { name: l.name })}
                     >
                       −
                     </button>
@@ -164,7 +164,7 @@ export default function NewOrder() {
                     <button
                       className="qty-btn"
                       onClick={() => changeQty(l.productId, 1)}
-                      aria-label={`One more ${l.name}`}
+                      aria-label={t('oneMore', { name: l.name })}
                     >
                       +
                     </button>
@@ -175,17 +175,17 @@ export default function NewOrder() {
           )}
 
           <label className="field" style={{ marginTop: 14 }}>
-            <span>Note for the kitchen</span>
+            <span>{t('kitchenNote')}</span>
             <input
               className="input"
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="e.g. no onion"
+              placeholder={t('kitchenNotePlaceholder')}
             />
           </label>
 
           <div className="cart-total">
-            <span>Total</span>
+            <span>{t('total')}</span>
             <span className="amount">€{formatMoney(total)}</span>
           </div>
 
@@ -196,11 +196,11 @@ export default function NewOrder() {
               disabled={lines.length === 0 || submitting}
               onClick={() => void submit()}
             >
-              {submitting ? 'Sending…' : 'Send order'}
+              {submitting ? t('sending') : t('sendOrder')}
             </button>
             {lines.length > 0 && (
               <button className="btn danger" onClick={() => setLines([])} disabled={submitting}>
-                Clear
+                {t('clear')}
               </button>
             )}
           </div>

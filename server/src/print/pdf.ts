@@ -16,8 +16,17 @@ const INNER_W = PAGE_W - MARGIN * 2
 const RESTAURANT_NAME = process.env.RESTAURANT_NAME ?? 'FoodDesk'
 const CURRENCY = process.env.CURRENCY_SYMBOL ?? '€'
 
+// Printed labels follow PDF_LANG (it|en); Italian venue, Italian default.
+const LABELS = {
+  it: { table: 'Tavolo', order: 'Ordine', total: 'TOTALE', thanks: 'Grazie!' },
+  en: { table: 'Table', order: 'Order', total: 'TOTAL', thanks: 'Thank you!' },
+}
+const LANG = process.env.PDF_LANG === 'en' ? 'en' : 'it'
+const L = LABELS[LANG]
+
 function money(cents: number): string {
-  return `${CURRENCY}${(cents / 100).toFixed(2)}`
+  const amount = (cents / 100).toFixed(2)
+  return `${CURRENCY}${LANG === 'it' ? amount.replace('.', ',') : amount}`
 }
 
 function timeOf(order: Order): string {
@@ -86,7 +95,7 @@ export function renderKitchenTicket(order: Order, items: OrderItem[]): Promise<B
     doc
       .font('Helvetica')
       .fontSize(12)
-      .text(`${order.tableLabel ? `Table ${order.tableLabel}  ·  ` : ''}${timeOf(order)}`, {
+      .text(`${order.tableLabel ? `${L.table} ${order.tableLabel}  ·  ` : ''}${timeOf(order)}`, {
         align: 'center',
       })
 
@@ -114,7 +123,7 @@ export function renderReceipt(order: Order, items: OrderItem[]): Promise<Buffer>
     doc
       .font('Helvetica')
       .fontSize(10)
-      .text(`Order #${ticketNo(order)}${order.tableLabel ? ` · Table ${order.tableLabel}` : ''}`, {
+      .text(`${L.order} #${ticketNo(order)}${order.tableLabel ? ` · ${L.table} ${order.tableLabel}` : ''}`, {
         align: 'center',
       })
       .text(`${order.serviceDay} · ${timeOf(order)}`, { align: 'center' })
@@ -144,11 +153,11 @@ export function renderReceipt(order: Order, items: OrderItem[]): Promise<Buffer>
     dashes(doc)
 
     const y = doc.y
-    doc.font('Helvetica-Bold').fontSize(14).text('TOTAL', MARGIN, y)
+    doc.font('Helvetica-Bold').fontSize(14).text(L.total, MARGIN, y)
     doc.text(money(order.totalCents), MARGIN, y, { width: INNER_W, align: 'right' })
     doc.x = MARGIN
 
     doc.moveDown(0.8)
-    doc.font('Helvetica').fontSize(9).text('Grazie!', { align: 'center' })
+    doc.font('Helvetica').fontSize(9).text(L.thanks, { align: 'center' })
   })
 }

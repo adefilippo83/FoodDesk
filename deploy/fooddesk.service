@@ -1,0 +1,26 @@
+[Unit]
+Description=FoodDesk restaurant ordering server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=fooddesk
+Group=fooddesk
+WorkingDirectory=/opt/fooddesk/server
+EnvironmentFile=/etc/fooddesk/env
+ExecStart=/usr/bin/node /opt/fooddesk/server/dist/index.js
+Restart=always
+RestartSec=2
+
+# The database lives in /var/lib/fooddesk (StateDirectory) — nothing else on
+# the system is writable to the service.
+StateDirectory=fooddesk
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/fooddesk
+
+[Install]
+WantedBy=multi-user.target

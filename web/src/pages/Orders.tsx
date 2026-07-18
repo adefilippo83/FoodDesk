@@ -1,19 +1,21 @@
 import { useEffect, useState } from 'react'
 import { ApiError, api, formatMoney, type OrderDetail, type OrderSummary } from '../api'
 import { useAuth } from '../auth'
+import { useI18n } from '../i18n'
 
 function PrintStatus({ order }: { order: OrderSummary }) {
-  if (order.printedAt) return <span className="badge ok">printed</span>
+  const { t } = useI18n()
+  if (order.printedAt) return <span className="badge ok">{t('badgePrinted')}</span>
   if (order.printError === 'printer_not_configured')
     return (
-      <span className="badge" title="No kitchen printer is configured on the server">
-        no printer
+      <span className="badge" title={t('noPrinterTitle')}>
+        {t('badgeNoPrinter')}
       </span>
     )
   if (order.printError)
     return (
       <span className="badge fail" title={order.printError}>
-        failed
+        {t('badgeFailed')}
       </span>
     )
   return <span className="badge">…</span>
@@ -21,6 +23,7 @@ function PrintStatus({ order }: { order: OrderSummary }) {
 
 export default function Orders() {
   const { user } = useAuth()
+  const { t } = useI18n()
   const [orders, setOrders] = useState<OrderSummary[]>([])
   const [serviceDay, setServiceDay] = useState('')
   const [open, setOpen] = useState<OrderDetail | null>(null)
@@ -36,8 +39,8 @@ export default function Orders() {
     } catch (err) {
       setError(
         err instanceof ApiError && err.code === 'printer_not_configured'
-          ? 'No kitchen printer is configured on the server — open the kitchen PDF and print it from the browser instead.'
-          : 'Reprint failed — check the kitchen printer.',
+          ? t('errNoPrinter')
+          : t('errReprintFailed'),
       )
     } finally {
       setReprinting(null)
@@ -52,7 +55,7 @@ export default function Orders() {
       setServiceDay(res.serviceDay)
       setError(null)
     } catch {
-      setError('Could not load orders.')
+      setError(t('errLoadOrders'))
     } finally {
       setLoading(false)
     }
@@ -61,21 +64,22 @@ export default function Orders() {
   useEffect(() => {
     void load()
     // Someone else's order should appear without a manual refresh.
-    const t = setInterval(() => void load(), 15000)
-    return () => clearInterval(t)
+    const timer = setInterval(() => void load(), 15000)
+    return () => clearInterval(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const dayTotal = orders.reduce((sum, o) => sum + o.totalCents, 0)
 
-  if (loading) return <div className="empty">Loading…</div>
+  if (loading) return <div className="empty">{t('loading')}</div>
 
   return (
     <>
       <div className="row" style={{ marginBottom: 16, alignItems: 'baseline' }}>
-        <h1 style={{ margin: 0 }}>Orders</h1>
+        <h1 style={{ margin: 0 }}>{t('ordersTitle')}</h1>
         <span className="muted" style={{ marginLeft: 'auto' }}>
-          {serviceDay} · {orders.length} order{orders.length === 1 ? '' : 's'} · €
-          {formatMoney(dayTotal)}
+          {serviceDay} · {orders.length}{' '}
+          {orders.length === 1 ? t('orderSingular') : t('orderPlural')} · €{formatMoney(dayTotal)}
         </span>
       </div>
 
@@ -83,23 +87,23 @@ export default function Orders() {
 
       {user?.role !== 'admin' && (
         <p className="muted" style={{ marginTop: 0 }}>
-          Showing the orders you took today.
+          {t('showingOwnOrders')}
         </p>
       )}
 
       {orders.length === 0 ? (
-        <div className="empty">No orders yet today.</div>
+        <div className="empty">{t('noOrdersToday')}</div>
       ) : (
         <div className="card table-scroll">
           <table>
             <thead>
               <tr>
                 <th>#</th>
-                <th>Table</th>
-                <th>Waiter</th>
-                <th>Time</th>
-                <th className="num">Total</th>
-                <th>Kitchen</th>
+                <th>{t('table')}</th>
+                <th>{t('colWaiter')}</th>
+                <th>{t('colTime')}</th>
+                <th className="num">{t('total')}</th>
+                <th>{t('colKitchen')}</th>
                 <th />
               </tr>
             </thead>
@@ -122,11 +126,8 @@ export default function Orders() {
                     <PrintStatus order={o} />
                   </td>
                   <td className="num" style={{ whiteSpace: 'nowrap' }}>
-                    <button
-                      className="btn small"
-                      onClick={() => void api.order(o.id).then(setOpen)}
-                    >
-                      View
+                    <button className="btn small" onClick={() => void api.order(o.id).then(setOpen)}>
+                      {t('view')}
                     </button>{' '}
                     <a
                       className="btn small"
@@ -134,14 +135,18 @@ export default function Orders() {
                       target="_blank"
                       rel="noreferrer"
                     >
-                      Receipt
+                      {t('receipt')}
                     </a>{' '}
                     <button
                       className="btn small"
                       disabled={reprinting === o.id}
                       onClick={() => void reprint(o.id)}
                     >
-                      {reprinting === o.id ? 'Printing…' : o.printedAt ? 'Reprint' : 'Print'}
+                      {reprinting === o.id
+                        ? t('printing')
+                        : o.printedAt
+                          ? t('reprint')
+                          : t('print')}
                     </button>
                   </td>
                 </tr>
@@ -170,8 +175,8 @@ export default function Orders() {
             onClick={(e) => e.stopPropagation()}
           >
             <h2>
-              Order #{String(open.dailyNumber).padStart(3, '0')}
-              {open.tableLabel ? ` · Table ${open.tableLabel}` : ''}
+              #{String(open.dailyNumber).padStart(3, '0')}
+              {open.tableLabel ? ` · ${t('table')} ${open.tableLabel}` : ''}
             </h2>
             <div className="table-scroll">
               <table>
@@ -183,7 +188,11 @@ export default function Orders() {
                       </td>
                       <td>
                         {i.nameSnapshot}
-                        {i.note && <div className="muted" style={{ fontSize: 13 }}>{i.note}</div>}
+                        {i.note && (
+                          <div className="muted" style={{ fontSize: 13 }}>
+                            {i.note}
+                          </div>
+                        )}
                       </td>
                       <td className="num">€{formatMoney(i.priceCentsSnapshot * i.qty)}</td>
                     </tr>
@@ -193,11 +202,11 @@ export default function Orders() {
             </div>
             {open.note && (
               <p className="muted" style={{ marginBottom: 0 }}>
-                Note: {open.note}
+                {t('notePrefix')} {open.note}
               </p>
             )}
             <div className="cart-total">
-              <span>Total</span>
+              <span>{t('total')}</span>
               <span className="amount">€{formatMoney(open.totalCents)}</span>
             </div>
             <div className="row">
@@ -208,7 +217,7 @@ export default function Orders() {
                 target="_blank"
                 rel="noreferrer"
               >
-                Receipt PDF
+                {t('receiptPdf')}
               </a>
               <a
                 className="btn"
@@ -217,10 +226,10 @@ export default function Orders() {
                 target="_blank"
                 rel="noreferrer"
               >
-                Kitchen PDF
+                {t('kitchenPdf')}
               </a>
               <button className="btn" onClick={() => setOpen(null)}>
-                Close
+                {t('close')}
               </button>
             </div>
           </div>

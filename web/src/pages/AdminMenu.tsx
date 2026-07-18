@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { api, formatMoney, parseMoney, type Category, type Product } from '../api'
+import { useI18n } from '../i18n'
 
 export default function AdminMenu() {
+  const { t } = useI18n()
   const [categories, setCategories] = useState<Category[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -22,7 +24,7 @@ export default function AdminMenu() {
       setPCategory((cur) => (cur === '' ? (c.find((x) => x.active)?.id ?? '') : cur))
       setError(null)
     } catch {
-      setError('Could not load the menu.')
+      setError(t('errLoadMenu'))
     } finally {
       setLoading(false)
     }
@@ -30,6 +32,7 @@ export default function AdminMenu() {
 
   useEffect(() => {
     void load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function run(action: () => Promise<unknown>, failure: string) {
@@ -44,19 +47,16 @@ export default function AdminMenu() {
   function commitPrice(productId: number) {
     const cents = parseMoney(editPrice)
     setEditing(null)
-    if (cents === null) return setError('Price must look like 8 or 8.50.')
+    if (cents === null) return setError(t('errPriceFormat'))
     setError(null)
-    void run(
-      () => api.updateProduct(productId, { priceCents: cents }),
-      'Could not update the price.',
-    )
+    void run(() => api.updateProduct(productId, { priceCents: cents }), t('errUpdatePrice'))
   }
 
   function addProduct() {
     const cents = parseMoney(pPrice)
-    if (!pName.trim()) return setError('Give the product a name.')
-    if (cents === null) return setError('Price must look like 8 or 8.50.')
-    if (pCategory === '') return setError('Pick a category.')
+    if (!pName.trim()) return setError(t('errProductName'))
+    if (cents === null) return setError(t('errPriceFormat'))
+    if (pCategory === '') return setError(t('errPickCategory'))
     setError(null)
     void run(
       () =>
@@ -66,56 +66,51 @@ export default function AdminMenu() {
             setPName('')
             setPPrice('')
           }),
-      'Could not add the product.',
+      t('errAddProduct'),
     )
   }
 
-  if (loading) return <div className="empty">Loading…</div>
+  function addCategory() {
+    if (!newCategory.trim()) return
+    void run(
+      () => api.createCategory(newCategory.trim()).then(() => setNewCategory('')),
+      t('errAddCategory'),
+    )
+  }
+
+  if (loading) return <div className="empty">{t('loading')}</div>
 
   return (
     <>
-      <h1>Menu</h1>
+      <h1>{t('navMenu')}</h1>
       {error && <div className="error">{error}</div>}
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <h2>Categories</h2>
+        <h2>{t('categories')}</h2>
         <div className="row" style={{ marginBottom: 14 }}>
           <input
             className="input"
-            placeholder="New category, e.g. Starters"
+            placeholder={t('newCategoryPlaceholder')}
             value={newCategory}
             onChange={(e) => setNewCategory(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key !== 'Enter' || !newCategory.trim()) return
-              void run(
-                () => api.createCategory(newCategory.trim()).then(() => setNewCategory('')),
-                'Could not add the category.',
-              )
+              if (e.key === 'Enter') addCategory()
             }}
           />
-          <button
-            className="btn primary"
-            disabled={!newCategory.trim()}
-            onClick={() =>
-              void run(
-                () => api.createCategory(newCategory.trim()).then(() => setNewCategory('')),
-                'Could not add the category.',
-              )
-            }
-          >
-            Add
+          <button className="btn primary" disabled={!newCategory.trim()} onClick={addCategory}>
+            {t('add')}
           </button>
         </div>
 
         {categories.length === 0 ? (
-          <p className="muted">No categories yet.</p>
+          <p className="muted">{t('noCategories')}</p>
         ) : (
           <div className="table-scroll">
             <table>
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th className="num">Products</th>
+                  <th>{t('name')}</th>
+                  <th className="num">{t('products')}</th>
                   <th />
                 </tr>
               </thead>
@@ -123,7 +118,7 @@ export default function AdminMenu() {
                 {categories.map((c) => (
                   <tr key={c.id} className={c.active ? '' : 'inactive'}>
                     <td>
-                      {c.name} {!c.active && <span className="badge">hidden</span>}
+                      {c.name} {!c.active && <span className="badge">{t('hidden')}</span>}
                     </td>
                     <td className="num">
                       {products.filter((p) => p.categoryId === c.id && p.active).length}
@@ -132,11 +127,9 @@ export default function AdminMenu() {
                       {c.active ? (
                         <button
                           className="btn small danger"
-                          onClick={() =>
-                            void run(() => api.deleteCategory(c.id), 'Could not hide the category.')
-                          }
+                          onClick={() => void run(() => api.deleteCategory(c.id), t('errHideCategory'))}
                         >
-                          Hide
+                          {t('hide')}
                         </button>
                       ) : (
                         <button
@@ -144,11 +137,11 @@ export default function AdminMenu() {
                           onClick={() =>
                             void run(
                               () => api.updateCategory(c.id, { active: true }),
-                              'Could not restore the category.',
+                              t('errRestoreCategory'),
                             )
                           }
                         >
-                          Restore
+                          {t('restore')}
                         </button>
                       )}
                     </td>
@@ -159,26 +152,25 @@ export default function AdminMenu() {
           </div>
         )}
         <p className="muted" style={{ fontSize: 13, marginBottom: 0 }}>
-          Hiding a category also hides its products. Nothing is ever deleted outright, so past
-          orders stay intact.
+          {t('softDeleteHint')}
         </p>
       </div>
 
       <div className="card">
-        <h2>Products</h2>
+        <h2>{t('products')}</h2>
 
         <div className="row" style={{ marginBottom: 14, flexWrap: 'wrap' }}>
           <input
             className="input"
             style={{ flex: '2 1 160px', width: 'auto' }}
-            placeholder="Product name"
+            placeholder={t('productNamePlaceholder')}
             value={pName}
             onChange={(e) => setPName(e.target.value)}
           />
           <input
             className="input"
             style={{ flex: '1 1 90px', width: 'auto' }}
-            placeholder="8.50"
+            placeholder={t('pricePlaceholder')}
             inputMode="decimal"
             value={pPrice}
             onChange={(e) => setPPrice(e.target.value)}
@@ -198,20 +190,20 @@ export default function AdminMenu() {
               ))}
           </select>
           <button className="btn primary" onClick={addProduct}>
-            Add
+            {t('add')}
           </button>
         </div>
 
         {products.length === 0 ? (
-          <p className="muted">No products yet.</p>
+          <p className="muted">{t('noProducts')}</p>
         ) : (
           <div className="table-scroll">
             <table>
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>Category</th>
-                  <th className="num">Price</th>
+                  <th>{t('name')}</th>
+                  <th>{t('category')}</th>
+                  <th className="num">{t('price')}</th>
                   <th />
                 </tr>
               </thead>
@@ -219,7 +211,7 @@ export default function AdminMenu() {
                 {products.map((p) => (
                   <tr key={p.id} className={p.active ? '' : 'inactive'}>
                     <td>
-                      {p.name} {!p.active && <span className="badge">hidden</span>}
+                      {p.name} {!p.active && <span className="badge">{t('hidden')}</span>}
                     </td>
                     <td className="muted">
                       {categories.find((c) => c.id === p.categoryId)?.name ?? '—'}
@@ -242,10 +234,10 @@ export default function AdminMenu() {
                       ) : (
                         <button
                           className="btn small"
-                          title="Tap to change the price"
+                          title={t('tapToChangePrice')}
                           onClick={() => {
                             setEditing(p.id)
-                            setEditPrice(formatMoney(p.priceCents))
+                            setEditPrice((p.priceCents / 100).toFixed(2))
                           }}
                         >
                           €{formatMoney(p.priceCents)}
@@ -256,11 +248,9 @@ export default function AdminMenu() {
                       {p.active ? (
                         <button
                           className="btn small danger"
-                          onClick={() =>
-                            void run(() => api.deleteProduct(p.id), 'Could not remove the product.')
-                          }
+                          onClick={() => void run(() => api.deleteProduct(p.id), t('errRemoveProduct'))}
                         >
-                          Remove
+                          {t('remove')}
                         </button>
                       ) : (
                         <button
@@ -268,11 +258,11 @@ export default function AdminMenu() {
                           onClick={() =>
                             void run(
                               () => api.updateProduct(p.id, { active: true }),
-                              'Could not restore the product.',
+                              t('errRestoreProduct'),
                             )
                           }
                         >
-                          Restore
+                          {t('restore')}
                         </button>
                       )}
                     </td>
