@@ -10,7 +10,10 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: process.env.API_TARGET ?? 'http://localhost:3000',
-        changeOrigin: true,
+        // Deliberately NOT changeOrigin: the server's CSRF guard compares the
+        // Origin header against Host, so the browser's real Host must pass
+        // through. changeOrigin would rewrite it to :3000 and every write
+        // through the dev proxy would be rejected as bad_origin.
       },
     },
   },
