@@ -190,6 +190,16 @@ export function orderRoutes(db: Db) {
           .where(eq(orders.id, id))
           .returning()
       )[0]!
+      req.log.info(
+        {
+          event: 'order_cancelled',
+          by: req.user!.id,
+          orderId: id,
+          dailyNumber: updated.dailyNumber,
+          totalCents: updated.totalCents,
+        },
+        'audit',
+      )
       return updated
     })
 

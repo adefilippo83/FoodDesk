@@ -13,9 +13,59 @@ import { settingsRoutes } from './routes/settings.js';
 import { userRoutes } from './routes/users.js';
 const PUBLIC_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../public');
 export async function buildApp(db, opts = {}) {
-    // bodyLimit: settings uploads carry base64 logo/background images in JSON.
-    const app = Fastify({ logger: opts.logger ?? true, bodyLimit: 3 * 1024 * 1024 });
+    const app = Fastify({
+        logger: opts.logger ?? true,
+        // Orders and menu edits are tiny; the one route that legitimately carries
+        // megabytes (settings image uploads) raises its own limit. Everything else
+        // rejecting large bodies early blunts memory-pressure abuse.
+        bodyLimit: 64 * 1024,
+        // Only the local nginx may speak for the client's address — a LAN client
+        // cannot spoof X-Forwarded-For to dodge the login lockout.
+        trustProxy: '127.0.0.1',
+    });
     await app.register(cookie);
+    const CSP = [
+        "default-src 'self'",
+        "script-src 'self'",
+        // React writes inline style attributes; the print iframe uses an inline <style>.
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' data:",
+        "object-src 'none'",
+        "base-uri 'self'",
+        "frame-ancestors 'self'",
+    ].join('; ');
+    app.addHook('onSend', async (_req, reply) => {
+        reply.header('content-security-policy', CSP);
+        reply.header('x-content-type-options', 'nosniff');
+        reply.header('x-frame-options', 'SAMEORIGIN');
+        reply.header('referrer-policy', 'no-referrer');
+        reply.header('permissions-policy', 'camera=(), microphone=(), geolocation=()');
+    });
+    // Belt-and-braces CSRF guard on top of SameSite=Lax: a state-changing
+    // request whose Origin disagrees with the Host it reached is not ours.
+    // Requests without an Origin header (curl, native clients) pass — CSRF is
+    // a browser-borne attack and browsers always send Origin on those methods.
+    app.addHook('onRequest', async (req, reply) => {
+        if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS')
+            return;
+        const origin = req.headers.origin;
+        if (!origin)
+            return;
+        // URL() drops default ports from .host while the Host header keeps them —
+        // normalize both sides or same-origin requests on port 80/443 would fail.
+        const normalize = (h) => h.replace(/:(80|443)$/, '');
+        let originHost;
+        try {
+            originHost = normalize(new URL(origin).host);
+        }
+        catch {
+            return reply.code(403).send({ error: 'bad_origin' });
+        }
+        if (originHost !== normalize(req.headers.host ?? '')) {
+            req.log.warn({ event: 'origin_mismatch', origin, host: req.headers.host }, 'audit');
+            return reply.code(403).send({ error: 'bad_origin' });
+        }
+    });
     // Attach the session user before any route handler runs. This only
     // identifies the caller; authorization happens in the route guards.
     app.addHook('onRequest', async (req) => {

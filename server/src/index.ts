@@ -21,6 +21,8 @@ migrate(db, {
 const app = await buildApp(db)
 
 await purgeExpiredSessions(db)
+// Keep the session table tidy across a multi-day event, not just at boot.
+setInterval(() => void purgeExpiredSessions(db).catch(() => {}), 60 * 60 * 1000).unref()
 
 const shutdown = async (signal: string) => {
   app.log.info({ signal }, 'shutting down')

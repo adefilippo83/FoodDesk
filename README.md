@@ -53,6 +53,11 @@ Environment variables:
 - **Authorization is server-side** on every route (`src/auth/acl.ts`). The UI hiding
   admin screens is cosmetic; `test/acl.test.ts` is the actual contract.
 - **Passwords use Node's built-in scrypt** — no native module to compile on the server.
+- **Security hardening**: login lockout (5 failures per IP+username → 15 min block),
+  timing-equalized login, session eviction on password change/reset/disable, CSP +
+  security headers, Origin check on writes, 64 KB body limit (3 MB only on settings
+  uploads), image magic-byte validation, and an audit trail in the logs
+  (`grep audit` in `journalctl -u fooddesk`).
 - **The UI is bilingual (it/en)** via a typed dictionary in `web/src/i18n.tsx` — Italian by
   default on Italian browsers, toggle in the top bar, choice saved per device. Money follows
   the language (`28,50` vs `28.50`). PDFs are localized separately via `PDF_LANG`.

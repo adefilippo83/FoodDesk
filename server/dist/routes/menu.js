@@ -175,6 +175,15 @@ export function menuRoutes(db) {
             if (Object.keys(patch).length === 0)
                 return reply.code(400).send({ error: 'nothing_to_update' });
             const updated = (await db.update(products).set(patch).where(eq(products.id, id)).returning())[0];
+            if (patch.priceCents !== undefined && patch.priceCents !== existing.priceCents) {
+                req.log.info({
+                    event: 'price_changed',
+                    by: req.user.id,
+                    productId: id,
+                    from: existing.priceCents,
+                    to: patch.priceCents,
+                }, 'audit');
+            }
             return updated;
         });
         app.delete('/api/products/:id', { preHandler: requireAdmin }, async (req, reply) => {

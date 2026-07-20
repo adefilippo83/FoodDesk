@@ -3,7 +3,7 @@ import type { FastifyInstance } from 'fastify'
 import { requireAdmin } from '../auth/acl.js'
 import type { Db } from '../db/index.js'
 import { hashPassword } from '../auth/password.js'
-import { users, type Role } from '../db/schema.js'
+import { sessions, users, type Role } from '../db/schema.js'
 
 const ROLES: Role[] = ['admin', 'operator']
 
@@ -63,6 +63,10 @@ export function userRoutes(db: Db) {
             active: users.active,
           })
       )[0]!
+      req.log.info(
+        { event: 'user_created', by: req.user!.id, userId: inserted.id, role: inserted.role },
+        'audit',
+      )
       return reply.code(201).send(inserted)
     })
 
@@ -115,6 +119,21 @@ export function userRoutes(db: Db) {
           active: users.active,
         })
       )[0]!
+
+      // A reset password or a disabled account signs the user out everywhere.
+      if (patch.passwordHash !== undefined || patch.active === false) {
+        await db.delete(sessions).where(eq(sessions.userId, id))
+      }
+
+      req.log.info(
+        {
+          event: 'user_updated',
+          by: req.user!.id,
+          userId: id,
+          fields: Object.keys(patch).map((k) => (k === 'passwordHash' ? 'password' : k)),
+        },
+        'audit',
+      )
       return updated
     })
   }

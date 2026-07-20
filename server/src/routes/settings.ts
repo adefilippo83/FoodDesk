@@ -20,15 +20,24 @@ export function settingsRoutes(db: Db) {
 
     app.get('/api/settings', { preHandler: requireAdmin }, async () => loadSettings(db))
 
-    app.put('/api/settings', { preHandler: requireAdmin }, async (req, reply) => {
-      const body = req.body as Record<string, unknown> | undefined
-      if (!body || typeof body !== 'object') {
-        return reply.code(400).send({ error: 'invalid_body' })
-      }
-      const err = await saveSettings(db, body)
-      if (err) return reply.code(400).send({ error: err.error, field: err.field })
-      return loadSettings(db)
-    })
+    // The one route allowed a large body: base64 logo/background uploads.
+    app.put(
+      '/api/settings',
+      { preHandler: requireAdmin, bodyLimit: 3 * 1024 * 1024 },
+      async (req, reply) => {
+        const body = req.body as Record<string, unknown> | undefined
+        if (!body || typeof body !== 'object') {
+          return reply.code(400).send({ error: 'invalid_body' })
+        }
+        const err = await saveSettings(db, body)
+        if (err) return reply.code(400).send({ error: err.error, field: err.field })
+        req.log.info(
+          { event: 'settings_changed', by: req.user!.id, fields: Object.keys(body) },
+          'audit',
+        )
+        return loadSettings(db)
+      },
+    )
 
     /** A sample receipt with the current settings — the admin preview button. */
     app.get('/api/settings/preview.pdf', { preHandler: requireAdmin }, async (req, reply) => {

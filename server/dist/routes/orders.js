@@ -163,6 +163,13 @@ export function orderRoutes(db) {
                 .set({ cancelledAt: Math.floor(Date.now() / 1000), cancelledBy: req.user.id })
                 .where(eq(orders.id, id))
                 .returning())[0];
+            req.log.info({
+                event: 'order_cancelled',
+                by: req.user.id,
+                orderId: id,
+                dailyNumber: updated.dailyNumber,
+                totalCents: updated.totalCents,
+            }, 'audit');
             return updated;
         });
         /** Re-send the kitchen ticket to CUPS — the jam-recovery button. */

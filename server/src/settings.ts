@@ -113,8 +113,15 @@ export async function saveSettings(
     if (typeof v !== 'string' || !DATA_URL_RE.test(v)) {
       return { field: key, error: 'invalid_image' }
     }
-    const bytes = Buffer.byteLength(v.split(',')[1]!, 'base64')
-    if (bytes > MAX_IMAGE_BYTES) return { field: key, error: 'image_too_large' }
+    const buf = Buffer.from(v.split(',')[1]!, 'base64')
+    if (buf.length > MAX_IMAGE_BYTES) return { field: key, error: 'image_too_large' }
+    // The claimed MIME type must match the actual bytes, not just the label.
+    const isPng = buf.length > 8 && buf.readUInt32BE(0) === 0x89504e47
+    const isJpeg = buf.length > 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff
+    const declaredPng = v.startsWith('data:image/png')
+    if ((declaredPng && !isPng) || (!declaredPng && !isJpeg)) {
+      return { field: key, error: 'invalid_image' }
+    }
     writes.push([key, v])
   }
 
