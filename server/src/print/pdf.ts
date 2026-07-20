@@ -1,6 +1,6 @@
 import PDFDocument from 'pdfkit'
 import type { Order, OrderItem } from '../db/schema.js'
-import { imageBuffer, type AppSettings, type PaperSize } from '../settings.js'
+import { imageBuffer, type AppSettings, type PaperSize, type PdfLang } from '../settings.js'
 
 /**
  * All print documents are rendered from the admin-configurable settings:
@@ -31,6 +31,33 @@ const LABELS = {
     thanks: 'Thank you!',
     cancelled: 'CANCELLED',
   },
+  es: {
+    order: 'Pedido',
+    customer: 'Cliente',
+    covers: 'Cubiertos',
+    coverCharge: 'Cubierto',
+    total: 'TOTAL',
+    thanks: '¡Gracias!',
+    cancelled: 'ANULADO',
+  },
+  fr: {
+    order: 'Commande',
+    customer: 'Client',
+    covers: 'Couverts',
+    coverCharge: 'Couvert',
+    total: 'TOTAL',
+    thanks: 'Merci !',
+    cancelled: 'ANNULÉE',
+  },
+  pt: {
+    order: 'Pedido',
+    customer: 'Cliente',
+    covers: 'Couverts',
+    coverCharge: 'Couvert',
+    total: 'TOTAL',
+    thanks: 'Obrigado!',
+    cancelled: 'ANULADO',
+  },
 }
 
 type Dims = { pageW: number; margin: number; innerW: number; fixedH: number | null }
@@ -48,9 +75,10 @@ function dimsFor(paper: PaperSize): Dims {
   }
 }
 
-function money(cents: number, lang: 'it' | 'en'): string {
+function money(cents: number, lang: PdfLang): string {
   const amount = (cents / 100).toFixed(2)
-  return `${CURRENCY} ${lang === 'it' ? amount.replace('.', ',') : amount}`
+  // Every supported language except English writes decimals with a comma.
+  return `${CURRENCY} ${lang === 'en' ? amount : amount.replace('.', ',')}`
 }
 
 function timeOf(order: Order): string {
@@ -90,7 +118,7 @@ function drawBackground(doc: PDFKit.PDFDocument, s: AppSettings, pageW: number, 
 
 function drawCancelledStamp(
   doc: PDFKit.PDFDocument,
-  lang: 'it' | 'en',
+  lang: PdfLang,
   pageW: number,
   pageH: number,
 ) {

@@ -27,6 +27,33 @@ const LABELS = {
         thanks: 'Thank you!',
         cancelled: 'CANCELLED',
     },
+    es: {
+        order: 'Pedido',
+        customer: 'Cliente',
+        covers: 'Cubiertos',
+        coverCharge: 'Cubierto',
+        total: 'TOTAL',
+        thanks: '¡Gracias!',
+        cancelled: 'ANULADO',
+    },
+    fr: {
+        order: 'Commande',
+        customer: 'Client',
+        covers: 'Couverts',
+        coverCharge: 'Couvert',
+        total: 'TOTAL',
+        thanks: 'Merci !',
+        cancelled: 'ANNULÉE',
+    },
+    pt: {
+        order: 'Pedido',
+        customer: 'Cliente',
+        covers: 'Couverts',
+        coverCharge: 'Couvert',
+        total: 'TOTAL',
+        thanks: 'Obrigado!',
+        cancelled: 'ANULADO',
+    },
 };
 function dimsFor(paper) {
     switch (paper) {
@@ -42,7 +69,8 @@ function dimsFor(paper) {
 }
 function money(cents, lang) {
     const amount = (cents / 100).toFixed(2);
-    return `${CURRENCY} ${lang === 'it' ? amount.replace('.', ',') : amount}`;
+    // Every supported language except English writes decimals with a comma.
+    return `${CURRENCY} ${lang === 'en' ? amount : amount.replace('.', ',')}`;
 }
 function timeOf(order) {
     return new Date(order.createdAt * 1000).toLocaleTimeString('it-IT', {

@@ -494,6 +494,15 @@ a.btn {
   text-decoration: none;
 }
 
+/* Compact language picker in the top bar */
+.lang-select {
+  width: auto;
+  min-height: 36px;
+  padding: 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 /* ---------- drag reorder ---------- */
 
 .drag-handle {

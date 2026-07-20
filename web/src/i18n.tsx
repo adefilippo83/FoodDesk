@@ -379,16 +379,566 @@ const it: typeof en = {
   downloadPdf: 'Scarica PDF',
 }
 
-export type Lang = 'en' | 'it'
+
+const es: typeof en = {
+  navNewOrder: 'Nuevo pedido',
+  navOrders: 'Pedidos',
+  navMenu: 'Menú',
+  navStaff: 'Personal',
+  navReports: 'Informes',
+  roleAdmin: 'admin',
+  roleWaiter: 'camarero',
+  signOut: 'Salir',
+  loading: 'Cargando…',
+
+  loginTagline: 'Inicia sesión para tomar pedidos.',
+  username: 'Usuario',
+  password: 'Contraseña',
+  signIn: 'Entrar',
+  signingIn: 'Entrando…',
+  errWrongCredentials: 'Usuario o contraseña incorrectos.',
+  errServerUnreachable: 'No se puede conectar con el servidor. Comprueba la conexión Wi-Fi.',
+
+  loadingMenu: 'Cargando menú…',
+  errLoadMenu: 'No se pudo cargar el menú.',
+  menuEmpty: 'El menú está vacío.',
+  menuEmptyHint: 'Un administrador debe añadir primero categorías y productos.',
+  nothingInCategory: 'Todavía no hay nada en {name}.',
+  cartTitle: 'Pedido',
+  table: 'Mesa',
+  tablePlaceholder: 'p. ej. 12 o Barra',
+  tapToAdd: 'Toca un producto para añadirlo.',
+  each: 'c/u',
+  kitchenNote: 'Nota para la cocina',
+  kitchenNotePlaceholder: 'p. ej. sin cebolla',
+  total: 'Total',
+  sendOrder: 'Enviar pedido',
+  sending: 'Enviando…',
+  clear: 'Vaciar',
+  orderSent: 'Pedido #{n} enviado',
+  errProductGone: 'Un producto de este pedido acaba de quitarse del menú. Actualiza y añádelo de nuevo.',
+  errSendOrder: 'No se pudo enviar el pedido. Comprueba la conexión e inténtalo de nuevo.',
+  oneMore: 'Añadir un {name}',
+  oneLess: 'Quitar un {name}',
+
+  ordersTitle: 'Pedidos',
+  orderSingular: 'pedido',
+  orderPlural: 'pedidos',
+  showingOwnOrders: 'Estos son los pedidos que has tomado hoy.',
+  noOrdersToday: 'Todavía no hay pedidos hoy.',
+  errLoadOrders: 'No se pudieron cargar los pedidos.',
+  colWaiter: 'Camarero',
+  colTime: 'Hora',
+  colKitchen: 'Cocina',
+  view: 'Ver',
+  receipt: 'Recibo',
+  print: 'Imprimir',
+  reprint: 'Reimprimir',
+  printing: 'Imprimiendo…',
+  badgePrinted: 'impreso',
+  badgeFailed: 'error',
+  badgeNoPrinter: 'sin impresora',
+  noPrinterTitle: 'No hay impresora de cocina configurada en el servidor',
+  errNoPrinter:
+    'No hay impresora de cocina configurada en el servidor — abre el PDF de cocina e imprímelo desde el navegador.',
+  errReprintFailed: 'La reimpresión falló — revisa la impresora de la cocina.',
+  notePrefix: 'Nota:',
+  receiptPdf: 'PDF recibo',
+  kitchenPdf: 'PDF cocina',
+  close: 'Cerrar',
+
+  categories: 'Categorías',
+  newCategoryPlaceholder: 'Nueva categoría, p. ej. Entrantes',
+  add: 'Añadir',
+  noCategories: 'No hay categorías.',
+  name: 'Nombre',
+  products: 'Productos',
+  hidden: 'oculto',
+  hide: 'Ocultar',
+  restore: 'Restaurar',
+  softDeleteHint:
+    'Ocultar una categoría también oculta sus productos. Nada se elimina del todo: los pedidos pasados se conservan.',
+  productNamePlaceholder: 'Nombre del producto',
+  pricePlaceholder: '8,50',
+  remove: 'Quitar',
+  noProducts: 'No hay productos.',
+  category: 'Categoría',
+  price: 'Precio',
+  tapToChangePrice: 'Toca para cambiar el precio',
+  errProductName: 'Ponle un nombre al producto.',
+  errPriceFormat: 'El precio debe ser como 8 u 8,50.',
+  errPickCategory: 'Elige una categoría.',
+  errAddProduct: 'No se pudo añadir el producto.',
+  errAddCategory: 'No se pudo añadir la categoría.',
+  errHideCategory: 'No se pudo ocultar la categoría.',
+  errRestoreCategory: 'No se pudo restaurar la categoría.',
+  errUpdatePrice: 'No se pudo actualizar el precio.',
+  errRemoveProduct: 'No se pudo quitar el producto.',
+  errRestoreProduct: 'No se pudo restaurar el producto.',
+
+  addSomeone: 'Añadir a alguien',
+  usernamePlaceholder: 'usuario',
+  displayNamePlaceholder: 'Nombre visible',
+  passwordPlaceholder: 'contraseña (mín. 8 caracteres)',
+  optionWaiter: 'Camarero',
+  optionAdmin: 'Administrador',
+  staffHint:
+    'Los camareros pueden tomar y ver sus propios pedidos. Los administradores también pueden cambiar el menú, los precios y el personal.',
+  role: 'Rol',
+  you: '(tú)',
+  disable: 'Desactivar',
+  enable: 'Activar',
+  cantDisableSelf: 'No puedes desactivar tu propia cuenta',
+  errLastAdmin: 'Es el último administrador — asciende antes a otra persona.',
+  errUsernameTaken: 'Ese usuario ya existe.',
+  errCreateAccount: 'No se pudo crear la cuenta.',
+  errUpdateAccount: 'No se pudo actualizar la cuenta.',
+  errLoadStaff: 'No se pudo cargar el personal.',
+  errUsernameRequired: 'El usuario es obligatorio.',
+  errPasswordShort: 'La contraseña debe tener al menos 8 caracteres.',
+
+  noReportsYet: 'Todavía no hay pedidos — los informes aparecen tras la primera venta.',
+  downloadCsv: 'Descargar CSV',
+  revenue: 'Ingresos',
+  avgOrder: 'Pedido medio',
+  byProduct: 'Por producto',
+  byCategory: 'Por categoría',
+  byWaiter: 'Por camarero',
+  qty: 'Cant.',
+  nothingSold: 'Sin ventas.',
+  errLoadReportDays: 'No se pudieron cargar los días.',
+  errLoadReport: 'No se pudo cargar el informe.',
+
+  customer: 'Cliente',
+  customerPlaceholder: 'p. ej. Mario',
+  errCustomerRequired: 'Introduce el nombre del cliente.',
+  covers: 'Cubiertos',
+  coverCharge: 'Cubierto',
+
+  cancelOrder: 'Anular pedido',
+  confirmCancel: '¿Seguro?',
+  cancelledBadge: 'anulado',
+  errCancelOrder: 'No se pudo anular el pedido.',
+
+  changePassword: 'Cambiar contraseña',
+  currentPassword: 'Contraseña actual',
+  newPassword: 'Nueva contraseña (mín. 8 caracteres)',
+  passwordChanged: 'Contraseña cambiada',
+  errWrongCurrentPassword: 'La contraseña actual es incorrecta.',
+  errChangePassword: 'No se pudo cambiar la contraseña.',
+  save: 'Guardar',
+  cancel: 'Cancelar',
+  resetPassword: 'Restablecer contraseña',
+  passwordReset: 'Contraseña actualizada',
+
+  dragToReorder: 'Arrastra ≡ para reordenar. El orden aquí es el que ven los camareros.',
+  errReorder: 'No se pudo guardar el nuevo orden.',
+  errMoveProduct: 'No se pudo mover el producto.',
+
+  navSettings: 'Ajustes',
+  settingsGeneral: 'General',
+  settingsPrint: 'Impresión y diseño',
+  coverChargeAmount: 'Cubierto (por persona)',
+  paperSize: 'Tamaño de papel',
+  paperRoll80: 'Rollo 80mm (térmica)',
+  pdfLangLabel: 'Idioma del recibo',
+  headerTextLabel: 'Encabezado del recibo',
+  footerTextLabel: 'Pie del recibo',
+  logoLabel: 'Logo',
+  backgroundLabel: 'Fondo (marca de agua)',
+  uploadImage: 'Subir imagen…',
+  removeImage: 'Quitar',
+  previewReceipt: 'Vista previa del recibo',
+  settingsSaved: 'Ajustes guardados',
+  errSaveSettings: 'No se pudieron guardar los ajustes.',
+  errImageTooLarge: 'Imagen demasiado grande (máx. 700 KB, PNG o JPEG).',
+
+  coversStat: 'Cubiertos',
+  avgPerCover: 'Media por cubierto',
+  cancelledStat: 'Anulados',
+  downloadPdf: 'Descargar PDF',
+}
+
+const fr: typeof en = {
+  navNewOrder: 'Nouvelle commande',
+  navOrders: 'Commandes',
+  navMenu: 'Menu',
+  navStaff: 'Équipe',
+  navReports: 'Rapports',
+  roleAdmin: 'admin',
+  roleWaiter: 'serveur',
+  signOut: 'Se déconnecter',
+  loading: 'Chargement…',
+
+  loginTagline: 'Connectez-vous pour prendre les commandes.',
+  username: 'Nom d’utilisateur',
+  password: 'Mot de passe',
+  signIn: 'Se connecter',
+  signingIn: 'Connexion…',
+  errWrongCredentials: 'Nom d’utilisateur ou mot de passe incorrect.',
+  errServerUnreachable: 'Impossible de joindre le serveur. Vérifiez la connexion Wi-Fi.',
+
+  loadingMenu: 'Chargement du menu…',
+  errLoadMenu: 'Impossible de charger le menu.',
+  menuEmpty: 'Le menu est vide.',
+  menuEmptyHint: 'Un administrateur doit d’abord ajouter des catégories et des produits.',
+  nothingInCategory: 'Rien dans {name} pour le moment.',
+  cartTitle: 'Commande',
+  table: 'Table',
+  tablePlaceholder: 'ex. 12 ou Bar',
+  tapToAdd: 'Touchez un produit pour l’ajouter.',
+  each: 'l’unité',
+  kitchenNote: 'Note pour la cuisine',
+  kitchenNotePlaceholder: 'ex. sans oignon',
+  total: 'Total',
+  sendOrder: 'Envoyer la commande',
+  sending: 'Envoi…',
+  clear: 'Vider',
+  orderSent: 'Commande n°{n} envoyée',
+  errProductGone:
+    'Un produit de cette commande vient d’être retiré du menu. Actualisez et ajoutez-le à nouveau.',
+  errSendOrder: 'Impossible d’envoyer la commande. Vérifiez la connexion et réessayez.',
+  oneMore: 'Un {name} de plus',
+  oneLess: 'Un {name} de moins',
+
+  ordersTitle: 'Commandes',
+  orderSingular: 'commande',
+  orderPlural: 'commandes',
+  showingOwnOrders: 'Voici les commandes que vous avez prises aujourd’hui.',
+  noOrdersToday: 'Pas encore de commandes aujourd’hui.',
+  errLoadOrders: 'Impossible de charger les commandes.',
+  colWaiter: 'Serveur',
+  colTime: 'Heure',
+  colKitchen: 'Cuisine',
+  view: 'Voir',
+  receipt: 'Ticket',
+  print: 'Imprimer',
+  reprint: 'Réimprimer',
+  printing: 'Impression…',
+  badgePrinted: 'imprimé',
+  badgeFailed: 'erreur',
+  badgeNoPrinter: 'sans imprimante',
+  noPrinterTitle: 'Aucune imprimante de cuisine n’est configurée sur le serveur',
+  errNoPrinter:
+    'Aucune imprimante de cuisine configurée sur le serveur — ouvrez le PDF cuisine et imprimez-le depuis le navigateur.',
+  errReprintFailed: 'Échec de la réimpression — vérifiez l’imprimante de la cuisine.',
+  notePrefix: 'Note :',
+  receiptPdf: 'PDF ticket',
+  kitchenPdf: 'PDF cuisine',
+  close: 'Fermer',
+
+  categories: 'Catégories',
+  newCategoryPlaceholder: 'Nouvelle catégorie, ex. Entrées',
+  add: 'Ajouter',
+  noCategories: 'Aucune catégorie.',
+  name: 'Nom',
+  products: 'Produits',
+  hidden: 'masqué',
+  hide: 'Masquer',
+  restore: 'Rétablir',
+  softDeleteHint:
+    'Masquer une catégorie masque aussi ses produits. Rien n’est jamais supprimé : les commandes passées restent intactes.',
+  productNamePlaceholder: 'Nom du produit',
+  pricePlaceholder: '8,50',
+  remove: 'Retirer',
+  noProducts: 'Aucun produit.',
+  category: 'Catégorie',
+  price: 'Prix',
+  tapToChangePrice: 'Touchez pour changer le prix',
+  errProductName: 'Donnez un nom au produit.',
+  errPriceFormat: 'Le prix doit ressembler à 8 ou 8,50.',
+  errPickCategory: 'Choisissez une catégorie.',
+  errAddProduct: 'Impossible d’ajouter le produit.',
+  errAddCategory: 'Impossible d’ajouter la catégorie.',
+  errHideCategory: 'Impossible de masquer la catégorie.',
+  errRestoreCategory: 'Impossible de rétablir la catégorie.',
+  errUpdatePrice: 'Impossible de mettre à jour le prix.',
+  errRemoveProduct: 'Impossible de retirer le produit.',
+  errRestoreProduct: 'Impossible de rétablir le produit.',
+
+  addSomeone: 'Ajouter quelqu’un',
+  usernamePlaceholder: 'nom d’utilisateur',
+  displayNamePlaceholder: 'Nom affiché',
+  passwordPlaceholder: 'mot de passe (min. 8 caractères)',
+  optionWaiter: 'Serveur',
+  optionAdmin: 'Administrateur',
+  staffHint:
+    'Les serveurs peuvent prendre et voir leurs propres commandes. Les administrateurs peuvent aussi modifier le menu, les prix et l’équipe.',
+  role: 'Rôle',
+  you: '(vous)',
+  disable: 'Désactiver',
+  enable: 'Activer',
+  cantDisableSelf: 'Vous ne pouvez pas désactiver votre propre compte',
+  errLastAdmin: 'C’est le dernier administrateur — promouvez d’abord quelqu’un d’autre.',
+  errUsernameTaken: 'Ce nom d’utilisateur est déjà pris.',
+  errCreateAccount: 'Impossible de créer le compte.',
+  errUpdateAccount: 'Impossible de mettre à jour le compte.',
+  errLoadStaff: 'Impossible de charger l’équipe.',
+  errUsernameRequired: 'Le nom d’utilisateur est obligatoire.',
+  errPasswordShort: 'Le mot de passe doit contenir au moins 8 caractères.',
+
+  noReportsYet: 'Pas encore de commandes — les rapports apparaissent après la première vente.',
+  downloadCsv: 'Télécharger le CSV',
+  revenue: 'Recettes',
+  avgOrder: 'Commande moyenne',
+  byProduct: 'Par produit',
+  byCategory: 'Par catégorie',
+  byWaiter: 'Par serveur',
+  qty: 'Qté',
+  nothingSold: 'Aucune vente.',
+  errLoadReportDays: 'Impossible de charger les jours.',
+  errLoadReport: 'Impossible de charger le rapport.',
+
+  customer: 'Client',
+  customerPlaceholder: 'ex. Mario',
+  errCustomerRequired: 'Saisissez le nom du client.',
+  covers: 'Couverts',
+  coverCharge: 'Couvert',
+
+  cancelOrder: 'Annuler la commande',
+  confirmCancel: 'Sûr ?',
+  cancelledBadge: 'annulée',
+  errCancelOrder: 'Impossible d’annuler la commande.',
+
+  changePassword: 'Changer le mot de passe',
+  currentPassword: 'Mot de passe actuel',
+  newPassword: 'Nouveau mot de passe (min. 8 caractères)',
+  passwordChanged: 'Mot de passe changé',
+  errWrongCurrentPassword: 'Le mot de passe actuel est incorrect.',
+  errChangePassword: 'Impossible de changer le mot de passe.',
+  save: 'Enregistrer',
+  cancel: 'Annuler',
+  resetPassword: 'Réinitialiser le mot de passe',
+  passwordReset: 'Mot de passe mis à jour',
+
+  dragToReorder: 'Faites glisser ≡ pour réordonner. L’ordre ici est celui que voient les serveurs.',
+  errReorder: 'Impossible d’enregistrer le nouvel ordre.',
+  errMoveProduct: 'Impossible de déplacer le produit.',
+
+  navSettings: 'Réglages',
+  settingsGeneral: 'Général',
+  settingsPrint: 'Impression et mise en page',
+  coverChargeAmount: 'Couvert (par personne)',
+  paperSize: 'Format de papier',
+  paperRoll80: 'Rouleau 80 mm (thermique)',
+  pdfLangLabel: 'Langue du ticket',
+  headerTextLabel: 'En-tête du ticket',
+  footerTextLabel: 'Pied de page du ticket',
+  logoLabel: 'Logo',
+  backgroundLabel: 'Arrière-plan (filigrane)',
+  uploadImage: 'Téléverser une image…',
+  removeImage: 'Retirer',
+  previewReceipt: 'Aperçu du ticket',
+  settingsSaved: 'Réglages enregistrés',
+  errSaveSettings: 'Impossible d’enregistrer les réglages.',
+  errImageTooLarge: 'Image trop lourde (max. 700 Ko, PNG ou JPEG).',
+
+  coversStat: 'Couverts',
+  avgPerCover: 'Moyenne par couvert',
+  cancelledStat: 'Annulées',
+  downloadPdf: 'Télécharger le PDF',
+}
+
+const pt: typeof en = {
+  navNewOrder: 'Novo pedido',
+  navOrders: 'Pedidos',
+  navMenu: 'Menu',
+  navStaff: 'Equipa',
+  navReports: 'Relatórios',
+  roleAdmin: 'admin',
+  roleWaiter: 'empregado',
+  signOut: 'Sair',
+  loading: 'A carregar…',
+
+  loginTagline: 'Inicie sessão para registar pedidos.',
+  username: 'Utilizador',
+  password: 'Palavra-passe',
+  signIn: 'Entrar',
+  signingIn: 'A entrar…',
+  errWrongCredentials: 'Utilizador ou palavra-passe errados.',
+  errServerUnreachable: 'Não foi possível contactar o servidor. Verifique a ligação Wi-Fi.',
+
+  loadingMenu: 'A carregar o menu…',
+  errLoadMenu: 'Não foi possível carregar o menu.',
+  menuEmpty: 'O menu está vazio.',
+  menuEmptyHint: 'Um administrador tem de adicionar primeiro categorias e produtos.',
+  nothingInCategory: 'Ainda não há nada em {name}.',
+  cartTitle: 'Pedido',
+  table: 'Mesa',
+  tablePlaceholder: 'ex. 12 ou Balcão',
+  tapToAdd: 'Toque num produto para o adicionar.',
+  each: 'cada',
+  kitchenNote: 'Nota para a cozinha',
+  kitchenNotePlaceholder: 'ex. sem cebola',
+  total: 'Total',
+  sendOrder: 'Enviar pedido',
+  sending: 'A enviar…',
+  clear: 'Esvaziar',
+  orderSent: 'Pedido #{n} enviado',
+  errProductGone:
+    'Um produto deste pedido acabou de sair do menu. Atualize e adicione-o de novo.',
+  errSendOrder: 'Não foi possível enviar o pedido. Verifique a ligação e tente novamente.',
+  oneMore: 'Mais um {name}',
+  oneLess: 'Menos um {name}',
+
+  ordersTitle: 'Pedidos',
+  orderSingular: 'pedido',
+  orderPlural: 'pedidos',
+  showingOwnOrders: 'Estes são os pedidos que registou hoje.',
+  noOrdersToday: 'Ainda não há pedidos hoje.',
+  errLoadOrders: 'Não foi possível carregar os pedidos.',
+  colWaiter: 'Empregado',
+  colTime: 'Hora',
+  colKitchen: 'Cozinha',
+  view: 'Ver',
+  receipt: 'Recibo',
+  print: 'Imprimir',
+  reprint: 'Reimprimir',
+  printing: 'A imprimir…',
+  badgePrinted: 'impresso',
+  badgeFailed: 'erro',
+  badgeNoPrinter: 'sem impressora',
+  noPrinterTitle: 'Não há impressora de cozinha configurada no servidor',
+  errNoPrinter:
+    'Não há impressora de cozinha configurada no servidor — abra o PDF da cozinha e imprima-o no navegador.',
+  errReprintFailed: 'A reimpressão falhou — verifique a impressora da cozinha.',
+  notePrefix: 'Nota:',
+  receiptPdf: 'PDF recibo',
+  kitchenPdf: 'PDF cozinha',
+  close: 'Fechar',
+
+  categories: 'Categorias',
+  newCategoryPlaceholder: 'Nova categoria, ex. Entradas',
+  add: 'Adicionar',
+  noCategories: 'Sem categorias.',
+  name: 'Nome',
+  products: 'Produtos',
+  hidden: 'oculto',
+  hide: 'Ocultar',
+  restore: 'Repor',
+  softDeleteHint:
+    'Ocultar uma categoria também oculta os seus produtos. Nada é apagado de vez: os pedidos antigos ficam intactos.',
+  productNamePlaceholder: 'Nome do produto',
+  pricePlaceholder: '8,50',
+  remove: 'Remover',
+  noProducts: 'Sem produtos.',
+  category: 'Categoria',
+  price: 'Preço',
+  tapToChangePrice: 'Toque para alterar o preço',
+  errProductName: 'Dê um nome ao produto.',
+  errPriceFormat: 'O preço deve ser tipo 8 ou 8,50.',
+  errPickCategory: 'Escolha uma categoria.',
+  errAddProduct: 'Não foi possível adicionar o produto.',
+  errAddCategory: 'Não foi possível adicionar a categoria.',
+  errHideCategory: 'Não foi possível ocultar a categoria.',
+  errRestoreCategory: 'Não foi possível repor a categoria.',
+  errUpdatePrice: 'Não foi possível atualizar o preço.',
+  errRemoveProduct: 'Não foi possível remover o produto.',
+  errRestoreProduct: 'Não foi possível repor o produto.',
+
+  addSomeone: 'Adicionar alguém',
+  usernamePlaceholder: 'utilizador',
+  displayNamePlaceholder: 'Nome apresentado',
+  passwordPlaceholder: 'palavra-passe (mín. 8 caracteres)',
+  optionWaiter: 'Empregado',
+  optionAdmin: 'Administrador',
+  staffHint:
+    'Os empregados podem registar e ver os seus próprios pedidos. Os administradores também podem alterar o menu, os preços e a equipa.',
+  role: 'Função',
+  you: '(você)',
+  disable: 'Desativar',
+  enable: 'Ativar',
+  cantDisableSelf: 'Não pode desativar a sua própria conta',
+  errLastAdmin: 'É o último administrador — promova primeiro outra pessoa.',
+  errUsernameTaken: 'Esse utilizador já existe.',
+  errCreateAccount: 'Não foi possível criar a conta.',
+  errUpdateAccount: 'Não foi possível atualizar a conta.',
+  errLoadStaff: 'Não foi possível carregar a equipa.',
+  errUsernameRequired: 'O utilizador é obrigatório.',
+  errPasswordShort: 'A palavra-passe deve ter pelo menos 8 caracteres.',
+
+  noReportsYet: 'Ainda não há pedidos — os relatórios aparecem após a primeira venda.',
+  downloadCsv: 'Transferir CSV',
+  revenue: 'Receita',
+  avgOrder: 'Pedido médio',
+  byProduct: 'Por produto',
+  byCategory: 'Por categoria',
+  byWaiter: 'Por empregado',
+  qty: 'Qtd.',
+  nothingSold: 'Sem vendas.',
+  errLoadReportDays: 'Não foi possível carregar os dias.',
+  errLoadReport: 'Não foi possível carregar o relatório.',
+
+  customer: 'Cliente',
+  customerPlaceholder: 'ex. Mario',
+  errCustomerRequired: 'Indique o nome do cliente.',
+  covers: 'Couverts',
+  coverCharge: 'Couvert',
+
+  cancelOrder: 'Anular pedido',
+  confirmCancel: 'De certeza?',
+  cancelledBadge: 'anulado',
+  errCancelOrder: 'Não foi possível anular o pedido.',
+
+  changePassword: 'Alterar palavra-passe',
+  currentPassword: 'Palavra-passe atual',
+  newPassword: 'Nova palavra-passe (mín. 8 caracteres)',
+  passwordChanged: 'Palavra-passe alterada',
+  errWrongCurrentPassword: 'A palavra-passe atual está errada.',
+  errChangePassword: 'Não foi possível alterar a palavra-passe.',
+  save: 'Guardar',
+  cancel: 'Cancelar',
+  resetPassword: 'Repor palavra-passe',
+  passwordReset: 'Palavra-passe atualizada',
+
+  dragToReorder: 'Arraste ≡ para reordenar. A ordem aqui é a que os empregados veem.',
+  errReorder: 'Não foi possível guardar a nova ordem.',
+  errMoveProduct: 'Não foi possível mover o produto.',
+
+  navSettings: 'Definições',
+  settingsGeneral: 'Geral',
+  settingsPrint: 'Impressão e layout',
+  coverChargeAmount: 'Couvert (por pessoa)',
+  paperSize: 'Tamanho do papel',
+  paperRoll80: 'Rolo 80mm (térmica)',
+  pdfLangLabel: 'Idioma do recibo',
+  headerTextLabel: 'Cabeçalho do recibo',
+  footerTextLabel: 'Rodapé do recibo',
+  logoLabel: 'Logótipo',
+  backgroundLabel: 'Fundo (marca de água)',
+  uploadImage: 'Carregar imagem…',
+  removeImage: 'Remover',
+  previewReceipt: 'Pré-visualizar recibo',
+  settingsSaved: 'Definições guardadas',
+  errSaveSettings: 'Não foi possível guardar as definições.',
+  errImageTooLarge: 'Imagem demasiado grande (máx. 700 KB, PNG ou JPEG).',
+
+  coversStat: 'Couverts',
+  avgPerCover: 'Média por couvert',
+  cancelledStat: 'Anulados',
+  downloadPdf: 'Transferir PDF',
+}
+
+export type Lang = 'en' | 'it' | 'es' | 'fr' | 'pt'
 export type StringKey = keyof typeof en
-const dictionaries: Record<Lang, typeof en> = { en, it }
+const dictionaries: Record<Lang, typeof en> = { en, it, es, fr, pt }
+
+export const LANGS: Lang[] = ['it', 'en', 'es', 'fr', 'pt']
+const LOCALES: Record<Lang, string> = {
+  it: 'it-IT',
+  en: 'en-GB',
+  es: 'es-ES',
+  fr: 'fr-FR',
+  pt: 'pt-PT',
+}
 
 const STORAGE_KEY = 'fd_lang'
 
 function initialLang(): Lang {
   const stored = localStorage.getItem(STORAGE_KEY)
-  if (stored === 'en' || stored === 'it') return stored
-  return navigator.language.toLowerCase().startsWith('it') ? 'it' : 'en'
+  if (stored && (LANGS as string[]).includes(stored)) return stored as Lang
+  const browser = navigator.language.toLowerCase().slice(0, 2)
+  return (LANGS as string[]).includes(browser) ? (browser as Lang) : 'en'
 }
 
 type I18n = {
@@ -402,13 +952,13 @@ const I18nContext = createContext<I18n | null>(null)
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>(() => {
     const l = initialLang()
-    setMoneyLocale(l === 'it' ? 'it-IT' : 'en-GB')
+    setMoneyLocale(LOCALES[l])
     return l
   })
 
   const setLang = useCallback((l: Lang) => {
     localStorage.setItem(STORAGE_KEY, l)
-    setMoneyLocale(l === 'it' ? 'it-IT' : 'en-GB')
+    setMoneyLocale(LOCALES[l])
     setLangState(l)
   }, [])
 
@@ -430,17 +980,21 @@ export function useI18n(): I18n {
   return ctx
 }
 
-/** Compact IT/EN switch, shown in the top bar and on the login screen. */
+/** Compact language picker, shown in the top bar and on the login screen. */
 export function LangToggle() {
   const { lang, setLang } = useI18n()
-  const other: Lang = lang === 'it' ? 'en' : 'it'
   return (
-    <button
-      className="btn small lang-toggle"
-      onClick={() => setLang(other)}
-      title={other === 'it' ? 'Passa all’italiano' : 'Switch to English'}
+    <select
+      className="input lang-select"
+      aria-label="Language"
+      value={lang}
+      onChange={(e) => setLang(e.target.value as Lang)}
     >
-      {other.toUpperCase()}
-    </button>
+      {LANGS.map((l) => (
+        <option key={l} value={l}>
+          {l.toUpperCase()}
+        </option>
+      ))}
+    </select>
   )
 }

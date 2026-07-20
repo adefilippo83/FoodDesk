@@ -51,7 +51,7 @@ export type AppSettings = {
   restaurantName: string
   coverChargeCents: number
   paperSize: PaperSize
-  pdfLang: 'it' | 'en'
+  pdfLang: 'it' | 'en' | 'es' | 'fr' | 'pt'
   headerText: string
   footerText: string
   logoImage: string

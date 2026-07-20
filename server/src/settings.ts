@@ -11,11 +11,14 @@ import { settings } from './db/schema.js'
 export const PAPER_SIZES = ['roll80', 'a5', 'a4', 'letter'] as const
 export type PaperSize = (typeof PAPER_SIZES)[number]
 
+export const PDF_LANGS = ['it', 'en', 'es', 'fr', 'pt'] as const
+export type PdfLang = (typeof PDF_LANGS)[number]
+
 export type AppSettings = {
   restaurantName: string
   coverChargeCents: number
   paperSize: PaperSize
-  pdfLang: 'it' | 'en'
+  pdfLang: PdfLang
   headerText: string
   footerText: string
   /** data: URLs (image/png or image/jpeg), empty string = none */
@@ -27,7 +30,9 @@ const DEFAULTS: AppSettings = {
   restaurantName: process.env.RESTAURANT_NAME ?? 'FoodDesk',
   coverChargeCents: 0,
   paperSize: 'roll80',
-  pdfLang: process.env.PDF_LANG === 'en' ? 'en' : 'it',
+  pdfLang: (PDF_LANGS as readonly string[]).includes(process.env.PDF_LANG ?? '')
+    ? (process.env.PDF_LANG as PdfLang)
+    : 'it',
   headerText: '',
   footerText: '',
   logoImage: '',
@@ -50,7 +55,7 @@ export async function loadSettings(db: Db): Promise<AppSettings> {
   const paper = map.get('paperSize')
   if (paper && (PAPER_SIZES as readonly string[]).includes(paper)) s.paperSize = paper as PaperSize
   const lang = map.get('pdfLang')
-  if (lang === 'it' || lang === 'en') s.pdfLang = lang
+  if (lang && (PDF_LANGS as readonly string[]).includes(lang)) s.pdfLang = lang as PdfLang
   for (const key of ['headerText', 'footerText', 'logoImage', 'backgroundImage'] as const) {
     const v = map.get(key)
     if (v !== undefined) s[key] = v
@@ -87,10 +92,10 @@ export async function saveSettings(
     writes.push(['paperSize', patch.paperSize as string])
   }
   if (patch.pdfLang !== undefined) {
-    if (patch.pdfLang !== 'it' && patch.pdfLang !== 'en') {
+    if (!(PDF_LANGS as readonly string[]).includes(patch.pdfLang as string)) {
       return { field: 'pdfLang', error: 'invalid_lang' }
     }
-    writes.push(['pdfLang', patch.pdfLang])
+    writes.push(['pdfLang', patch.pdfLang as string])
   }
   for (const key of ['headerText', 'footerText'] as const) {
     if (patch[key] !== undefined) {

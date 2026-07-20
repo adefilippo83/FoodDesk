@@ -5,11 +5,14 @@ import { settings } from './db/schema.js';
  * in the UI, the database wins.
  */
 export const PAPER_SIZES = ['roll80', 'a5', 'a4', 'letter'];
+export const PDF_LANGS = ['it', 'en', 'es', 'fr', 'pt'];
 const DEFAULTS = {
     restaurantName: process.env.RESTAURANT_NAME ?? 'FoodDesk',
     coverChargeCents: 0,
     paperSize: 'roll80',
-    pdfLang: process.env.PDF_LANG === 'en' ? 'en' : 'it',
+    pdfLang: PDF_LANGS.includes(process.env.PDF_LANG ?? '')
+        ? process.env.PDF_LANG
+        : 'it',
     headerText: '',
     footerText: '',
     logoImage: '',
@@ -32,7 +35,7 @@ export async function loadSettings(db) {
     if (paper && PAPER_SIZES.includes(paper))
         s.paperSize = paper;
     const lang = map.get('pdfLang');
-    if (lang === 'it' || lang === 'en')
+    if (lang && PDF_LANGS.includes(lang))
         s.pdfLang = lang;
     for (const key of ['headerText', 'footerText', 'logoImage', 'backgroundImage']) {
         const v = map.get(key);
@@ -64,7 +67,7 @@ export async function saveSettings(db, patch) {
         writes.push(['paperSize', patch.paperSize]);
     }
     if (patch.pdfLang !== undefined) {
-        if (patch.pdfLang !== 'it' && patch.pdfLang !== 'en') {
+        if (!PDF_LANGS.includes(patch.pdfLang)) {
             return { field: 'pdfLang', error: 'invalid_lang' };
         }
         writes.push(['pdfLang', patch.pdfLang]);

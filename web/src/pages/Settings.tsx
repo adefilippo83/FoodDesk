@@ -182,10 +182,13 @@ export default function Settings() {
             <select
               className="input"
               value={settings.pdfLang}
-              onChange={(e) => void save({ pdfLang: e.target.value as 'it' | 'en' })}
+              onChange={(e) => void save({ pdfLang: e.target.value as AppSettings['pdfLang'] })}
             >
               <option value="it">Italiano</option>
               <option value="en">English</option>
+              <option value="es">Español</option>
+              <option value="fr">Français</option>
+              <option value="pt">Português</option>
             </select>
           </label>
         </div>
