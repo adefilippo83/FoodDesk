@@ -1,0 +1,50 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & publish release
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run test suites
+        run: npm test
+
+      - name: Build web + server
+        run: npm run build
+
+      # Everything the venue server needs: source, deploy kit and prebuilt
+      # dist/public — `sudo deploy/install.sh` from the unpacked tree works
+      # exactly like a git checkout.
+      - name: Package tarball
+        run: |
+          tar -czf "fooddesk-${GITHUB_REF_NAME}.tar.gz" \
+            --exclude node_modules \
+            --exclude .git \
+            --exclude 'server/data' \
+            README.md package.json package-lock.json deploy server web
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            "fooddesk-${GITHUB_REF_NAME}.tar.gz" \
+            --title "FoodDesk $GITHUB_REF_NAME" \
+            --generate-notes

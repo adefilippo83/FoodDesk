@@ -1,5 +1,10 @@
 # FoodDesk
 
+[![CI](https://github.com/adefilippo83/FoodDesk/actions/workflows/ci.yml/badge.svg)](https://github.com/adefilippo83/FoodDesk/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/adefilippo83/FoodDesk/actions/workflows/codeql.yml/badge.svg)](https://github.com/adefilippo83/FoodDesk/actions/workflows/codeql.yml)
+[![Release](https://img.shields.io/github/v/release/adefilippo83/FoodDesk?include_prereleases&sort=semver)](https://github.com/adefilippo83/FoodDesk/releases)
+[![Node](https://img.shields.io/badge/node-22.x-339933?logo=node.js&logoColor=white)](deploy/README.md)
+
 Ordering system for a temporary restaurant. Runs on a single Debian server on the
 venue Wi-Fi; waiters connect from their phones over the LAN.
 
@@ -75,6 +80,46 @@ Environment variables:
   cancellation (audit, never delete), drag-reorder for menu, per-cover reporting +
   report PDF export, self-service & admin password management, admin Settings page
   (paper size, logo, header/footer, background watermark), browser auto-print fallback
+
+## CI/CD
+
+Every push and pull request runs through GitHub Actions (`.github/workflows/`):
+
+| Workflow | When it runs | What it does |
+|---|---|---|
+| **CI** (`ci.yml`) | push to `main`, every PR | `npm ci` → test suites → full build, on Node 22 (the deploy target) and Node 24. Uploads the built `server/dist` + `server/public` as a downloadable artifact. |
+| **CodeQL** (`codeql.yml`) | push, PR, weekly | Static security analysis with the `security-extended` query pack. |
+| **Release** (`release.yml`) | tag `v*` | Tests + build, then publishes a GitHub Release with a deployable tarball and auto-generated notes. |
+
+Dependabot (`.github/dependabot.yml`) opens a weekly PR batching minor/patch
+dependency bumps (majors arrive individually), plus updates for the actions
+themselves — CI validates each one like any other PR.
+
+### Reading the badges
+
+The badges at the top of this README show the project's health at a glance:
+
+- ![CI passing](https://img.shields.io/badge/CI-passing-brightgreen) — the
+  latest build on `main` compiled and every test suite passed. This is the one
+  to check before pulling an update onto the venue server.
+- ![CI failing](https://img.shields.io/badge/CI-failing-red) — `main` is
+  broken; do not deploy until it is green again.
+- **CodeQL** — green means the last security scan found no open alerts
+  (details under the repo's *Security → Code scanning* tab).
+- **Release** — the newest tagged version; clicking it opens the release with
+  its tarball.
+- **Node 22.x** — the runtime the Debian server is expected to run.
+
+### Cutting a release
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The Release workflow does the rest: it refuses to publish if tests fail, and
+otherwise attaches `fooddesk-v1.0.0.tar.gz` — unpack it on the server and run
+`sudo deploy/install.sh` exactly as with a git checkout.
 
 ## Deploying
 

@@ -1,0 +1,18 @@
+version: 2
+updates:
+  # One lockfile at the repo root covers both workspaces.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      # Batch routine bumps into a single PR; majors stay individual.
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday

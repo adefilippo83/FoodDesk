@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+
+# Build output — CI and deploy/install.sh rebuild these from source
+server/dist/
+server/public/
+*.tsbuildinfo
+
+# Runtime data — the venue database lives outside the repo
+server/data/
+*.db
+*.db-wal
+*.db-shm
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
