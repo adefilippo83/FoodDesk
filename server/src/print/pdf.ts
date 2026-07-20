@@ -50,7 +50,7 @@ function dimsFor(paper: PaperSize): Dims {
 
 function money(cents: number, lang: 'it' | 'en'): string {
   const amount = (cents / 100).toFixed(2)
-  return `${CURRENCY}${lang === 'it' ? amount.replace('.', ',') : amount}`
+  return `${CURRENCY} ${lang === 'it' ? amount.replace('.', ',') : amount}`
 }
 
 function timeOf(order: Order): string {
