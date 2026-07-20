@@ -45,7 +45,7 @@ describe('reports', () => {
       url: '/api/orders',
       headers: { cookie: opCookie },
       payload: {
-        tableLabel: 'Bar; outside',
+        customerName: 'Bar; outside',
         items: [
           { productId: beer.json().id, qty: 2 },
           { productId: wine.json().id, qty: 1 },
@@ -56,7 +56,7 @@ describe('reports', () => {
       method: 'POST',
       url: '/api/orders',
       headers: { cookie: luciaCookie },
-      payload: { items: [{ productId: beer.json().id, qty: 3 }] },
+      payload: { customerName: 'Test', items: [{ productId: beer.json().id, qty: 3 }] },
     })
   })
 
@@ -81,7 +81,9 @@ describe('reports', () => {
     const r = res.json()
     assert.equal(r.ordersCount, 2)
     assert.equal(r.revenueCents, 3250)
-    assert.equal(r.avgOrderCents, 1625)
+    // Both orders defaulted to covers=1 → 2 covers total.
+    assert.equal(r.totalCovers, 2)
+    assert.equal(r.avgPerCoverCents, 1625)
   })
 
   it('aggregates products across orders', async () => {
@@ -95,19 +97,24 @@ describe('reports', () => {
     assert.equal(beerRow.revenueCents, 2500)
   })
 
-  it('attributes orders and revenue per waiter', async () => {
+  it('no longer exposes a by-waiter breakdown', async () => {
     const res = await app.inject({
       method: 'GET',
       url: '/api/reports/daily',
       headers: { cookie: adminCookie },
     })
-    const byWaiter = res.json().byWaiter
-    const marco = byWaiter.find((w: { name: string }) => w.name === 'marco')
-    const lucia = byWaiter.find((w: { name: string }) => w.name === 'lucia')
-    assert.deepEqual(
-      { m: [marco.ordersCount, marco.revenueCents], l: [lucia.ordersCount, lucia.revenueCents] },
-      { m: [1, 1750], l: [1, 1500] },
-    )
+    assert.equal(res.json().byWaiter, undefined)
+  })
+
+  it('exports the dashboard as a PDF', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/reports/daily.pdf',
+      headers: { cookie: adminCookie },
+    })
+    assert.equal(res.statusCode, 200)
+    assert.equal(res.headers['content-type'], 'application/pdf')
+    assert.ok(res.rawPayload.subarray(0, 5).toString() === '%PDF-')
   })
 
   it('returns zeros for a day with no orders', async () => {
@@ -119,7 +126,7 @@ describe('reports', () => {
     const r = res.json()
     assert.equal(r.ordersCount, 0)
     assert.equal(r.revenueCents, 0)
-    assert.equal(r.avgOrderCents, 0)
+    assert.equal(r.avgPerCoverCents, null)
   })
 
   it('rejects a malformed day', async () => {
@@ -145,15 +152,15 @@ describe('reports', () => {
     assert.equal(lines.length, 4)
     assert.equal(
       lines[0],
-      'order;time;table;waiter;category;item;qty;unit_price;line_total',
+      'order;time;customer;waiter;category;item;qty;unit_price;line_total;cancelled',
     )
     // Fields containing ; or " must be quoted and doubled.
     const wineLine = lines.find((l) => l.includes('Riserva'))!
     assert.ok(wineLine.includes('"Wine; ""Riserva"""'), `bad quoting: ${wineLine}`)
-    assert.ok(wineLine.includes('"Bar; outside"'), `table not quoted: ${wineLine}`)
+    assert.ok(wineLine.includes('"Bar; outside"'), `customer not quoted: ${wineLine}`)
     // 3 beers at 5,00 = 15,00
     const luciaLine = lines.find((l) => l.includes('lucia'))!
-    assert.ok(luciaLine.endsWith(';3;5,00;15,00'), `bad money format: ${luciaLine}`)
+    assert.ok(luciaLine.endsWith(';3;5,00;15,00;'), `bad money format: ${luciaLine}`)
   })
 
   it('lists service days with counts', async () => {

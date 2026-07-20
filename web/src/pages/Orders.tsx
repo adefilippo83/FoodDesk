@@ -30,6 +30,8 @@ export default function Orders() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [reprinting, setReprinting] = useState<number | null>(null)
+  const [confirmingCancel, setConfirmingCancel] = useState<number | null>(null)
+  const [cancelling, setCancelling] = useState(false)
 
   async function reprint(id: number) {
     setReprinting(id)
@@ -44,6 +46,20 @@ export default function Orders() {
       )
     } finally {
       setReprinting(null)
+      await load()
+    }
+  }
+
+  async function cancelOrder(id: number) {
+    setCancelling(true)
+    try {
+      await api.cancelOrder(id)
+      setError(null)
+    } catch {
+      setError(t('errCancelOrder'))
+    } finally {
+      setCancelling(false)
+      setConfirmingCancel(null)
       await load()
     }
   }
@@ -99,7 +115,7 @@ export default function Orders() {
             <thead>
               <tr>
                 <th>#</th>
-                <th>{t('table')}</th>
+                <th>{t('customer')}</th>
                 <th>{t('colWaiter')}</th>
                 <th>{t('colTime')}</th>
                 <th className="num">{t('total')}</th>
@@ -109,11 +125,18 @@ export default function Orders() {
             </thead>
             <tbody>
               {orders.map((o) => (
-                <tr key={o.id}>
+                <tr key={o.id} className={o.cancelledAt ? 'cancelled' : ''}>
                   <td>
                     <strong>{String(o.dailyNumber).padStart(3, '0')}</strong>
                   </td>
-                  <td>{o.tableLabel ?? <span className="muted">—</span>}</td>
+                  <td>
+                    {o.customerName ?? <span className="muted">—</span>}
+                    {o.cancelledAt !== null && (
+                      <span className="badge fail" style={{ marginLeft: 6 }}>
+                        {t('cancelledBadge')}
+                      </span>
+                    )}
+                  </td>
                   <td>{o.createdByName}</td>
                   <td className="muted">
                     {new Date(o.createdAt * 1000).toLocaleTimeString([], {
@@ -139,7 +162,7 @@ export default function Orders() {
                     </a>{' '}
                     <button
                       className="btn small"
-                      disabled={reprinting === o.id}
+                      disabled={reprinting === o.id || o.cancelledAt !== null}
                       onClick={() => void reprint(o.id)}
                     >
                       {reprinting === o.id
@@ -147,7 +170,27 @@ export default function Orders() {
                         : o.printedAt
                           ? t('reprint')
                           : t('print')}
-                    </button>
+                    </button>{' '}
+                    {user?.role === 'admin' && o.cancelledAt === null && (
+                      confirmingCancel === o.id ? (
+                        <button
+                          className="btn small danger"
+                          disabled={cancelling}
+                          onClick={() => void cancelOrder(o.id)}
+                          onBlur={() => setConfirmingCancel(null)}
+                          autoFocus
+                        >
+                          {t('confirmCancel')}
+                        </button>
+                      ) : (
+                        <button
+                          className="btn small danger"
+                          onClick={() => setConfirmingCancel(o.id)}
+                        >
+                          {t('cancelOrder')}
+                        </button>
+                      )
+                    )}
                   </td>
                 </tr>
               ))}
@@ -176,7 +219,12 @@ export default function Orders() {
           >
             <h2>
               #{String(open.dailyNumber).padStart(3, '0')}
-              {open.tableLabel ? ` · ${t('table')} ${open.tableLabel}` : ''}
+              {open.customerName ? ` · ${open.customerName}` : ''}
+              {open.cancelledAt !== null && (
+                <span className="badge fail" style={{ marginLeft: 8 }}>
+                  {t('cancelledBadge')}
+                </span>
+              )}
             </h2>
             <div className="table-scroll">
               <table>
@@ -200,6 +248,16 @@ export default function Orders() {
                 </tbody>
               </table>
             </div>
+            {open.covers > 0 && open.coverChargeCents > 0 && (
+              <p style={{ display: 'flex', justifyContent: 'space-between', margin: '8px 0 0' }}>
+                <span>
+                  {open.covers} × {t('coverCharge')}
+                </span>
+                <span className="line-total">
+                  €{formatMoney(open.covers * open.coverChargeCents)}
+                </span>
+              </p>
+            )}
             {open.note && (
               <p className="muted" style={{ marginBottom: 0 }}>
                 {t('notePrefix')} {open.note}

@@ -57,6 +57,11 @@ export const products = sqliteTable(
   (t) => [index('products_category_id_idx').on(t.categoryId)],
 )
 
+export const settings = sqliteTable('settings', {
+  key: text('key').primaryKey(),
+  value: text('value').notNull(),
+})
+
 export const orders = sqliteTable(
   'orders',
   {
@@ -64,7 +69,14 @@ export const orders = sqliteTable(
     // Human-facing sequence, reset per service day: "042"
     dailyNumber: integer('daily_number').notNull(),
     serviceDay: text('service_day').notNull(), // YYYY-MM-DD, local time
-    tableLabel: text('table_label'),
+    // Mandatory for new orders (enforced in the route); old rows may be null.
+    customerName: text('customer_name'),
+    // Coperto: number of people and the per-person charge at order time.
+    covers: integer('covers').notNull().default(1),
+    coverChargeCents: integer('cover_charge_cents').notNull().default(0),
+    // Cancelled orders keep their row and number forever — audit, not delete.
+    cancelledAt: integer('cancelled_at'),
+    cancelledBy: integer('cancelled_by').references(() => users.id),
     note: text('note'),
     totalCents: integer('total_cents').notNull(),
     createdBy: integer('created_by')

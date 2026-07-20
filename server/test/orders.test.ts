@@ -146,7 +146,7 @@ describe('orders', () => {
       url: '/api/orders',
       headers: { cookie: opCookie },
       payload: {
-        tableLabel: '7',
+        customerName: '7',
         items: [
           // A tampered client tries to pay 1 cent for two beers.
           { productId: beerId, qty: 2, priceCents: 1 },
@@ -163,13 +163,13 @@ describe('orders', () => {
       method: 'POST',
       url: '/api/orders',
       headers: { cookie: opCookie },
-      payload: { items: [{ productId: beerId, qty: 1 }] },
+      payload: { customerName: 'Test', items: [{ productId: beerId, qty: 1 }] },
     })
     const b = await app.inject({
       method: 'POST',
       url: '/api/orders',
       headers: { cookie: op2Cookie },
-      payload: { items: [{ productId: beerId, qty: 1 }] },
+      payload: { customerName: 'Test', items: [{ productId: beerId, qty: 1 }] },
     })
     assert.equal(b.json().dailyNumber, a.json().dailyNumber + 1)
   })
@@ -179,7 +179,7 @@ describe('orders', () => {
       method: 'POST',
       url: '/api/orders',
       headers: { cookie: opCookie },
-      payload: { items: [{ productId: wineId, qty: 1 }] },
+      payload: { customerName: 'Test', items: [{ productId: wineId, qty: 1 }] },
     })
     const id = order.json().id
 
@@ -223,7 +223,7 @@ describe('orders', () => {
       method: 'POST',
       url: '/api/orders',
       headers: { cookie: opCookie },
-      payload: { items: [{ productId: special.json().id, qty: 1 }] },
+      payload: { customerName: 'Test', items: [{ productId: special.json().id, qty: 1 }] },
     })
     assert.equal(res.statusCode, 409)
     assert.equal(res.json().error, 'products_unavailable')
@@ -235,7 +235,7 @@ describe('orders', () => {
         method: 'POST',
         url: '/api/orders',
         headers: { cookie: opCookie },
-        payload: { items: [{ productId: beerId, qty }] },
+        payload: { customerName: 'Test', items: [{ productId: beerId, qty }] },
       })
       assert.equal(res.statusCode, 400, `qty ${qty} should be rejected`)
     }
@@ -246,7 +246,7 @@ describe('orders', () => {
       method: 'POST',
       url: '/api/orders',
       headers: { cookie: opCookie },
-      payload: { items: [{ productId: beerId, qty: 1 }] },
+      payload: { customerName: 'Test', items: [{ productId: beerId, qty: 1 }] },
     })
     const id = mine.json().id
 

@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { users } from '../db/schema.js';
-import { verifyPassword } from '../auth/password.js';
+import { hashPassword, verifyPassword } from '../auth/password.js';
 import { SESSION_COOKIE, SESSION_TTL_SECONDS, createSession, destroySession, } from '../auth/session.js';
 import { requireAuth } from '../auth/acl.js';
 export function authRoutes(db) {
@@ -40,6 +40,23 @@ export function authRoutes(db) {
         app.get('/api/auth/me', { preHandler: requireAuth }, async (req) => {
             const u = req.user;
             return { id: u.id, username: u.username, displayName: u.displayName, role: u.role };
+        });
+        /** Self-service password change — current password required, any role. */
+        app.post('/api/auth/password', { preHandler: requireAuth }, async (req, reply) => {
+            const body = req.body;
+            const current = typeof body?.currentPassword === 'string' ? body.currentPassword : '';
+            const next = typeof body?.newPassword === 'string' ? body.newPassword : '';
+            if (next.length < 8) {
+                return reply.code(400).send({ error: 'password_too_short', minLength: 8 });
+            }
+            if (!(await verifyPassword(current, req.user.passwordHash))) {
+                return reply.code(403).send({ error: 'wrong_password' });
+            }
+            await db
+                .update(users)
+                .set({ passwordHash: await hashPassword(next) })
+                .where(eq(users.id, req.user.id));
+            return { ok: true };
         });
     };
 }

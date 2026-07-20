@@ -100,6 +100,34 @@ export function menuRoutes(db: Db) {
     })
 
     /**
+     * Persist a drag-reorder: sortOrder becomes the index in the given list.
+     * Ids not mentioned keep their old sortOrder, so a stale client cannot
+     * scramble items it never saw.
+     */
+    for (const [path, table] of [
+      ['/api/categories/order', categories],
+      ['/api/products/order', products],
+    ] as const) {
+      app.put(path, { preHandler: requireAdmin }, async (req, reply) => {
+        const ids = (req.body as { ids?: unknown } | undefined)?.ids
+        if (
+          !Array.isArray(ids) ||
+          ids.length === 0 ||
+          ids.length > 500 ||
+          !ids.every((id) => Number.isInteger(id))
+        ) {
+          return reply.code(400).send({ error: 'invalid_ids' })
+        }
+        db.transaction((tx) => {
+          ids.forEach((id: number, index) => {
+            tx.update(table).set({ sortOrder: index }).where(eq(table.id, id)).run()
+          })
+        })
+        return { ok: true }
+      })
+    }
+
+    /**
      * Soft delete. Past orders reference this category by snapshot, but the
      * products inside it would otherwise linger on the menu with no home, so
      * they get hidden alongside it.

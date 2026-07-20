@@ -4,6 +4,8 @@ import { categories, orderItems, orders, products, users } from '../db/schema.js
 import { isServiceDay, serviceDayOf } from '../lib/serviceDay.js';
 import { renderKitchenTicket, renderReceipt } from '../print/pdf.js';
 import { kitchenQueue, printKitchenTicket } from '../print/service.js';
+import { loadSettings } from '../settings.js';
+import { requireAdmin } from '../auth/acl.js';
 function parseItems(raw) {
     if (!Array.isArray(raw) || raw.length === 0)
         return { error: 'items_required' };
@@ -32,9 +34,16 @@ export function orderRoutes(db) {
             const parsed = parseItems(body?.items);
             if ('error' in parsed)
                 return reply.code(400).send({ error: parsed.error });
-            const tableLabel = typeof body?.tableLabel === 'string' && body.tableLabel.trim()
-                ? body.tableLabel.trim().slice(0, 40)
+            const customerName = typeof body?.customerName === 'string' && body.customerName.trim()
+                ? body.customerName.trim().slice(0, 60)
                 : null;
+            if (!customerName)
+                return reply.code(400).send({ error: 'customer_name_required' });
+            // Coperto: people at the table. 0 is legitimate (bar/takeaway order).
+            const covers = body?.covers === undefined ? 1 : Number(body.covers);
+            if (!Number.isInteger(covers) || covers < 0 || covers > 99) {
+                return reply.code(400).send({ error: 'invalid_covers' });
+            }
             const note = typeof body?.note === 'string' && body.note.trim() ? body.note.trim().slice(0, 500) : null;
             // Prices come from the database, never from the client. A tampered
             // payload cannot discount anything.
@@ -60,6 +69,9 @@ export function orderRoutes(db) {
             }
             const serviceDay = serviceDayOf();
             const userId = req.user.id;
+            // Snapshot the coperto amount now: changing it in settings tomorrow
+            // must not change tonight's bills.
+            const { coverChargeCents } = await loadSettings(db);
             const created = db.transaction((tx) => {
                 // Per-day sequence, allocated inside the transaction so two waiters
                 // submitting at once cannot land on the same ticket number.
@@ -69,13 +81,16 @@ export function orderRoutes(db) {
                     .where(eq(orders.serviceDay, serviceDay))
                     .get();
                 const dailyNumber = (last?.max ?? 0) + 1;
-                const totalCents = parsed.reduce((sum, i) => sum + byId.get(i.productId).priceCents * i.qty, 0);
+                const totalCents = parsed.reduce((sum, i) => sum + byId.get(i.productId).priceCents * i.qty, 0) +
+                    covers * coverChargeCents;
                 const order = tx
                     .insert(orders)
                     .values({
                     dailyNumber,
                     serviceDay,
-                    tableLabel,
+                    customerName,
+                    covers,
+                    coverChargeCents,
                     note,
                     totalCents,
                     createdBy: userId,
@@ -122,15 +137,34 @@ export function orderRoutes(db) {
                 if (order === 'forbidden')
                     return reply.code(403).send({ error: 'forbidden' });
                 const items = await db.select().from(orderItems).where(eq(orderItems.orderId, id));
+                const s = await loadSettings(db);
                 const pdf = kind === 'receipt'
-                    ? await renderReceipt(order, items)
-                    : await renderKitchenTicket(order, items);
+                    ? await renderReceipt(order, items, s)
+                    : await renderKitchenTicket(order, items, s);
                 return reply
                     .header('content-type', 'application/pdf')
                     .header('content-disposition', `inline; filename="order-${order.serviceDay}-${String(order.dailyNumber).padStart(3, '0')}-${kind}.pdf"`)
                     .send(pdf);
             });
         }
+        /**
+         * Cancel, never delete: the row and its daily number survive for the
+         * records; report totals simply skip it.
+         */
+        app.post('/api/orders/:id/cancel', { preHandler: requireAdmin }, async (req, reply) => {
+            const id = Number(req.params.id);
+            const order = (await db.select().from(orders).where(eq(orders.id, id)).limit(1))[0];
+            if (!order)
+                return reply.code(404).send({ error: 'not_found' });
+            if (order.cancelledAt)
+                return { ...order }; // idempotent
+            const updated = (await db
+                .update(orders)
+                .set({ cancelledAt: Math.floor(Date.now() / 1000), cancelledBy: req.user.id })
+                .where(eq(orders.id, id))
+                .returning())[0];
+            return updated;
+        });
         /** Re-send the kitchen ticket to CUPS — the jam-recovery button. */
         app.post('/api/orders/:id/print', async (req, reply) => {
             const id = Number(req.params.id);
@@ -161,7 +195,9 @@ export function orderRoutes(db) {
                 id: orders.id,
                 dailyNumber: orders.dailyNumber,
                 serviceDay: orders.serviceDay,
-                tableLabel: orders.tableLabel,
+                customerName: orders.customerName,
+                covers: orders.covers,
+                cancelledAt: orders.cancelledAt,
                 note: orders.note,
                 totalCents: orders.totalCents,
                 createdAt: orders.createdAt,

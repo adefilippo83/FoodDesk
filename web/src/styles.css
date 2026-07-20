@@ -494,6 +494,42 @@ a.btn {
   text-decoration: none;
 }
 
+/* ---------- drag reorder ---------- */
+
+.drag-handle {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  color: var(--text-dim);
+  font-size: 18px;
+  cursor: grab;
+  user-select: none;
+  /* Without this, touch-dragging scrolls the page instead of moving the row. */
+  touch-action: none;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+  background: var(--surface-2);
+}
+
+tr.dragging td {
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+}
+
+/* ---------- cancelled orders ---------- */
+
+tr.cancelled td {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+
+tr.cancelled td .badge {
+  text-decoration: none;
+}
+
 /* ---------- reports ---------- */
 
 .stat-row {

@@ -1,5 +1,6 @@
 import { eq, sql } from 'drizzle-orm';
 import { orderItems, orders } from '../db/schema.js';
+import { loadSettings } from '../settings.js';
 import { renderKitchenTicket } from './pdf.js';
 import { sendToCups } from './printer.js';
 export function kitchenQueue() {
@@ -22,7 +23,7 @@ export async function printKitchenTicket(db, order) {
     }
     const items = await db.select().from(orderItems).where(eq(orderItems.orderId, order.id));
     try {
-        const pdf = await renderKitchenTicket(order, items);
+        const pdf = await renderKitchenTicket(order, items, await loadSettings(db));
         await sendToCups(pdf, queue, `Order ${String(order.dailyNumber).padStart(3, '0')}`);
         const printedAt = Math.floor(Date.now() / 1000);
         await db

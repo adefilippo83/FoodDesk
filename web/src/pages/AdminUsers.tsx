@@ -14,6 +14,9 @@ export default function AdminUsers() {
   const [displayName, setDisplayName] = useState('')
   const [password, setPassword] = useState('')
   const [role, setRole] = useState<Role>('operator')
+  const [resetting, setResetting] = useState<number | null>(null)
+  const [resetValue, setResetValue] = useState('')
+  const [toast, setToast] = useState<string | null>(null)
 
   async function load() {
     try {
@@ -52,6 +55,21 @@ export default function AdminUsers() {
           ? t('errUsernameTaken')
           : t('errCreateAccount'),
       )
+    }
+  }
+
+  async function commitReset(id: number) {
+    if (resetValue.length < 8) return setError(t('errPasswordShort'))
+    try {
+      await api.updateUser(id, { password: resetValue })
+      setError(null)
+      setToast(t('passwordReset'))
+      setTimeout(() => setToast(null), 2000)
+    } catch {
+      setError(t('errUpdateAccount'))
+    } finally {
+      setResetting(null)
+      setResetValue('')
     }
   }
 
@@ -143,7 +161,37 @@ export default function AdminUsers() {
                     {u.role === 'admin' ? t('roleAdmin') : t('roleWaiter')}
                   </span>
                 </td>
-                <td className="num">
+                <td className="num" style={{ whiteSpace: 'nowrap' }}>
+                  {resetting === u.id ? (
+                    <span className="row" style={{ display: 'inline-flex', gap: 6 }}>
+                      <input
+                        className="input"
+                        style={{ minHeight: 36, width: 170 }}
+                        type="password"
+                        autoFocus
+                        placeholder={t('newPassword')}
+                        value={resetValue}
+                        onChange={(e) => setResetValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') void commitReset(u.id)
+                          if (e.key === 'Escape') setResetting(null)
+                        }}
+                      />
+                      <button className="btn small primary" onClick={() => void commitReset(u.id)}>
+                        {t('save')}
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      className="btn small"
+                      onClick={() => {
+                        setResetting(u.id)
+                        setResetValue('')
+                      }}
+                    >
+                      {t('resetPassword')}
+                    </button>
+                  )}{' '}
                   {u.active ? (
                     <button
                       className="btn small danger"
@@ -164,6 +212,7 @@ export default function AdminUsers() {
           </tbody>
         </table>
       </div>
+      {toast && <div className="toast">{toast}</div>}
     </>
   )
 }

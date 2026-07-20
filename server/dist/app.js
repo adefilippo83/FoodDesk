@@ -9,10 +9,12 @@ import { authRoutes } from './routes/auth.js';
 import { menuRoutes } from './routes/menu.js';
 import { orderRoutes } from './routes/orders.js';
 import { reportRoutes } from './routes/reports.js';
+import { settingsRoutes } from './routes/settings.js';
 import { userRoutes } from './routes/users.js';
 const PUBLIC_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../public');
 export async function buildApp(db, opts = {}) {
-    const app = Fastify({ logger: opts.logger ?? true });
+    // bodyLimit: settings uploads carry base64 logo/background images in JSON.
+    const app = Fastify({ logger: opts.logger ?? true, bodyLimit: 3 * 1024 * 1024 });
     await app.register(cookie);
     // Attach the session user before any route handler runs. This only
     // identifies the caller; authorization happens in the route guards.
@@ -30,6 +32,7 @@ export async function buildApp(db, opts = {}) {
     await app.register(menuRoutes(db));
     await app.register(orderRoutes(db));
     await app.register(reportRoutes(db));
+    await app.register(settingsRoutes(db));
     // In production the built React app is served from the same origin as the
     // API, so waiters only ever need one address on the venue Wi-Fi.
     if (opts.serveStatic ?? existsSync(PUBLIC_DIR)) {

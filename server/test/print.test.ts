@@ -41,7 +41,7 @@ describe('printing', () => {
       url: '/api/orders',
       headers: { cookie: opCookie },
       payload: {
-        tableLabel: '9',
+        customerName: '9',
         note: 'birthday table',
         items: [{ productId: beer.json().id, qty: 2, note: 'cold ones' }],
       },

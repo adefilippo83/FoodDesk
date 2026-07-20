@@ -38,9 +38,9 @@ Environment variables:
 | `PORT` / `HOST` | `3000` / `0.0.0.0` | Binds all interfaces so phones can reach it |
 | `COOKIE_SECURE` | `false` | Set `true` when served over TLS |
 | `ADMIN_USERNAME` / `ADMIN_PASSWORD` | `admin` / generated | Seed-time admin credentials |
-| `KITCHEN_PRINTER` | unset | CUPS queue name for the kitchen printer (`lpstat -p` lists queues). Unset ⇒ orders are marked "no printer" and tickets are printed from the browser via the kitchen PDF |
-| `RESTAURANT_NAME` | `FoodDesk` | Header on the customer receipt |
-| `PDF_LANG` | `it` | Language of receipt/ticket labels (`it` or `en`); `it` also formats money as `28,00` |
+| `KITCHEN_PRINTER` | unset | CUPS queue name for the kitchen printer (`lpstat -p` lists queues). Unset ⇒ tickets auto-open the browser's print dialog on order submit |
+| `RESTAURANT_NAME` | `FoodDesk` | Default receipt header — the admin **Settings** page overrides this |
+| `PDF_LANG` | `it` | Default receipt language — the Settings page overrides this |
 | `CURRENCY_SYMBOL` | `€` | Currency symbol on receipts and totals |
 | `SERVICE_DAY_CUTOFF_HOUR` | `5` | Orders before this hour count as the previous service day |
 
@@ -66,6 +66,10 @@ Environment variables:
 - [x] Phase 5 — PDF receipts, kitchen ticket via CUPS, reprint + print-status tracking
 - [x] Phase 6 — daily reports (product/category/waiter breakdowns), CSV export
 - [x] Phase 7 — Debian deploy kit (`deploy/`): install script, systemd, nginx, 15-min backups, PWA
+- [x] Phase 8 — coperto (configurable cover charge), mandatory customer name, order
+  cancellation (audit, never delete), drag-reorder for menu, per-cover reporting +
+  report PDF export, self-service & admin password management, admin Settings page
+  (paper size, logo, header/footer, background watermark), browser auto-print fallback
 
 ## Deploying
 

@@ -92,9 +92,14 @@ export default function Reports() {
           ))}
         </select>
         {day && (
-          <a className="btn" href={api.dailyCsvUrl(day)}>
-            {t('downloadCsv')}
-          </a>
+          <>
+            <a className="btn" href={api.dailyCsvUrl(day)}>
+              {t('downloadCsv')}
+            </a>
+            <a className="btn" href={api.dailyPdfUrl(day)}>
+              {t('downloadPdf')}
+            </a>
+          </>
         )}
       </div>
 
@@ -112,15 +117,26 @@ export default function Reports() {
               <strong>€{formatMoney(report.revenueCents)}</strong>
             </div>
             <div className="card stat">
-              <span className="muted">{t('avgOrder')}</span>
-              <strong>€{formatMoney(report.avgOrderCents)}</strong>
+              <span className="muted">{t('coversStat')}</span>
+              <strong>{report.totalCovers}</strong>
             </div>
+            {report.avgPerCoverCents !== null && (
+              <div className="card stat">
+                <span className="muted">{t('avgPerCover')}</span>
+                <strong>€{formatMoney(report.avgPerCoverCents)}</strong>
+              </div>
+            )}
+            {report.cancelledCount > 0 && (
+              <div className="card stat">
+                <span className="muted">{t('cancelledStat')}</span>
+                <strong>{report.cancelledCount}</strong>
+              </div>
+            )}
           </div>
 
           <div className="report-grid">
             <Breakdown title={t('byProduct')} rows={report.byProduct} unitLabel={t('qty')} />
             <Breakdown title={t('byCategory')} rows={report.byCategory} unitLabel={t('qty')} />
-            <Breakdown title={t('byWaiter')} rows={report.byWaiter} unitLabel={t('navOrders')} />
           </div>
         </>
       )}

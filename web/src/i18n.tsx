@@ -142,6 +142,61 @@ const en = {
   nothingSold: 'Nothing sold.',
   errLoadReportDays: 'Could not load report days.',
   errLoadReport: 'Could not load the report.',
+
+  // new-order extras
+  customer: 'Customer',
+  customerPlaceholder: 'e.g. Mario',
+  errCustomerRequired: 'Enter the customer name.',
+  covers: 'Covers',
+  coverCharge: 'Cover charge',
+
+  // cancellation
+  cancelOrder: 'Cancel order',
+  confirmCancel: 'Sure?',
+  cancelledBadge: 'cancelled',
+  errCancelOrder: 'Could not cancel the order.',
+
+  // password
+  changePassword: 'Change password',
+  currentPassword: 'Current password',
+  newPassword: 'New password (8+ chars)',
+  passwordChanged: 'Password changed',
+  errWrongCurrentPassword: 'Current password is wrong.',
+  errChangePassword: 'Could not change the password.',
+  save: 'Save',
+  cancel: 'Cancel',
+  resetPassword: 'Reset password',
+  passwordReset: 'Password updated',
+
+  // menu extras
+  dragToReorder: 'Drag ≡ to reorder. The order here is the order waiters see.',
+  errReorder: 'Could not save the new order.',
+  errMoveProduct: 'Could not move the product.',
+
+  // settings
+  navSettings: 'Settings',
+  settingsGeneral: 'General',
+  settingsPrint: 'Printing & layout',
+  coverChargeAmount: 'Cover charge (per person)',
+  paperSize: 'Paper size',
+  paperRoll80: '80mm roll (thermal)',
+  pdfLangLabel: 'Receipt language',
+  headerTextLabel: 'Receipt header text',
+  footerTextLabel: 'Receipt footer text',
+  logoLabel: 'Logo',
+  backgroundLabel: 'Background (watermark)',
+  uploadImage: 'Upload image…',
+  removeImage: 'Remove',
+  previewReceipt: 'Preview receipt',
+  settingsSaved: 'Settings saved',
+  errSaveSettings: 'Could not save the settings.',
+  errImageTooLarge: 'Image too large (max 700 KB, PNG or JPEG).',
+
+  // reports extras
+  coversStat: 'Covers',
+  avgPerCover: 'Average per cover',
+  cancelledStat: 'Cancelled',
+  downloadPdf: 'Download PDF',
 }
 
 const it: typeof en = {
@@ -273,6 +328,55 @@ const it: typeof en = {
   nothingSold: 'Nessuna vendita.',
   errLoadReportDays: 'Impossibile caricare i giorni.',
   errLoadReport: 'Impossibile caricare il report.',
+
+  customer: 'Cliente',
+  customerPlaceholder: 'es. Mario',
+  errCustomerRequired: 'Inserisci il nome del cliente.',
+  covers: 'Coperti',
+  coverCharge: 'Coperto',
+
+  cancelOrder: 'Annulla ordine',
+  confirmCancel: 'Sicuro?',
+  cancelledBadge: 'annullato',
+  errCancelOrder: "Impossibile annullare l'ordine.",
+
+  changePassword: 'Cambia password',
+  currentPassword: 'Password attuale',
+  newPassword: 'Nuova password (min 8 caratteri)',
+  passwordChanged: 'Password cambiata',
+  errWrongCurrentPassword: 'La password attuale è sbagliata.',
+  errChangePassword: 'Impossibile cambiare la password.',
+  save: 'Salva',
+  cancel: 'Annulla',
+  resetPassword: 'Reimposta password',
+  passwordReset: 'Password aggiornata',
+
+  dragToReorder: "Trascina ≡ per riordinare. L'ordine qui è quello che vedono i camerieri.",
+  errReorder: 'Impossibile salvare il nuovo ordine.',
+  errMoveProduct: 'Impossibile spostare il prodotto.',
+
+  navSettings: 'Impostazioni',
+  settingsGeneral: 'Generale',
+  settingsPrint: 'Stampa e layout',
+  coverChargeAmount: 'Coperto (a persona)',
+  paperSize: 'Formato carta',
+  paperRoll80: 'Rotolo 80mm (termica)',
+  pdfLangLabel: 'Lingua scontrino',
+  headerTextLabel: 'Intestazione scontrino',
+  footerTextLabel: 'Piè di pagina scontrino',
+  logoLabel: 'Logo',
+  backgroundLabel: 'Sfondo (filigrana)',
+  uploadImage: 'Carica immagine…',
+  removeImage: 'Rimuovi',
+  previewReceipt: 'Anteprima scontrino',
+  settingsSaved: 'Impostazioni salvate',
+  errSaveSettings: 'Impossibile salvare le impostazioni.',
+  errImageTooLarge: 'Immagine troppo grande (max 700 KB, PNG o JPEG).',
+
+  coversStat: 'Coperti',
+  avgPerCover: 'Medio a coperto',
+  cancelledStat: 'Annullati',
+  downloadPdf: 'Scarica PDF',
 }
 
 export type Lang = 'en' | 'it'

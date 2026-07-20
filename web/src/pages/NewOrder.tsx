@@ -1,19 +1,50 @@
-import { useEffect, useMemo, useState } from 'react'
-import { api, formatMoney, type MenuCategory } from '../api'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { api, formatMoney, type AppConfig, type MenuCategory } from '../api'
 import { useI18n } from '../i18n'
 
 type Line = { productId: number; name: string; priceCents: number; qty: number }
 
+/**
+ * Best-effort auto-print: load the PDF in a hidden iframe and ask the browser
+ * to print it. The print dialog still appears — browsers never allow silent
+ * printing — but the waiter only has to confirm, not hunt for the document.
+ */
+function autoPrintPdf(url: string) {
+  const frame = document.createElement('iframe')
+  frame.style.position = 'fixed'
+  frame.style.right = '0'
+  frame.style.bottom = '0'
+  frame.style.width = '0'
+  frame.style.height = '0'
+  frame.style.border = '0'
+  frame.src = url
+  frame.onload = () => {
+    try {
+      frame.contentWindow?.focus()
+      frame.contentWindow?.print()
+    } catch {
+      // PDF viewers in some browsers refuse scripted print — open it instead.
+      window.open(url, '_blank')
+    }
+  }
+  document.body.appendChild(frame)
+  // Give the print dialog ample time before cleaning up.
+  setTimeout(() => frame.remove(), 60_000)
+}
+
 export default function NewOrder() {
   const { t } = useI18n()
   const [menu, setMenu] = useState<MenuCategory[] | null>(null)
+  const [config, setConfig] = useState<AppConfig | null>(null)
   const [activeCat, setActiveCat] = useState<number | null>(null)
   const [lines, setLines] = useState<Line[]>([])
-  const [tableLabel, setTableLabel] = useState('')
+  const [customerName, setCustomerName] = useState('')
+  const [covers, setCovers] = useState(1)
   const [note, setNote] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const customerRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     api
@@ -23,6 +54,7 @@ export default function NewOrder() {
         setActiveCat((c) => c ?? m[0]?.id ?? null)
       })
       .catch(() => setError(t('errLoadMenu')))
+    api.config().then(setConfig).catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -32,7 +64,11 @@ export default function NewOrder() {
     return () => clearTimeout(timer)
   }, [toast])
 
-  const total = useMemo(() => lines.reduce((sum, l) => sum + l.priceCents * l.qty, 0), [lines])
+  const coverChargeCents = config?.coverChargeCents ?? 0
+  const total = useMemo(
+    () => lines.reduce((sum, l) => sum + l.priceCents * l.qty, 0) + covers * coverChargeCents,
+    [lines, covers, coverChargeCents],
+  )
 
   function add(product: { id: number; name: string; priceCents: number }) {
     setLines((prev) => {
@@ -57,19 +93,30 @@ export default function NewOrder() {
 
   async function submit() {
     if (lines.length === 0) return
+    if (!customerName.trim()) {
+      setError(t('errCustomerRequired'))
+      customerRef.current?.focus()
+      return
+    }
     setSubmitting(true)
     setError(null)
     try {
       const order = await api.createOrder({
-        tableLabel: tableLabel.trim() || undefined,
+        customerName: customerName.trim(),
+        covers,
         note: note.trim() || undefined,
         items: lines.map((l) => ({ productId: l.productId, qty: l.qty })),
       })
       // Clear straight away — the waiter is already walking to the next table.
       setLines([])
-      setTableLabel('')
+      setCustomerName('')
+      setCovers(1)
       setNote('')
       setToast(t('orderSent', { n: order.dailyNumber }))
+      // No CUPS printer? Hand the kitchen ticket to the browser's print dialog.
+      if (config && !config.printerConfigured) {
+        autoPrintPdf(api.kitchenPdfUrl(order.id))
+      }
     } catch (err) {
       setError(
         err && typeof err === 'object' && 'code' in err && err.code === 'products_unavailable'
@@ -130,14 +177,57 @@ export default function NewOrder() {
           <h2>{t('cartTitle')}</h2>
 
           <label className="field">
-            <span>{t('table')}</span>
+            <span>{t('customer')} *</span>
             <input
+              ref={customerRef}
               className="input"
-              value={tableLabel}
-              onChange={(e) => setTableLabel(e.target.value)}
-              placeholder={t('tablePlaceholder')}
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
+              placeholder={t('customerPlaceholder')}
+              required
             />
           </label>
+
+          <div className="field">
+            <span
+              style={{
+                display: 'block',
+                fontSize: 13,
+                color: 'var(--text-dim)',
+                marginBottom: 6,
+                fontWeight: 600,
+              }}
+            >
+              {t('covers')}
+              {coverChargeCents > 0 && (
+                <span style={{ fontWeight: 400 }}> · €{formatMoney(coverChargeCents)} cad.</span>
+              )}
+            </span>
+            <div className="qty-controls">
+              <button
+                className="qty-btn"
+                onClick={() => setCovers((c) => Math.max(0, c - 1))}
+                aria-label={t('oneLess', { name: t('covers') })}
+              >
+                −
+              </button>
+              <span className="qty" style={{ minWidth: 34, fontSize: 18 }}>
+                {covers}
+              </span>
+              <button
+                className="qty-btn"
+                onClick={() => setCovers((c) => Math.min(99, c + 1))}
+                aria-label={t('oneMore', { name: t('covers') })}
+              >
+                +
+              </button>
+              {coverChargeCents > 0 && covers > 0 && (
+                <span className="line-total" style={{ marginLeft: 'auto' }}>
+                  €{formatMoney(covers * coverChargeCents)}
+                </span>
+              )}
+            </div>
+          </div>
 
           {lines.length === 0 ? (
             <p className="muted">{t('tapToAdd')}</p>

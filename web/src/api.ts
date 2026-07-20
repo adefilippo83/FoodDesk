@@ -19,7 +19,9 @@ export type OrderSummary = {
   id: number
   dailyNumber: number
   serviceDay: string
-  tableLabel: string | null
+  customerName: string | null
+  covers: number
+  cancelledAt: number | null
   note: string | null
   totalCents: number
   createdAt: number
@@ -35,7 +37,26 @@ export type OrderItem = {
   qty: number
   note: string | null
 }
-export type OrderDetail = OrderSummary & { items: OrderItem[] }
+export type OrderDetail = OrderSummary & { items: OrderItem[]; coverChargeCents: number }
+
+export type AppConfig = {
+  restaurantName: string
+  coverChargeCents: number
+  printerConfigured: boolean
+}
+
+export type PaperSize = 'roll80' | 'a5' | 'a4' | 'letter'
+
+export type AppSettings = {
+  restaurantName: string
+  coverChargeCents: number
+  paperSize: PaperSize
+  pdfLang: 'it' | 'en'
+  headerText: string
+  footerText: string
+  logoImage: string
+  backgroundImage: string
+}
 export type User = {
   id: number
   username: string
@@ -47,11 +68,13 @@ export type User = {
 export type DailyReport = {
   serviceDay: string
   ordersCount: number
+  cancelledCount: number
   revenueCents: number
-  avgOrderCents: number
+  totalCovers: number
+  coverRevenueCents: number
+  avgPerCoverCents: number | null
   byProduct: { name: string; qty: number; revenueCents: number }[]
   byCategory: { name: string; qty: number; revenueCents: number }[]
-  byWaiter: { name: string; ordersCount: number; revenueCents: number }[]
 }
 
 export class ApiError extends Error {
@@ -121,10 +144,12 @@ export const api = {
   deleteProduct: (id: number) => request<{ ok: true }>('DELETE', `/api/products/${id}`),
 
   createOrder: (input: {
-    tableLabel?: string
+    customerName: string
+    covers: number
     note?: string
     items: { productId: number; qty: number; note?: string }[]
   }) => request<OrderDetail>('POST', '/api/orders', input),
+  cancelOrder: (id: number) => request<OrderSummary>('POST', `/api/orders/${id}/cancel`),
   orders: (day?: string) =>
     request<{ serviceDay: string; orders: OrderSummary[] }>(
       'GET',
@@ -132,6 +157,14 @@ export const api = {
     ),
   order: (id: number) => request<OrderDetail>('GET', `/api/orders/${id}`),
   reprint: (id: number) => request<{ ok: true; printedAt: number }>('POST', `/api/orders/${id}/print`),
+  config: () => request<AppConfig>('GET', '/api/config'),
+  settings: () => request<AppSettings>('GET', '/api/settings'),
+  saveSettings: (patch: Partial<AppSettings>) => request<AppSettings>('PUT', '/api/settings', patch),
+  settingsPreviewUrl: () => `/api/settings/preview.pdf?ts=${Date.now()}`,
+  changePassword: (currentPassword: string, newPassword: string) =>
+    request<{ ok: true }>('POST', '/api/auth/password', { currentPassword, newPassword }),
+  reorderCategories: (ids: number[]) => request<{ ok: true }>('PUT', '/api/categories/order', { ids }),
+  reorderProducts: (ids: number[]) => request<{ ok: true }>('PUT', '/api/products/order', { ids }),
   receiptUrl: (id: number) => `/api/orders/${id}/receipt.pdf`,
   kitchenPdfUrl: (id: number) => `/api/orders/${id}/kitchen.pdf`,
 
@@ -143,6 +176,7 @@ export const api = {
   dailyReport: (day?: string) =>
     request<DailyReport>('GET', day ? `/api/reports/daily?day=${day}` : '/api/reports/daily'),
   dailyCsvUrl: (day: string) => `/api/reports/daily.csv?day=${day}`,
+  dailyPdfUrl: (day: string) => `/api/reports/daily.pdf?day=${day}`,
 
   users: () => request<User[]>('GET', '/api/users'),
   createUser: (input: { username: string; password: string; displayName: string; role: Role }) =>
