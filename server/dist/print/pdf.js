@@ -42,7 +42,7 @@ function dimsFor(paper) {
 }
 function money(cents, lang) {
     const amount = (cents / 100).toFixed(2);
-    return `${CURRENCY}${lang === 'it' ? amount.replace('.', ',') : amount}`;
+    return `${CURRENCY} ${lang === 'it' ? amount.replace('.', ',') : amount}`;
 }
 function timeOf(order) {
     return new Date(order.createdAt * 1000).toLocaleTimeString('it-IT', {

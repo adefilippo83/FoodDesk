@@ -124,7 +124,7 @@ async function renderReportPdf(report, restaurantName) {
     });
     const pageW = 595.28;
     const innerW = pageW - margin * 2;
-    const money = (cents) => `€${(cents / 100).toFixed(2).replace('.', ',')}`;
+    const money = (cents) => `€ ${(cents / 100).toFixed(2).replace('.', ',')}`;
     doc.font('Helvetica-Bold').fontSize(20).text(restaurantName);
     doc.font('Helvetica').fontSize(12).fillColor('#555').text(`Report · ${report.serviceDay}`);
     doc.fillColor('#000').moveDown(1);

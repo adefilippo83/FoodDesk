@@ -1,15 +1,56 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { api, formatMoney, type AppConfig, type MenuCategory } from '../api'
+import { api, formatMoney, type AppConfig, type MenuCategory, type OrderDetail } from '../api'
 import { useI18n } from '../i18n'
 
 type Line = { productId: number; name: string; priceCents: number; qty: number }
 
+function escapeHtml(s: string): string {
+  return s
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+}
+
 /**
- * Best-effort auto-print: load the PDF in a hidden iframe and ask the browser
- * to print it. The print dialog still appears — browsers never allow silent
- * printing — but the waiter only has to confirm, not hunt for the document.
+ * Auto-print fallback when no CUPS printer is configured. This deliberately
+ * prints an HTML ticket, not the PDF: browsers cannot script-print a PDF
+ * inside an iframe (Chrome prints the surrounding page instead — which, on a
+ * dark theme, comes out as blank sheets). Same-origin HTML iframes print
+ * reliably everywhere. The print dialog still appears; browsers never allow
+ * fully silent printing.
  */
-function autoPrintPdf(url: string) {
+function autoPrintTicket(order: OrderDetail, coversLabel: string) {
+  const items = order.items
+    .map(
+      (i) =>
+        `<div class="item">${i.qty} × ${escapeHtml(i.nameSnapshot)}</div>` +
+        (i.note ? `<div class="note">» ${escapeHtml(i.note)}</div>` : ''),
+    )
+    .join('')
+
+  const time = new Date(order.createdAt * 1000).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+
+  const html = `<!doctype html><html><head><meta charset="utf-8"><style>
+    @page { margin: 5mm; }
+    body { font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; color: #000; background: #fff; margin: 0; }
+    .num { font-size: 30px; font-weight: 800; text-align: center; margin: 0; }
+    .sub { text-align: center; font-size: 15px; margin: 2px 0 0; }
+    hr { border: 0; border-top: 2px dashed #000; margin: 10px 0; }
+    .item { font-size: 19px; font-weight: 700; margin: 5px 0; }
+    .note { font-style: italic; font-size: 14px; margin: 0 0 4px 14px; }
+  </style></head><body>
+    <p class="num">#${String(order.dailyNumber).padStart(3, '0')}</p>
+    <p class="sub">${escapeHtml(order.customerName ?? '')} · ${time}</p>
+    ${order.covers > 0 ? `<p class="sub">${escapeHtml(coversLabel)}: ${order.covers}</p>` : ''}
+    <hr>
+    ${items}
+    ${order.note ? `<hr><div class="note">${escapeHtml(order.note)}</div>` : ''}
+  </body></html>`
+
   const frame = document.createElement('iframe')
   frame.style.position = 'fixed'
   frame.style.right = '0'
@@ -17,18 +58,17 @@ function autoPrintPdf(url: string) {
   frame.style.width = '0'
   frame.style.height = '0'
   frame.style.border = '0'
-  frame.src = url
+  frame.srcdoc = html
   frame.onload = () => {
     try {
       frame.contentWindow?.focus()
       frame.contentWindow?.print()
     } catch {
-      // PDF viewers in some browsers refuse scripted print — open it instead.
-      window.open(url, '_blank')
+      window.open(api.kitchenPdfUrl(order.id), '_blank')
     }
   }
   document.body.appendChild(frame)
-  // Give the print dialog ample time before cleaning up.
+  // Keep the frame alive while the print dialog is open.
   setTimeout(() => frame.remove(), 60_000)
 }
 
@@ -115,7 +155,7 @@ export default function NewOrder() {
       setToast(t('orderSent', { n: order.dailyNumber }))
       // No CUPS printer? Hand the kitchen ticket to the browser's print dialog.
       if (config && !config.printerConfigured) {
-        autoPrintPdf(api.kitchenPdfUrl(order.id))
+        autoPrintTicket(order, t('covers'))
       }
     } catch (err) {
       setError(
