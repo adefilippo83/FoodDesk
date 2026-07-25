@@ -8,8 +8,8 @@ a native app).
 ## First install
 
 ```bash
-# 1. Node 22 LTS (Debian's packaged node is too old)
-curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+# 1. Node 24 LTS (Debian's packaged node is too old)
+curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
 apt-get install -y nodejs nginx
 
 # 2. Get the code onto the server (git clone or scp), then:

@@ -3,7 +3,7 @@
 [![CI](https://github.com/adefilippo83/FoodDesk/actions/workflows/ci.yml/badge.svg)](https://github.com/adefilippo83/FoodDesk/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/adefilippo83/FoodDesk/actions/workflows/codeql.yml/badge.svg)](https://github.com/adefilippo83/FoodDesk/actions/workflows/codeql.yml)
 [![Release](https://img.shields.io/github/v/release/adefilippo83/FoodDesk?include_prereleases&sort=semver)](https://github.com/adefilippo83/FoodDesk/releases)
-[![Node](https://img.shields.io/badge/node-22.x-339933?logo=node.js&logoColor=white)](deploy/README.md)
+[![Node](https://img.shields.io/badge/node-24.x-339933?logo=node.js&logoColor=white)](deploy/README.md)
 
 Ordering system for a temporary restaurant. Runs on a single Debian server on the
 venue Wi-Fi; waiters connect from their phones over the LAN.
@@ -91,7 +91,7 @@ Every push and pull request runs through GitHub Actions (`.github/workflows/`):
 
 | Workflow | When it runs | What it does |
 |---|---|---|
-| **CI** (`ci.yml`) | push to `main`, every PR | `npm ci` → test suites → full build, on Node 22 (the deploy target) and Node 24. Uploads the built `server/dist` + `server/public` as a downloadable artifact. |
+| **CI** (`ci.yml`) | push to `main`, every PR | `npm ci` → test suites → full build, on Node 24 (the deploy target) and Node 26. Uploads the built `server/dist` + `server/public` as a downloadable artifact. |
 | **CodeQL** (`codeql.yml`) | push, PR, weekly | Static security analysis with the `security-extended` query pack. |
 | **Release** (`release.yml`) | tag `v*` | Tests + build, then publishes a GitHub Release with a deployable tarball and auto-generated notes. |
 
@@ -112,7 +112,7 @@ The badges at the top of this README show the project's health at a glance:
   (details under the repo's *Security → Code scanning* tab).
 - **Release** — the newest tagged version; clicking it opens the release with
   its tarball.
-- **Node 22.x** — the runtime the Debian server is expected to run.
+- **Node 24.x** — the runtime the Debian server is expected to run.
 
 ### Cutting a release
 
