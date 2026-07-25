@@ -7,7 +7,7 @@
     "node": ">=24"
   },
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx watch --ignore '../node_modules/**' --ignore 'node_modules/**' src/index.ts",
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
     "start": "node dist/index.js",
     "migrate": "tsx src/db/migrate.ts",

@@ -12,6 +12,11 @@ server/data/
 *.db-wal
 *.db-shm
 
+# E2E artifacts
+e2e/.tmp/
+test-results/
+playwright-report/
+
 # Editors / OS
 .DS_Store
 .idea/

@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { buildApp } from './app.js'
 import { createDb } from './db/index.js'
 import { purgeExpiredSessions } from './auth/session.js'
+import { retryFailedPrints } from './print/service.js'
 
 const DATABASE_FILE = process.env.DATABASE_FILE ?? './data/fooddesk.db'
 const PORT = Number(process.env.PORT ?? 3000)
@@ -23,6 +24,10 @@ const app = await buildApp(db)
 await purgeExpiredSessions(db)
 // Keep the session table tidy across a multi-day event, not just at boot.
 setInterval(() => void purgeExpiredSessions(db).catch(() => {}), 60 * 60 * 1000).unref()
+
+// A jammed or briefly offline printer must not swallow tickets: sweep for
+// recent failed kitchen prints and retry them until they succeed or cap out.
+setInterval(() => void retryFailedPrints(db, app.log).catch(() => {}), 30 * 1000).unref()
 
 const shutdown = async (signal: string) => {
   app.log.info({ signal }, 'shutting down')

@@ -217,6 +217,53 @@ describe('coperto, cancellation, settings, passwords, reorder', () => {
     assert.equal(res.json().orderDisclaimer, 'Documento non fiscale')
   })
 
+  it('serves order-sheet images as cached assets, never as base64 in config', async () => {
+    const png = Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      Buffer.alloc(64),
+    ])
+    const up = await app.inject({
+      method: 'PUT',
+      url: '/api/settings',
+      headers: { cookie: adminCookie },
+      payload: { orderHeaderImage: `data:image/png;base64,${png.toString('base64')}` },
+    })
+    assert.equal(up.statusCode, 200)
+
+    const config = await app.inject({
+      method: 'GET',
+      url: '/api/config',
+      headers: { cookie: opCookie },
+    })
+    assert.equal(config.json().orderHeaderImage, undefined, 'no base64 in config')
+    assert.match(config.json().orderHeaderImageUrl, /^\/api\/order-assets\/header\?v=[0-9a-f]{8}$/)
+    assert.equal(config.json().orderFooterImageUrl, '')
+
+    const asset = await app.inject({
+      method: 'GET',
+      url: config.json().orderHeaderImageUrl,
+      headers: { cookie: opCookie },
+    })
+    assert.equal(asset.statusCode, 200)
+    assert.equal(asset.headers['content-type'], 'image/png')
+    assert.match(String(asset.headers['cache-control']), /immutable/)
+    assert.ok(asset.rawPayload.equals(png), 'asset bytes must match the upload')
+
+    const missing = await app.inject({
+      method: 'GET',
+      url: '/api/order-assets/footer',
+      headers: { cookie: opCookie },
+    })
+    assert.equal(missing.statusCode, 404)
+
+    await app.inject({
+      method: 'PUT',
+      url: '/api/settings',
+      headers: { cookie: adminCookie },
+      payload: { orderHeaderImage: '' },
+    })
+  })
+
   it('serves the order-sheet PDF preview to admins only', async () => {
     const admin = await app.inject({
       method: 'GET',

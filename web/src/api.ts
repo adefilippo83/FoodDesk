@@ -56,6 +56,7 @@ export type KitchenOrder = {
   covers: number
   note: string | null
   createdAt: number
+  cancelledAt: number | null
   completedAt: number | null
   createdByName: string
   items: KitchenItem[]
@@ -65,9 +66,7 @@ export type CategoryStyle = 'alternating' | 'separator'
 
 export type OrderSheetLayout = {
   orderHeaderText: string
-  orderHeaderImage: string
   orderFooterText: string
-  orderFooterImage: string
   orderDisclaimer: string
   orderCategoryStyle: CategoryStyle
   orderHeaderFontSize: number
@@ -81,6 +80,9 @@ export type AppConfig = OrderSheetLayout & {
   restaurantName: string
   coverChargeCents: number
   printerConfigured: boolean
+  /** Versioned, cacheable image URLs — '' when no image is configured. */
+  orderHeaderImageUrl: string
+  orderFooterImageUrl: string
 }
 
 export type PaperSize = 'roll80' | 'a5' | 'a4' | 'letter'
@@ -94,6 +96,9 @@ export type AppSettings = OrderSheetLayout & {
   footerText: string
   logoImage: string
   backgroundImage: string
+  /** Full data URLs — the admin page uploads and previews these. */
+  orderHeaderImage: string
+  orderFooterImage: string
 }
 export type User = {
   id: number
@@ -185,6 +190,7 @@ export const api = {
     customerName: string
     covers: number
     note?: string
+    clientKey?: string
     items: { productId: number; qty: number; note?: string }[]
   }) => request<OrderDetail>('POST', '/api/orders', input),
   cancelOrder: (id: number) => request<OrderSummary>('POST', `/api/orders/${id}/cancel`),

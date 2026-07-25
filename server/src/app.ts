@@ -4,7 +4,9 @@ import Fastify, { type FastifyInstance } from 'fastify'
 import { existsSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { requireAuth } from './auth/acl.js'
 import { SESSION_COOKIE, resolveSession } from './auth/session.js'
+import { ordersBus } from './lib/events.js'
 import type { Db } from './db/index.js'
 import { authRoutes } from './routes/auth.js'
 import { kitchenRoutes } from './routes/kitchen.js'
@@ -85,6 +87,34 @@ export async function buildApp(
   })
 
   app.get('/api/health', async () => ({ ok: true }))
+
+  /**
+   * Server-sent events: a bare "orders" ping whenever orders change, so
+   * screens refetch immediately instead of leaning on their polling loop.
+   * EventSource reconnects on its own; polling stays as the safety net.
+   */
+  app.get('/api/events', { preHandler: requireAuth }, (req, reply) => {
+    reply.hijack()
+    const raw = reply.raw
+    raw.writeHead(200, {
+      'content-type': 'text/event-stream',
+      'cache-control': 'no-cache',
+      // Tells nginx not to buffer this response.
+      'x-accel-buffering': 'no',
+    })
+    raw.write('retry: 3000\n\n')
+
+    const onOrders = () => raw.write('event: orders\ndata: {}\n\n')
+    ordersBus.on('orders', onOrders)
+    // Comment frames keep idle proxies from timing the stream out.
+    const heartbeat = setInterval(() => raw.write(': keep-alive\n\n'), 25_000)
+    heartbeat.unref()
+
+    req.raw.on('close', () => {
+      clearInterval(heartbeat)
+      ordersBus.off('orders', onOrders)
+    })
+  })
 
   await app.register(authRoutes(db))
   await app.register(userRoutes(db))

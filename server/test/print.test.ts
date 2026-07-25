@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import { after, before, describe, it } from 'node:test'
 import type { FastifyInstance } from 'fastify'
+import type { Db } from '../src/db/index.js'
+import { retryFailedPrints } from '../src/print/service.js'
 import { login, makeTestApp, makeUser } from './helpers.js'
 
 describe('printing', () => {
@@ -145,4 +147,112 @@ describe('printing', () => {
     assert.equal(res.statusCode, 403)
   })
 
+})
+
+describe('automatic print retry', () => {
+  let app: FastifyInstance
+  let close: () => void
+  let db: Db
+  let adminCookie: string
+  let opCookie: string
+  let beerId: number
+
+  async function fetchAttempts(id: number): Promise<number> {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/orders/${id}`,
+      headers: { cookie: adminCookie },
+    })
+    return res.json().printAttempts
+  }
+
+  async function createFailedOrder(customer: string): Promise<number> {
+    const order = await app.inject({
+      method: 'POST',
+      url: '/api/orders',
+      headers: { cookie: opCookie },
+      payload: { customerName: customer, items: [{ productId: beerId, qty: 1 }] },
+    })
+    const id = order.json().id
+    // The background print is fire-and-forget: wait for its failure to land.
+    for (let i = 0; i < 40; i++) {
+      if ((await fetchAttempts(id)) >= 1) return id
+      await new Promise((r) => setTimeout(r, 50))
+    }
+    throw new Error('background print never recorded its attempt')
+  }
+
+  before(async () => {
+    process.env.KITCHEN_PRINTER = 'no-such-queue-retry-test'
+    const t = await makeTestApp()
+    app = t.app
+    close = t.close
+    db = t.db
+    await makeUser(t.db, 'admin', 'admin')
+    await makeUser(t.db, 'marco', 'operator')
+    adminCookie = await login(app, 'admin')
+    opCookie = await login(app, 'marco')
+
+    const cat = await app.inject({
+      method: 'POST',
+      url: '/api/categories',
+      headers: { cookie: adminCookie },
+      payload: { name: 'Drinks' },
+    })
+    const beer = await app.inject({
+      method: 'POST',
+      url: '/api/products',
+      headers: { cookie: adminCookie },
+      payload: { name: 'Beer', priceCents: 500, categoryId: cat.json().id },
+    })
+    beerId = beer.json().id
+  })
+
+  after(() => {
+    delete process.env.KITCHEN_PRINTER
+    void app.close()
+    close()
+  })
+
+  it('retries a failed print until the attempt cap, then gives up', async () => {
+    const id = await createFailedOrder('Retry me')
+    let attempts = await fetchAttempts(id)
+    assert.ok(attempts >= 1)
+
+    for (let i = 0; i < 10 && attempts < 5; i++) {
+      await retryFailedPrints(db)
+      const next = await fetchAttempts(id)
+      assert.equal(next, attempts + 1, 'each sweep must retry exactly once')
+      attempts = next
+    }
+    assert.equal(attempts, 5)
+
+    // Cap reached: further sweeps must leave the order alone.
+    await retryFailedPrints(db)
+    assert.equal(await fetchAttempts(id), 5)
+  })
+
+  it('does not retry cancelled orders', async () => {
+    const id = await createFailedOrder('Cancelled one')
+    const before = await fetchAttempts(id)
+    await app.inject({
+      method: 'POST',
+      url: `/api/orders/${id}/cancel`,
+      headers: { cookie: adminCookie },
+    })
+    await retryFailedPrints(db)
+    assert.equal(await fetchAttempts(id), before)
+  })
+
+  it('is a no-op when no printer is configured', async () => {
+    const id = await createFailedOrder('No printer later')
+    const before = await fetchAttempts(id)
+    delete process.env.KITCHEN_PRINTER
+    try {
+      await retryFailedPrints(db)
+      assert.equal(await fetchAttempts(id), before)
+    } finally {
+      process.env.KITCHEN_PRINTER = 'no-such-queue-retry-test'
+    }
+  })
 })

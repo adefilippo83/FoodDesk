@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, type KitchenItem, type KitchenOrder } from '../api'
 import { useI18n } from '../i18n'
+import { useOrdersEvents } from '../useOrdersEvents'
 
 function minutesSince(ts: number): number {
   return Math.max(0, Math.floor((Date.now() / 1000 - ts) / 60))
@@ -15,10 +16,14 @@ function OrderCard({
 }) {
   const { t } = useI18n()
   const done = order.items.length > 0 && order.items.every((i) => i.doneAt !== null)
+  const cancelled = order.cancelledAt !== null
   const age = minutesSince(order.createdAt)
 
   return (
-    <div className={`kds-card ${done ? 'done' : ''} ${!done && age >= 15 ? 'late' : ''}`}>
+    <div
+      className={`kds-card ${cancelled ? 'cancelled' : done ? 'done' : age >= 15 ? 'late' : ''}`}
+    >
+      {cancelled && <div className="kds-cancelled">{t('cancelledBadge')}</div>}
       <div className="kds-head">
         <span className="kds-num">#{String(order.dailyNumber).padStart(3, '0')}</span>
         <div className="kds-meta">
@@ -42,6 +47,7 @@ function OrderCard({
           <button
             key={i.id}
             className={`kds-item ${i.doneAt !== null ? 'done' : ''}`}
+            disabled={cancelled}
             onClick={() => onToggle(order.id, i)}
           >
             <span className="kds-qty">{i.qty}×</span>
@@ -74,10 +80,36 @@ export default function Kitchen() {
 
   useEffect(() => {
     void load()
-    // A display, not a page someone refreshes: new orders must just appear.
-    const timer = setInterval(() => void load(), 5000)
+    // SSE pushes new orders instantly; this slow poll is only the safety net.
+    const timer = setInterval(() => void load(), 30000)
     return () => clearInterval(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useOrdersEvents(() => void load())
+
+  // Keep the tablet screen awake for the whole service. The lock is released
+  // by the browser whenever the tab is hidden, so re-acquire on return.
+  useEffect(() => {
+    if (!('wakeLock' in navigator)) return
+    let lock: WakeLockSentinel | null = null
+    let disposed = false
+    const acquire = async () => {
+      try {
+        if (!disposed && document.visibilityState === 'visible') {
+          lock = await navigator.wakeLock.request('screen')
+        }
+      } catch {
+        // Not critical — the tablet's own display settings still apply.
+      }
+    }
+    void acquire()
+    document.addEventListener('visibilitychange', acquire)
+    return () => {
+      disposed = true
+      document.removeEventListener('visibilitychange', acquire)
+      void lock?.release().catch(() => {})
+    }
   }, [])
 
   function toggle(orderId: number, item: KitchenItem) {
@@ -106,9 +138,12 @@ export default function Kitchen() {
 
   if (orders === null) return <div className="empty">{t('loading')}</div>
 
-  const open = orders.filter((o) => o.items.some((i) => i.doneAt === null))
+  // Cancelled orders stay in the main grid, marked, so the kitchen notices.
+  const open = orders.filter(
+    (o) => o.cancelledAt !== null || o.items.some((i) => i.doneAt === null),
+  )
   const completed = orders.filter(
-    (o) => o.items.length > 0 && o.items.every((i) => i.doneAt !== null),
+    (o) => o.cancelledAt === null && o.items.length > 0 && o.items.every((i) => i.doneAt !== null),
   )
 
   return (

@@ -570,6 +570,28 @@ tr.cancelled td .badge {
   opacity: 0.55;
 }
 
+.kds-card.cancelled {
+  border-color: var(--danger);
+}
+
+.kds-cancelled {
+  background: color-mix(in srgb, var(--danger) 22%, transparent);
+  color: var(--danger);
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: center;
+  border-radius: 8px;
+  padding: 6px;
+  margin-bottom: 8px;
+}
+
+.kds-card.cancelled .kds-item {
+  opacity: 0.45;
+  cursor: default;
+}
+
 .kds-head {
   display: flex;
   gap: 10px;
