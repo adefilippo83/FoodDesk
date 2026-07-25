@@ -1,7 +1,7 @@
 import { desc, eq, isNull, sql } from 'drizzle-orm'
 import PDFDocument from 'pdfkit'
 import type { FastifyInstance } from 'fastify'
-import { requireAdmin } from '../auth/acl.js'
+import { requireManager } from '../auth/acl.js'
 import type { Db } from '../db/index.js'
 import { orderItems, orders, users } from '../db/schema.js'
 import { isServiceDay, serviceDayOf } from '../lib/serviceDay.js'
@@ -235,7 +235,8 @@ async function renderReportPdf(
 
 export function reportRoutes(db: Db) {
   return async function register(app: FastifyInstance) {
-    app.addHook('preHandler', requireAdmin)
+    // The maître d' reconciles the day just like an admin.
+    app.addHook('preHandler', requireManager)
 
     /** Every service day that has orders — feeds the day picker. */
     app.get('/api/reports/days', async () => {

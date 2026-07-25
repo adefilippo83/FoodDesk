@@ -20,6 +20,16 @@ function AdminOnly({ children }: { children: ReactNode }) {
   return user?.role === 'admin' ? <>{children}</> : <Navigate to="/" replace />
 }
 
+/** Admin or maître d' (caposala). */
+function ManagerOnly({ children }: { children: ReactNode }) {
+  const { user } = useAuth()
+  return user?.role === 'admin' || user?.role === 'maitre' ? (
+    <>{children}</>
+  ) : (
+    <Navigate to="/" replace />
+  )
+}
+
 function ChangePasswordModal({ onClose }: { onClose: () => void }) {
   const { t } = useI18n()
   const [current, setCurrent] = useState('')
@@ -120,6 +130,8 @@ export default function App() {
   if (!user) return <Login />
 
   const isAdmin = user.role === 'admin'
+  const isManager = isAdmin || user.role === 'maitre'
+  const roleLabel = isAdmin ? t('roleAdmin') : user.role === 'maitre' ? t('roleMaitre') : t('roleWaiter')
 
   return (
     <div className="app">
@@ -134,7 +146,7 @@ export default function App() {
           <NavLink to="/orders" className={({ isActive }) => (isActive ? 'active' : '')}>
             {t('navOrders')}
           </NavLink>
-          {isAdmin && (
+          {isManager && (
             <>
               <NavLink to="/menu" className={({ isActive }) => (isActive ? 'active' : '')}>
                 {t('navMenu')}
@@ -145,10 +157,12 @@ export default function App() {
               <NavLink to="/reports" className={({ isActive }) => (isActive ? 'active' : '')}>
                 {t('navReports')}
               </NavLink>
-              <NavLink to="/settings" className={({ isActive }) => (isActive ? 'active' : '')}>
-                {t('navSettings')}
-              </NavLink>
             </>
+          )}
+          {isAdmin && (
+            <NavLink to="/settings" className={({ isActive }) => (isActive ? 'active' : '')}>
+              {t('navSettings')}
+            </NavLink>
           )}
         </nav>
         <button
@@ -158,7 +172,7 @@ export default function App() {
           onClick={() => setShowPassword(true)}
         >
           <strong>{user.displayName}</strong>
-          {isAdmin ? t('roleAdmin') : t('roleWaiter')}
+          {roleLabel}
         </button>
         <LangToggle />
         <button className="btn small" onClick={() => void logout()}>
@@ -175,25 +189,25 @@ export default function App() {
           <Route
             path="/menu"
             element={
-              <AdminOnly>
+              <ManagerOnly>
                 <AdminMenu />
-              </AdminOnly>
+              </ManagerOnly>
             }
           />
           <Route
             path="/users"
             element={
-              <AdminOnly>
+              <ManagerOnly>
                 <AdminUsers />
-              </AdminOnly>
+              </ManagerOnly>
             }
           />
           <Route
             path="/reports"
             element={
-              <AdminOnly>
+              <ManagerOnly>
                 <Reports />
-              </AdminOnly>
+              </ManagerOnly>
             }
           />
           <Route

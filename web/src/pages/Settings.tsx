@@ -1,19 +1,34 @@
 import { useEffect, useRef, useState } from 'react'
-import { ApiError, api, formatMoney, parseMoney, type AppSettings, type PaperSize } from '../api'
+import {
+  ApiError,
+  api,
+  formatMoney,
+  parseMoney,
+  type AppSettings,
+  type CategoryStyle,
+  type PaperSize,
+} from '../api'
 import { useI18n } from '../i18n'
 
 const MAX_IMAGE_BYTES = 700 * 1024
+const FONT_SIZES = [6, 7, 8, 9, 10, 11, 12, 14, 16, 18, 20, 24]
+const IMAGE_WIDTHS = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
 
 function ImageField({
   label,
   value,
   onChange,
   onError,
+  widthPct,
+  onWidthChange,
 }: {
   label: string
   value: string
   onChange: (dataUrl: string) => void
   onError: (msg: string) => void
+  /** When set (with onWidthChange), a % selector appears next to the image. */
+  widthPct?: number
+  onWidthChange?: (pct: number) => void
 }) {
   const { t } = useI18n()
   const fileRef = useRef<HTMLInputElement>(null)
@@ -72,8 +87,40 @@ function ImageField({
             {t('removeImage')}
           </button>
         )}
+        {value && widthPct !== undefined && onWidthChange && (
+          <select
+            className="input"
+            style={{ width: 'auto', minHeight: 36, padding: '0 8px' }}
+            title={t('imageWidthLabel')}
+            aria-label={t('imageWidthLabel')}
+            value={widthPct}
+            onChange={(e) => onWidthChange(Number(e.target.value))}
+          >
+            {IMAGE_WIDTHS.map((p) => (
+              <option key={p} value={p}>
+                {p}%
+              </option>
+            ))}
+          </select>
+        )}
       </div>
     </div>
+  )
+}
+
+function FontSizeSelect({ value, onSave }: { value: number; onSave: (pt: number) => void }) {
+  const { t } = useI18n()
+  return (
+    <label className="field" style={{ flex: '0 0 130px' }}>
+      <span>{t('fontSizeLabel')}</span>
+      <select className="input" value={value} onChange={(e) => onSave(Number(e.target.value))}>
+        {FONT_SIZES.map((n) => (
+          <option key={n} value={n}>
+            {n} pt
+          </option>
+        ))}
+      </select>
+    </label>
   )
 }
 
@@ -159,8 +206,8 @@ export default function Settings() {
         </label>
       </div>
 
-      <div className="card">
-        <h2>{t('settingsPrint')}</h2>
+      <div className="card" style={{ marginBottom: 16 }}>
+        <h2>{t('settingsPrintReceipt')}</h2>
 
         <div className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 4 }}>
           <label className="field" style={{ flex: '1 1 180px' }}>
@@ -227,8 +274,104 @@ export default function Settings() {
         />
 
         <div className="row" style={{ marginTop: 8 }}>
-          <a className="btn" href={api.settingsPreviewUrl()} target="_blank" rel="noreferrer">
+          <a
+            className="btn"
+            href={api.settingsPreviewUrl('receipt')}
+            target="_blank"
+            rel="noreferrer"
+          >
             {t('previewReceipt')}
+          </a>
+          {saving && <span className="muted">{t('sending')}</span>}
+        </div>
+      </div>
+
+      <div className="card">
+        <h2>{t('settingsPrintOrder')}</h2>
+
+        <div className="row" style={{ alignItems: 'flex-start' }}>
+          <label className="field" style={{ flex: 1 }}>
+            <span>{t('orderHeaderTextLabel')}</span>
+            <textarea
+              className="input"
+              rows={2}
+              value={settings.orderHeaderText}
+              onChange={(e) => setSettings({ ...settings, orderHeaderText: e.target.value })}
+              onBlur={() => void save({ orderHeaderText: settings.orderHeaderText })}
+            />
+          </label>
+          <FontSizeSelect
+            value={settings.orderHeaderFontSize}
+            onSave={(pt) => void save({ orderHeaderFontSize: pt })}
+          />
+        </div>
+        <ImageField
+          label={t('orderHeaderImageLabel')}
+          value={settings.orderHeaderImage}
+          onChange={(v) => void save({ orderHeaderImage: v })}
+          onError={setError}
+          widthPct={settings.orderHeaderImageWidthPct}
+          onWidthChange={(p) => void save({ orderHeaderImageWidthPct: p })}
+        />
+
+        <label className="field">
+          <span>{t('categoryStyleLabel')}</span>
+          <select
+            className="input"
+            style={{ maxWidth: 280 }}
+            value={settings.orderCategoryStyle}
+            onChange={(e) => void save({ orderCategoryStyle: e.target.value as CategoryStyle })}
+          >
+            <option value="alternating">{t('categoryStyleAlternating')}</option>
+            <option value="separator">{t('categoryStyleSeparator')}</option>
+          </select>
+        </label>
+
+        <div className="row" style={{ alignItems: 'flex-start' }}>
+          <label className="field" style={{ flex: 1 }}>
+            <span>{t('disclaimerLabel')}</span>
+            <textarea
+              className="input"
+              rows={3}
+              value={settings.orderDisclaimer}
+              onChange={(e) => setSettings({ ...settings, orderDisclaimer: e.target.value })}
+              onBlur={() => void save({ orderDisclaimer: settings.orderDisclaimer })}
+            />
+          </label>
+          <FontSizeSelect
+            value={settings.orderDisclaimerFontSize}
+            onSave={(pt) => void save({ orderDisclaimerFontSize: pt })}
+          />
+        </div>
+
+        <div className="row" style={{ alignItems: 'flex-start' }}>
+          <label className="field" style={{ flex: 1 }}>
+            <span>{t('orderFooterTextLabel')}</span>
+            <textarea
+              className="input"
+              rows={2}
+              value={settings.orderFooterText}
+              onChange={(e) => setSettings({ ...settings, orderFooterText: e.target.value })}
+              onBlur={() => void save({ orderFooterText: settings.orderFooterText })}
+            />
+          </label>
+          <FontSizeSelect
+            value={settings.orderFooterFontSize}
+            onSave={(pt) => void save({ orderFooterFontSize: pt })}
+          />
+        </div>
+        <ImageField
+          label={t('orderFooterImageLabel')}
+          value={settings.orderFooterImage}
+          onChange={(v) => void save({ orderFooterImage: v })}
+          onError={setError}
+          widthPct={settings.orderFooterImageWidthPct}
+          onWidthChange={(p) => void save({ orderFooterImageWidthPct: p })}
+        />
+
+        <div className="row" style={{ marginTop: 8 }}>
+          <a className="btn" href={api.settingsPreviewUrl('order')} target="_blank" rel="noreferrer">
+            {t('previewOrderSheet')}
           </a>
           {saving && <span className="muted">{t('sending')}</span>}
         </div>

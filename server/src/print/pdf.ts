@@ -21,6 +21,7 @@ const LABELS = {
     total: 'TOTALE',
     thanks: 'Grazie!',
     cancelled: 'ANNULLATO',
+    note: 'Nota',
   },
   en: {
     order: 'Order',
@@ -30,6 +31,7 @@ const LABELS = {
     total: 'TOTAL',
     thanks: 'Thank you!',
     cancelled: 'CANCELLED',
+    note: 'Note',
   },
   es: {
     order: 'Pedido',
@@ -39,6 +41,7 @@ const LABELS = {
     total: 'TOTAL',
     thanks: '¡Gracias!',
     cancelled: 'ANULADO',
+    note: 'Nota',
   },
   fr: {
     order: 'Commande',
@@ -48,6 +51,7 @@ const LABELS = {
     total: 'TOTAL',
     thanks: 'Merci !',
     cancelled: 'ANNULÉE',
+    note: 'Note',
   },
   pt: {
     order: 'Pedido',
@@ -57,6 +61,7 @@ const LABELS = {
     total: 'TOTAL',
     thanks: 'Obrigado!',
     cancelled: 'ANULADO',
+    note: 'Nota',
   },
 }
 
@@ -90,6 +95,37 @@ function timeOf(order: Order): string {
 
 function ticketNo(order: Order): string {
   return String(order.dailyNumber).padStart(3, '0')
+}
+
+/**
+ * Intrinsic pixel size of a PNG or JPEG buffer, so an image scaled to a
+ * chosen width can advance the layout cursor by its real rendered height.
+ */
+function imageDims(buf: Buffer): { w: number; h: number } | null {
+  // PNG: IHDR width/height right after the 16-byte signature+chunk header.
+  if (buf.length > 24 && buf.readUInt32BE(0) === 0x89504e47) {
+    return { w: buf.readUInt32BE(16), h: buf.readUInt32BE(20) }
+  }
+  // JPEG: scan markers for a start-of-frame segment.
+  if (buf.length > 4 && buf[0] === 0xff && buf[1] === 0xd8) {
+    let i = 2
+    while (i + 9 < buf.length) {
+      if (buf[i] !== 0xff) {
+        i++
+        continue
+      }
+      const marker = buf[i + 1]!
+      if (marker === 0xff || (marker >= 0xd0 && marker <= 0xd9)) {
+        i += 2
+        continue
+      }
+      if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
+        return { h: buf.readUInt16BE(i + 5), w: buf.readUInt16BE(i + 7) }
+      }
+      i += 2 + buf.readUInt16BE(i + 2)
+    }
+  }
+  return null
 }
 
 function collect(doc: PDFKit.PDFDocument): Promise<Buffer> {
@@ -296,5 +332,198 @@ export function renderReceipt(order: Order, items: OrderItem[], s: AppSettings):
       doc.fillColor('#000')
     }
     doc.font('Helvetica').fontSize(9).text(L.thanks, { align: 'center' })
+  })
+}
+
+/**
+ * Order sheet (foglio ordine): the document produced when the order is taken.
+ * Configurable header/footer (text and/or image), then order number/date/time/
+ * customer, the coperto line first, products grouped by category — set apart
+ * by alternating light-grey blocks or separator lines (orderCategoryStyle) —
+ * a highlighted total, the kitchen note, and a disclaimer above the footer.
+ */
+export function renderOrderSheet(order: Order, items: OrderItem[], s: AppSettings): Promise<Buffer> {
+  const L = LABELS[s.pdfLang]
+  const lang = s.pdfLang
+  return render(s, order.cancelledAt !== null, (doc, d) => {
+    // Centered image scaled to a % of the printable width, height proportional.
+    const scaledImage = (dataUrl: string, pct: number) => {
+      const img = imageBuffer(dataUrl)
+      if (!img) return
+      const w = (d.innerW * pct) / 100
+      const dims = imageDims(img)
+      const h = dims ? (w * dims.h) / dims.w : (s.paperSize === 'roll80' ? 16 * MM : 24 * MM)
+      const x = d.margin + (d.innerW - w) / 2
+      try {
+        if (dims) doc.image(img, x, doc.y, { width: w })
+        else doc.image(img, x, doc.y, { fit: [w, h], align: 'center' })
+        doc.y += h + 6
+      } catch {
+        // ignore bad image data
+      }
+    }
+
+    // ---- header ----
+    if (s.orderHeaderImage) scaledImage(s.orderHeaderImage, s.orderHeaderImageWidthPct)
+    if (s.orderHeaderText) {
+      doc
+        .font('Helvetica')
+        .fontSize(s.orderHeaderFontSize)
+        .fillColor('#333')
+        .text(s.orderHeaderText, d.margin, doc.y, { width: d.innerW, align: 'center' })
+      doc.fillColor('#000')
+      doc.moveDown(0.3)
+    }
+
+    // ---- order number · date · time · customer ----
+    doc
+      .font('Helvetica-Bold')
+      .fontSize(13)
+      .text(
+        `${L.order} #${ticketNo(order)} · ${order.serviceDay} · ${timeOf(order)}` +
+          (order.customerName ? ` · ${order.customerName}` : ''),
+        d.margin,
+        doc.y,
+        { width: d.innerW, align: 'center' },
+      )
+
+    dashes(doc, d)
+
+    const priceW = Math.min(22 * MM, d.innerW * 0.25)
+    const nameW = d.innerW - priceW
+    const PAD = 4
+
+    const line = (label: string, amountCents: number, note?: string) => {
+      const y = doc.y
+      doc
+        .font('Helvetica')
+        .fontSize(11)
+        .text(label, d.margin + PAD, y, { width: nameW - PAD * 2 })
+      const bottom = doc.y
+      doc.text(money(amountCents, lang), d.margin + nameW, y, {
+        width: priceW - PAD,
+        align: 'right',
+      })
+      doc.y = Math.max(doc.y, bottom)
+      if (note) {
+        doc
+          .font('Helvetica-Oblique')
+          .fontSize(9)
+          .text(`   » ${note}`, d.margin + PAD, doc.y, { width: nameW - PAD * 2 })
+      }
+      doc.y += 2
+    }
+
+    // Mirrors line() exactly so a background can be painted before rendering.
+    const lineHeight = (label: string, note?: string) => {
+      doc.font('Helvetica').fontSize(11)
+      let h = Math.max(
+        doc.heightOfString(label, { width: nameW - PAD * 2 }),
+        doc.heightOfString('0', { width: priceW - PAD }),
+      )
+      if (note) {
+        doc.font('Helvetica-Oblique').fontSize(9)
+        h += doc.heightOfString(`   » ${note}`, { width: nameW - PAD * 2 })
+      }
+      return h + 2
+    }
+
+    // ---- coperto first ----
+    if (order.covers > 0 && order.coverChargeCents > 0) {
+      line(`${order.covers} × ${L.coverCharge}`, order.covers * order.coverChargeCents)
+      doc.y += 2
+    }
+
+    // ---- products grouped by category (order of first appearance) ----
+    const groups: Array<{ name: string; items: OrderItem[] }> = []
+    for (const item of items) {
+      const g = groups.find((x) => x.name === item.categoryNameSnapshot)
+      if (g) g.items.push(item)
+      else groups.push({ name: item.categoryNameSnapshot, items: [item] })
+    }
+
+    groups.forEach((g, i) => {
+      if (s.orderCategoryStyle === 'separator' && i > 0) {
+        doc
+          .moveTo(d.margin, doc.y + 1)
+          .lineTo(d.margin + d.innerW, doc.y + 1)
+          .strokeColor('#999')
+          .stroke()
+        doc.y += 5
+      }
+
+      doc.font('Helvetica-Bold').fontSize(8)
+      let blockH = doc.heightOfString(g.name.toUpperCase(), { width: nameW - PAD * 2 }) + 2
+      for (const item of g.items) {
+        blockH += lineHeight(`${item.qty} × ${item.nameSnapshot}`, item.note ?? undefined)
+      }
+
+      if (s.orderCategoryStyle === 'alternating' && i % 2 === 1) {
+        doc.rect(d.margin, doc.y - PAD / 2, d.innerW, blockH + PAD).fill('#f0f0f0')
+        doc.fillColor('#000')
+      }
+
+      doc
+        .fillColor('#555')
+        .font('Helvetica-Bold')
+        .fontSize(8)
+        .text(g.name.toUpperCase(), d.margin + PAD, doc.y, { width: nameW - PAD * 2 })
+      doc.fillColor('#000')
+      doc.y += 2
+      for (const item of g.items) {
+        line(`${item.qty} × ${item.nameSnapshot}`, item.priceCentsSnapshot * item.qty, item.note ?? undefined)
+      }
+      doc.y += PAD
+    })
+
+    // ---- total, highlighted ----
+    doc.y += 2
+    const totalH = 24
+    const rectY = doc.y
+    doc.rect(d.margin, rectY, d.innerW, totalH).fill('#e5e5e5')
+    doc.fillColor('#000').font('Helvetica-Bold').fontSize(14)
+    doc.text(L.total, d.margin + PAD, rectY + 6, { width: d.innerW / 2 })
+    doc.text(money(order.totalCents, lang), d.margin, rectY + 6, {
+      width: d.innerW - PAD,
+      align: 'right',
+    })
+    doc.x = d.margin
+    doc.y = rectY + totalH + 6
+
+    // ---- kitchen note ----
+    if (order.note) {
+      dashes(doc, d)
+      doc
+        .font('Helvetica-Oblique')
+        .fontSize(11)
+        .text(`${L.note}: ${order.note}`, d.margin, doc.y, { width: d.innerW })
+      doc.moveDown(0.3)
+    }
+
+    // ---- disclaimer ----
+    if (s.orderDisclaimer) {
+      doc.moveDown(0.4)
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(s.orderDisclaimerFontSize)
+        .fillColor('#555')
+        .text(s.orderDisclaimer, d.margin, doc.y, { width: d.innerW, align: 'center' })
+      doc.fillColor('#000')
+    }
+
+    // ---- footer ----
+    if (s.orderFooterText) {
+      doc.moveDown(0.5)
+      doc
+        .font('Helvetica')
+        .fontSize(s.orderFooterFontSize)
+        .fillColor('#444')
+        .text(s.orderFooterText, d.margin, doc.y, { width: d.innerW, align: 'center' })
+      doc.fillColor('#000')
+    }
+    if (s.orderFooterImage) {
+      doc.y += 4
+      scaledImage(s.orderFooterImage, s.orderFooterImageWidthPct)
+    }
   })
 }

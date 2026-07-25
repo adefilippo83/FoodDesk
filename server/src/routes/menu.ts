@@ -1,6 +1,6 @@
 import { and, asc, eq } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
-import { requireAdmin, requireAuth } from '../auth/acl.js'
+import { isManager, requireAuth, requireManager } from '../auth/acl.js'
 import type { Db } from '../db/index.js'
 import { categories, orderItems, products } from '../db/schema.js'
 
@@ -43,7 +43,7 @@ export function menuRoutes(db: Db) {
 
     app.get('/api/categories', { preHandler: requireAuth }, async (req) => {
       const includeInactive =
-        req.user!.role === 'admin' && (req.query as { includeInactive?: string }).includeInactive === 'true'
+        isManager(req.user!) && (req.query as { includeInactive?: string }).includeInactive === 'true'
       const rows = await db
         .select()
         .from(categories)
@@ -53,7 +53,7 @@ export function menuRoutes(db: Db) {
 
     app.get('/api/products', { preHandler: requireAuth }, async (req) => {
       const q = req.query as { categoryId?: string; includeInactive?: string }
-      const includeInactive = req.user!.role === 'admin' && q.includeInactive === 'true'
+      const includeInactive = isManager(req.user!) && q.includeInactive === 'true'
       const rows = await db
         .select()
         .from(products)
@@ -65,9 +65,9 @@ export function menuRoutes(db: Db) {
       )
     })
 
-    // ---- Writes: admin only ----
+    // ---- Writes: admin or maître d' ----
 
-    app.post('/api/categories', { preHandler: requireAdmin }, async (req, reply) => {
+    app.post('/api/categories', { preHandler: requireManager }, async (req, reply) => {
       const body = req.body as Record<string, unknown> | undefined
       const name = parseName(body?.name)
       if (!name) return reply.code(400).send({ error: 'invalid_name' })
@@ -77,7 +77,7 @@ export function menuRoutes(db: Db) {
       return reply.code(201).send(created)
     })
 
-    app.patch('/api/categories/:id', { preHandler: requireAdmin }, async (req, reply) => {
+    app.patch('/api/categories/:id', { preHandler: requireManager }, async (req, reply) => {
       const id = Number((req.params as { id: string }).id)
       const body = req.body as Record<string, unknown> | undefined
       const existing = (await db.select().from(categories).where(eq(categories.id, id)).limit(1))[0]
@@ -108,7 +108,7 @@ export function menuRoutes(db: Db) {
       ['/api/categories/order', categories],
       ['/api/products/order', products],
     ] as const) {
-      app.put(path, { preHandler: requireAdmin }, async (req, reply) => {
+      app.put(path, { preHandler: requireManager }, async (req, reply) => {
         const ids = (req.body as { ids?: unknown } | undefined)?.ids
         if (
           !Array.isArray(ids) ||
@@ -132,7 +132,7 @@ export function menuRoutes(db: Db) {
      * products inside it would otherwise linger on the menu with no home, so
      * they get hidden alongside it.
      */
-    app.delete('/api/categories/:id', { preHandler: requireAdmin }, async (req, reply) => {
+    app.delete('/api/categories/:id', { preHandler: requireManager }, async (req, reply) => {
       const id = Number((req.params as { id: string }).id)
       const existing = (await db.select().from(categories).where(eq(categories.id, id)).limit(1))[0]
       if (!existing) return reply.code(404).send({ error: 'not_found' })
@@ -144,7 +144,7 @@ export function menuRoutes(db: Db) {
       return { ok: true, deactivatedCategory: id }
     })
 
-    app.post('/api/products', { preHandler: requireAdmin }, async (req, reply) => {
+    app.post('/api/products', { preHandler: requireManager }, async (req, reply) => {
       const body = req.body as Record<string, unknown> | undefined
       const name = parseName(body?.name)
       if (!name) return reply.code(400).send({ error: 'invalid_name' })
@@ -165,7 +165,7 @@ export function menuRoutes(db: Db) {
       return reply.code(201).send(created)
     })
 
-    app.patch('/api/products/:id', { preHandler: requireAdmin }, async (req, reply) => {
+    app.patch('/api/products/:id', { preHandler: requireManager }, async (req, reply) => {
       const id = Number((req.params as { id: string }).id)
       const body = req.body as Record<string, unknown> | undefined
       const existing = (await db.select().from(products).where(eq(products.id, id)).limit(1))[0]
@@ -210,7 +210,7 @@ export function menuRoutes(db: Db) {
       return updated
     })
 
-    app.delete('/api/products/:id', { preHandler: requireAdmin }, async (req, reply) => {
+    app.delete('/api/products/:id', { preHandler: requireManager }, async (req, reply) => {
       const id = Number((req.params as { id: string }).id)
       const existing = (await db.select().from(products).where(eq(products.id, id)).limit(1))[0]
       if (!existing) return reply.code(404).send({ error: 'not_found' })

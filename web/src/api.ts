@@ -1,4 +1,4 @@
-export type Role = 'admin' | 'operator'
+export type Role = 'admin' | 'maitre' | 'operator'
 
 export type Me = { id: number; username: string; displayName: string; role: Role }
 export type Category = { id: number; name: string; sortOrder: number; active: boolean }
@@ -22,6 +22,7 @@ export type OrderSummary = {
   customerName: string | null
   covers: number
   cancelledAt: number | null
+  cancelledByName: string | null
   note: string | null
   totalCents: number
   createdAt: number
@@ -39,7 +40,23 @@ export type OrderItem = {
 }
 export type OrderDetail = OrderSummary & { items: OrderItem[]; coverChargeCents: number }
 
-export type AppConfig = {
+export type CategoryStyle = 'alternating' | 'separator'
+
+export type OrderSheetLayout = {
+  orderHeaderText: string
+  orderHeaderImage: string
+  orderFooterText: string
+  orderFooterImage: string
+  orderDisclaimer: string
+  orderCategoryStyle: CategoryStyle
+  orderHeaderFontSize: number
+  orderFooterFontSize: number
+  orderDisclaimerFontSize: number
+  orderHeaderImageWidthPct: number
+  orderFooterImageWidthPct: number
+}
+
+export type AppConfig = OrderSheetLayout & {
   restaurantName: string
   coverChargeCents: number
   printerConfigured: boolean
@@ -47,7 +64,7 @@ export type AppConfig = {
 
 export type PaperSize = 'roll80' | 'a5' | 'a4' | 'letter'
 
-export type AppSettings = {
+export type AppSettings = OrderSheetLayout & {
   restaurantName: string
   coverChargeCents: number
   paperSize: PaperSize
@@ -160,13 +177,15 @@ export const api = {
   config: () => request<AppConfig>('GET', '/api/config'),
   settings: () => request<AppSettings>('GET', '/api/settings'),
   saveSettings: (patch: Partial<AppSettings>) => request<AppSettings>('PUT', '/api/settings', patch),
-  settingsPreviewUrl: () => `/api/settings/preview.pdf?ts=${Date.now()}`,
+  settingsPreviewUrl: (kind: 'receipt' | 'order' = 'receipt') =>
+    `/api/settings/preview.pdf?kind=${kind}&ts=${Date.now()}`,
   changePassword: (currentPassword: string, newPassword: string) =>
     request<{ ok: true }>('POST', '/api/auth/password', { currentPassword, newPassword }),
   reorderCategories: (ids: number[]) => request<{ ok: true }>('PUT', '/api/categories/order', { ids }),
   reorderProducts: (ids: number[]) => request<{ ok: true }>('PUT', '/api/products/order', { ids }),
   receiptUrl: (id: number) => `/api/orders/${id}/receipt.pdf`,
   kitchenPdfUrl: (id: number) => `/api/orders/${id}/kitchen.pdf`,
+  orderPdfUrl: (id: number) => `/api/orders/${id}/order.pdf`,
 
   reportDays: () =>
     request<{ serviceDay: string; ordersCount: number; revenueCents: number }[]>(

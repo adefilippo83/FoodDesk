@@ -101,7 +101,7 @@ export default function Orders() {
 
       {error && <div className="error">{error}</div>}
 
-      {user?.role !== 'admin' && (
+      {user?.role === 'operator' && (
         <p className="muted" style={{ marginTop: 0 }}>
           {t('showingOwnOrders')}
         </p>
@@ -132,9 +132,16 @@ export default function Orders() {
                   <td>
                     {o.customerName ?? <span className="muted">—</span>}
                     {o.cancelledAt !== null && (
-                      <span className="badge fail" style={{ marginLeft: 6 }}>
-                        {t('cancelledBadge')}
-                      </span>
+                      <>
+                        <span className="badge fail" style={{ marginLeft: 6 }}>
+                          {t('cancelledBadge')}
+                        </span>
+                        {o.cancelledByName && (
+                          <span className="muted" style={{ fontSize: 12, marginLeft: 4 }}>
+                            {t('cancelledBy', { name: o.cancelledByName })}
+                          </span>
+                        )}
+                      </>
                     )}
                   </td>
                   <td>{o.createdByName}</td>
@@ -171,7 +178,7 @@ export default function Orders() {
                           ? t('reprint')
                           : t('print')}
                     </button>{' '}
-                    {user?.role === 'admin' && o.cancelledAt === null && (
+                    {(user?.role === 'admin' || user?.role === 'maitre') && o.cancelledAt === null && (
                       confirmingCancel === o.id ? (
                         <button
                           className="btn small danger"
@@ -223,6 +230,7 @@ export default function Orders() {
               {open.cancelledAt !== null && (
                 <span className="badge fail" style={{ marginLeft: 8 }}>
                   {t('cancelledBadge')}
+                  {open.cancelledByName ? ` ${t('cancelledBy', { name: open.cancelledByName })}` : ''}
                 </span>
               )}
             </h2>
@@ -267,7 +275,16 @@ export default function Orders() {
               <span>{t('total')}</span>
               <span className="amount">€{formatMoney(open.totalCents)}</span>
             </div>
-            <div className="row">
+            <div className="row" style={{ flexWrap: 'wrap' }}>
+              <a
+                className="btn"
+                style={{ flex: 1 }}
+                href={api.orderPdfUrl(open.id)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {t('orderPdf')}
+              </a>
               <a
                 className="btn"
                 style={{ flex: 1 }}

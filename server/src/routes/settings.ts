@@ -2,19 +2,33 @@ import type { FastifyInstance } from 'fastify'
 import { requireAdmin, requireAuth } from '../auth/acl.js'
 import type { Db } from '../db/index.js'
 import { kitchenQueue } from '../print/service.js'
-import { renderReceipt } from '../print/pdf.js'
+import { renderOrderSheet, renderReceipt } from '../print/pdf.js'
 import { loadSettings, saveSettings } from '../settings.js'
 import type { Order, OrderItem } from '../db/schema.js'
 
 export function settingsRoutes(db: Db) {
   return async function register(app: FastifyInstance) {
-    /** The little a waiter's client needs: coperto amount and printer state. */
+    /**
+     * What a waiter's client needs: coperto amount, printer state, and the
+     * order-sheet layout fields the browser auto-print fallback renders.
+     */
     app.get('/api/config', { preHandler: requireAuth }, async () => {
       const s = await loadSettings(db)
       return {
         restaurantName: s.restaurantName,
         coverChargeCents: s.coverChargeCents,
         printerConfigured: Boolean(kitchenQueue()),
+        orderHeaderText: s.orderHeaderText,
+        orderHeaderImage: s.orderHeaderImage,
+        orderFooterText: s.orderFooterText,
+        orderFooterImage: s.orderFooterImage,
+        orderDisclaimer: s.orderDisclaimer,
+        orderCategoryStyle: s.orderCategoryStyle,
+        orderHeaderFontSize: s.orderHeaderFontSize,
+        orderFooterFontSize: s.orderFooterFontSize,
+        orderDisclaimerFontSize: s.orderDisclaimerFontSize,
+        orderHeaderImageWidthPct: s.orderHeaderImageWidthPct,
+        orderFooterImageWidthPct: s.orderFooterImageWidthPct,
       }
     })
 
@@ -39,8 +53,12 @@ export function settingsRoutes(db: Db) {
       },
     )
 
-    /** A sample receipt with the current settings — the admin preview button. */
+    /**
+     * A sample document with the current settings — the admin preview button.
+     * ?kind=order previews the order sheet; anything else the receipt.
+     */
     app.get('/api/settings/preview.pdf', { preHandler: requireAdmin }, async (req, reply) => {
+      const kind = (req.query as { kind?: string }).kind === 'order' ? 'order' : 'receipt'
       const s = await loadSettings(db)
       const now = Math.floor(Date.now() / 1000)
       const order = {
@@ -83,7 +101,10 @@ export function settingsRoutes(db: Db) {
         },
       ] satisfies OrderItem[]
 
-      const pdf = await renderReceipt(order, items, s)
+      const pdf =
+        kind === 'order'
+          ? await renderOrderSheet(order, items, s)
+          : await renderReceipt(order, items, s)
       return reply
         .header('content-type', 'application/pdf')
         .header('content-disposition', 'inline; filename="preview.pdf"')

@@ -6,6 +6,11 @@ import { useI18n } from '../i18n'
 export default function AdminUsers() {
   const { user: me } = useAuth()
   const { t } = useI18n()
+  const isMaitre = me?.role === 'maitre'
+  // A maître only manages waiters; the server enforces the same rule.
+  const canManage = (u: User) => me?.role === 'admin' || u.role === 'operator'
+  const roleLabel = (r: Role) =>
+    r === 'admin' ? t('roleAdmin') : r === 'maitre' ? t('roleMaitre') : t('roleWaiter')
   const [users, setUsers] = useState<User[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -102,6 +107,7 @@ export default function AdminUsers() {
             style={{ flex: '1 1 130px', width: 'auto' }}
             placeholder={t('usernamePlaceholder')}
             autoCapitalize="none"
+            autoComplete="off"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
           />
@@ -109,6 +115,7 @@ export default function AdminUsers() {
             className="input"
             style={{ flex: '1 1 130px', width: 'auto' }}
             placeholder={t('displayNamePlaceholder')}
+            autoComplete="off"
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
           />
@@ -117,18 +124,22 @@ export default function AdminUsers() {
             style={{ flex: '1 1 130px', width: 'auto' }}
             type="password"
             placeholder={t('passwordPlaceholder')}
+            autoComplete="new-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
-          <select
-            className="input"
-            style={{ flex: '0 1 150px', width: 'auto' }}
-            value={role}
-            onChange={(e) => setRole(e.target.value as Role)}
-          >
-            <option value="operator">{t('optionWaiter')}</option>
-            <option value="admin">{t('optionAdmin')}</option>
-          </select>
+          {!isMaitre && (
+            <select
+              className="input"
+              style={{ flex: '0 1 150px', width: 'auto' }}
+              value={role}
+              onChange={(e) => setRole(e.target.value as Role)}
+            >
+              <option value="operator">{t('optionWaiter')}</option>
+              <option value="maitre">{t('optionMaitre')}</option>
+              <option value="admin">{t('optionAdmin')}</option>
+            </select>
+          )}
           <button className="btn primary" onClick={() => void add()}>
             {t('add')}
           </button>
@@ -158,17 +169,18 @@ export default function AdminUsers() {
                 <td className="muted">{u.username}</td>
                 <td>
                   <span className={`badge ${u.role === 'admin' ? 'admin' : ''}`}>
-                    {u.role === 'admin' ? t('roleAdmin') : t('roleWaiter')}
+                    {roleLabel(u.role)}
                   </span>
                 </td>
                 <td className="num" style={{ whiteSpace: 'nowrap' }}>
-                  {resetting === u.id ? (
+                  {!canManage(u) ? null : resetting === u.id ? (
                     <span className="row" style={{ display: 'inline-flex', gap: 6 }}>
                       <input
                         className="input"
                         style={{ minHeight: 36, width: 170 }}
                         type="password"
                         autoFocus
+                        autoComplete="new-password"
                         placeholder={t('newPassword')}
                         value={resetValue}
                         onChange={(e) => setResetValue(e.target.value)}
@@ -192,20 +204,21 @@ export default function AdminUsers() {
                       {t('resetPassword')}
                     </button>
                   )}{' '}
-                  {u.active ? (
-                    <button
-                      className="btn small danger"
-                      disabled={u.id === me?.id}
-                      title={u.id === me?.id ? t('cantDisableSelf') : undefined}
-                      onClick={() => void setActive(u, false)}
-                    >
-                      {t('disable')}
-                    </button>
-                  ) : (
-                    <button className="btn small" onClick={() => void setActive(u, true)}>
-                      {t('enable')}
-                    </button>
-                  )}
+                  {canManage(u) &&
+                    (u.active ? (
+                      <button
+                        className="btn small danger"
+                        disabled={u.id === me?.id}
+                        title={u.id === me?.id ? t('cantDisableSelf') : undefined}
+                        onClick={() => void setActive(u, false)}
+                      >
+                        {t('disable')}
+                      </button>
+                    ) : (
+                      <button className="btn small" onClick={() => void setActive(u, true)}>
+                        {t('enable')}
+                      </button>
+                    ))}
                 </td>
               </tr>
             ))}

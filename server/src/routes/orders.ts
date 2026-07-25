@@ -1,13 +1,13 @@
 import { and, desc, eq, inArray, sql } from 'drizzle-orm'
+import { alias } from 'drizzle-orm/sqlite-core'
 import type { FastifyInstance } from 'fastify'
-import { requireAuth } from '../auth/acl.js'
+import { isManager, requireAuth, requireManager } from '../auth/acl.js'
 import type { Db } from '../db/index.js'
 import { categories, orderItems, orders, products, users, type Order } from '../db/schema.js'
 import { isServiceDay, serviceDayOf } from '../lib/serviceDay.js'
-import { renderKitchenTicket, renderReceipt } from '../print/pdf.js'
+import { renderKitchenTicket, renderOrderSheet, renderReceipt } from '../print/pdf.js'
 import { kitchenQueue, printKitchenTicket } from '../print/service.js'
 import { loadSettings } from '../settings.js'
-import { requireAdmin } from '../auth/acl.js'
 
 type IncomingItem = { productId: number; qty: number; note?: string }
 
@@ -145,11 +145,11 @@ export function orderRoutes(db: Db) {
     ): Promise<Order | 'not_found' | 'forbidden'> {
       const order = (await db.select().from(orders).where(eq(orders.id, id)).limit(1))[0]
       if (!order) return 'not_found'
-      if (user.role !== 'admin' && order.createdBy !== user.id) return 'forbidden'
+      if (!isManager(user) && order.createdBy !== user.id) return 'forbidden'
       return order
     }
 
-    for (const kind of ['receipt', 'kitchen'] as const) {
+    for (const kind of ['receipt', 'kitchen', 'order'] as const) {
       app.get(`/api/orders/:id/${kind}.pdf`, async (req, reply) => {
         const id = Number((req.params as { id: string }).id)
         const order = await loadVisibleOrder(id, req.user!)
@@ -161,7 +161,9 @@ export function orderRoutes(db: Db) {
         const pdf =
           kind === 'receipt'
             ? await renderReceipt(order, items, s)
-            : await renderKitchenTicket(order, items, s)
+            : kind === 'kitchen'
+              ? await renderKitchenTicket(order, items, s)
+              : await renderOrderSheet(order, items, s)
 
         return reply
           .header('content-type', 'application/pdf')
@@ -177,7 +179,7 @@ export function orderRoutes(db: Db) {
      * Cancel, never delete: the row and its daily number survive for the
      * records; report totals simply skip it.
      */
-    app.post('/api/orders/:id/cancel', { preHandler: requireAdmin }, async (req, reply) => {
+    app.post('/api/orders/:id/cancel', { preHandler: requireManager }, async (req, reply) => {
       const id = Number((req.params as { id: string }).id)
       const order = (await db.select().from(orders).where(eq(orders.id, id)).limit(1))[0]
       if (!order) return reply.code(404).send({ error: 'not_found' })
@@ -220,16 +222,18 @@ export function orderRoutes(db: Db) {
       return { ok: true, printedAt: result.printedAt }
     })
 
-    /** Admins see the whole service; operators see only what they rang up. */
+    /** Admins and maîtres see the whole service; operators only what they rang up. */
     app.get('/api/orders', async (req) => {
       const q = req.query as { day?: string; mine?: string }
       const day = q.day && isServiceDay(q.day) ? q.day : serviceDayOf()
 
-      const restrictToSelf = req.user!.role !== 'admin' || q.mine === 'true'
+      const restrictToSelf = !isManager(req.user!) || q.mine === 'true'
       const where = restrictToSelf
         ? and(eq(orders.serviceDay, day), eq(orders.createdBy, req.user!.id))
         : eq(orders.serviceDay, day)
 
+      // Second join on users under an alias: who cancelled ≠ who created.
+      const cancellers = alias(users, 'cancellers')
       const rows = await db
         .select({
           id: orders.id,
@@ -238,6 +242,7 @@ export function orderRoutes(db: Db) {
           customerName: orders.customerName,
           covers: orders.covers,
           cancelledAt: orders.cancelledAt,
+          cancelledByName: cancellers.displayName,
           note: orders.note,
           totalCents: orders.totalCents,
           createdAt: orders.createdAt,
@@ -247,6 +252,7 @@ export function orderRoutes(db: Db) {
         })
         .from(orders)
         .innerJoin(users, eq(users.id, orders.createdBy))
+        .leftJoin(cancellers, eq(cancellers.id, orders.cancelledBy))
         .where(where)
         .orderBy(desc(orders.dailyNumber))
 
@@ -259,12 +265,21 @@ export function orderRoutes(db: Db) {
       if (!order) return reply.code(404).send({ error: 'not_found' })
 
       // An operator must not be able to read a colleague's order by guessing ids.
-      if (req.user!.role !== 'admin' && order.createdBy !== req.user!.id) {
+      if (!isManager(req.user!) && order.createdBy !== req.user!.id) {
         return reply.code(403).send({ error: 'forbidden' })
       }
 
       const items = await db.select().from(orderItems).where(eq(orderItems.orderId, id))
-      return { ...order, items }
+      const cancelledByName = order.cancelledBy
+        ? ((
+            await db
+              .select({ name: users.displayName })
+              .from(users)
+              .where(eq(users.id, order.cancelledBy))
+              .limit(1)
+          )[0]?.name ?? null)
+        : null
+      return { ...order, cancelledByName, items }
     })
   }
 }

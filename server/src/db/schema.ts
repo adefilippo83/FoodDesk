@@ -12,7 +12,7 @@ export const users = sqliteTable(
     username: text('username').notNull(),
     passwordHash: text('password_hash').notNull(),
     displayName: text('display_name').notNull(),
-    role: text('role', { enum: ['admin', 'operator'] }).notNull(),
+    role: text('role', { enum: ['admin', 'maitre', 'operator'] }).notNull(),
     active: integer('active', { mode: 'boolean' }).notNull().default(true),
     createdAt: integer('created_at').notNull().default(sql`(unixepoch())`),
   },
