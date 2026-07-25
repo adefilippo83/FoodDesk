@@ -15,7 +15,8 @@ function OrderCard({
   onToggle: (orderId: number, item: KitchenItem) => void
 }) {
   const { t } = useI18n()
-  const done = order.items.length > 0 && order.items.every((i) => i.doneAt !== null)
+  const active = order.items.filter((i) => i.cancelledAt === null)
+  const done = active.length > 0 && active.every((i) => i.doneAt !== null)
   const cancelled = order.cancelledAt !== null
   const age = minutesSince(order.createdAt)
 
@@ -46,8 +47,10 @@ function OrderCard({
         {order.items.map((i) => (
           <button
             key={i.id}
-            className={`kds-item ${i.doneAt !== null ? 'done' : ''}`}
-            disabled={cancelled}
+            className={`kds-item ${
+              i.cancelledAt !== null ? 'cancelled' : i.doneAt !== null ? 'done' : ''
+            }`}
+            disabled={cancelled || i.cancelledAt !== null}
             onClick={() => onToggle(order.id, i)}
           >
             <span className="kds-qty">{i.qty}×</span>
@@ -139,12 +142,17 @@ export default function Kitchen() {
   if (orders === null) return <div className="empty">{t('loading')}</div>
 
   // Cancelled orders stay in the main grid, marked, so the kitchen notices.
+  // Cancelled lines never count toward an order's completion.
   const open = orders.filter(
-    (o) => o.cancelledAt !== null || o.items.some((i) => i.doneAt === null),
+    (o) =>
+      o.cancelledAt !== null ||
+      o.items.some((i) => i.doneAt === null && i.cancelledAt === null),
   )
-  const completed = orders.filter(
-    (o) => o.cancelledAt === null && o.items.length > 0 && o.items.every((i) => i.doneAt !== null),
-  )
+  const completed = orders.filter((o) => {
+    if (o.cancelledAt !== null) return false
+    const active = o.items.filter((i) => i.cancelledAt === null)
+    return active.length > 0 && active.every((i) => i.doneAt !== null)
+  })
 
   return (
     <>

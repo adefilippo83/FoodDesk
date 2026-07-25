@@ -217,6 +217,11 @@ function drawLogo(doc: PDFKit.PDFDocument, s: AppSettings, d: Dims) {
   }
 }
 
+/** Cancelled lines are omitted from every printed document. */
+function activeItems(items: OrderItem[]): OrderItem[] {
+  return items.filter((i) => i.cancelledAt === null)
+}
+
 function dashes(doc: PDFKit.PDFDocument, d: Dims) {
   doc.moveDown(0.4)
   doc
@@ -235,10 +240,11 @@ function dashes(doc: PDFKit.PDFDocument, d: Dims) {
  */
 export function renderKitchenTicket(
   order: Order,
-  items: OrderItem[],
+  allItems: OrderItem[],
   s: AppSettings,
 ): Promise<Buffer> {
   const L = LABELS[s.pdfLang]
+  const items = activeItems(allItems)
   return render(s, order.cancelledAt !== null, (doc, d) => {
     doc.font('Helvetica-Bold').fontSize(26).text(`#${ticketNo(order)}`, { align: 'center' })
     doc
@@ -269,9 +275,14 @@ export function renderKitchenTicket(
 }
 
 /** Customer receipt: itemised with prices, coperto and the total. */
-export function renderReceipt(order: Order, items: OrderItem[], s: AppSettings): Promise<Buffer> {
+export function renderReceipt(
+  order: Order,
+  allItems: OrderItem[],
+  s: AppSettings,
+): Promise<Buffer> {
   const L = LABELS[s.pdfLang]
   const lang = s.pdfLang
+  const items = activeItems(allItems)
   return render(s, order.cancelledAt !== null, (doc, d) => {
     drawLogo(doc, s, d)
     doc.font('Helvetica-Bold').fontSize(16).text(s.restaurantName, { align: 'center' })
@@ -342,9 +353,14 @@ export function renderReceipt(order: Order, items: OrderItem[], s: AppSettings):
  * by alternating light-grey blocks or separator lines (orderCategoryStyle) —
  * a highlighted total, the kitchen note, and a disclaimer above the footer.
  */
-export function renderOrderSheet(order: Order, items: OrderItem[], s: AppSettings): Promise<Buffer> {
+export function renderOrderSheet(
+  order: Order,
+  allItems: OrderItem[],
+  s: AppSettings,
+): Promise<Buffer> {
   const L = LABELS[s.pdfLang]
   const lang = s.pdfLang
+  const items = activeItems(allItems)
   return render(s, order.cancelledAt !== null, (doc, d) => {
     // Centered image scaled to a % of the printable width, height proportional.
     const scaledImage = (dataUrl: string, pct: number) => {

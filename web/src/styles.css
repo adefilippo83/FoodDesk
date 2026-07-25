@@ -658,6 +658,14 @@ tr.cancelled td .badge {
   border-color: var(--ok);
 }
 
+.kds-item.cancelled {
+  opacity: 0.5;
+  text-decoration: line-through;
+  border-color: var(--danger);
+  color: var(--danger);
+  cursor: default;
+}
+
 .kds-qty {
   font-variant-numeric: tabular-nums;
   color: var(--accent);

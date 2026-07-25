@@ -159,6 +159,8 @@ const en = {
   cancelledBadge: 'cancelled',
   cancelledBy: 'by {name}',
   errCancelOrder: 'Could not cancel the order.',
+  cancelItem: 'Cancel item',
+  errCancelItem: 'Could not cancel the item.',
 
   // password
   changePassword: 'Change password',
@@ -368,6 +370,8 @@ const it: typeof en = {
   cancelledBadge: 'annullato',
   cancelledBy: 'da {name}',
   errCancelOrder: "Impossibile annullare l'ordine.",
+  cancelItem: 'Annulla piatto',
+  errCancelItem: 'Impossibile annullare il piatto.',
 
   changePassword: 'Cambia password',
   currentPassword: 'Password attuale',
@@ -572,6 +576,8 @@ const es: typeof en = {
   cancelledBadge: 'anulado',
   cancelledBy: 'por {name}',
   errCancelOrder: 'No se pudo anular el pedido.',
+  cancelItem: 'Anular plato',
+  errCancelItem: 'No se pudo anular el plato.',
 
   changePassword: 'Cambiar contraseña',
   currentPassword: 'Contraseña actual',
@@ -776,6 +782,8 @@ const fr: typeof en = {
   cancelledBadge: 'annulée',
   cancelledBy: 'par {name}',
   errCancelOrder: 'Impossible d’annuler la commande.',
+  cancelItem: 'Annuler le plat',
+  errCancelItem: 'Impossible d’annuler le plat.',
 
   changePassword: 'Changer le mot de passe',
   currentPassword: 'Mot de passe actuel',
@@ -980,6 +988,8 @@ const pt: typeof en = {
   cancelledBadge: 'anulado',
   cancelledBy: 'por {name}',
   errCancelOrder: 'Não foi possível anular o pedido.',
+  cancelItem: 'Anular prato',
+  errCancelItem: 'Não foi possível anular o prato.',
 
   changePassword: 'Alterar palavra-passe',
   currentPassword: 'Palavra-passe atual',
