@@ -12,6 +12,9 @@ server/data/
 *.db-wal
 *.db-shm
 
+# Docker compose bind mount
+deploy/fooddesk-data/
+
 # E2E artifacts
 e2e/.tmp/
 test-results/

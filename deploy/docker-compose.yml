@@ -1,0 +1,20 @@
+# FoodDesk via Docker — the quickest way to try or run it:
+#   docker compose up -d
+#   docker compose logs        # the generated admin password is printed once
+#
+# The database lives in the ./fooddesk-data folder next to this file, so a
+# plain copy of that folder is a backup.
+services:
+  fooddesk:
+    image: ghcr.io/adefilippo83/fooddesk:latest
+    ports:
+      - '3000:3000'
+    volumes:
+      - ./fooddesk-data:/data
+    environment:
+      RESTAURANT_NAME: FoodDesk
+      # Printing: point `lp` at a CUPS server reachable from the container.
+      # KITCHEN_PRINTER: kitchen
+      # CUPS_SERVER: 192.168.1.10
+      # ADMIN_PASSWORD: set-me-before-first-start
+    restart: unless-stopped
