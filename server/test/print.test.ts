@@ -54,7 +54,7 @@ describe('printing', () => {
     close()
   })
 
-  for (const kind of ['receipt', 'kitchen'] as const) {
+  for (const kind of ['receipt', 'kitchen', 'order'] as const) {
     it(`serves a real PDF for the ${kind} document`, async () => {
       const res = await app.inject({
         method: 'GET',

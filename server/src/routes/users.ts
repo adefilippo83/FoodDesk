@@ -1,16 +1,18 @@
 import { and, eq } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
-import { requireAdmin } from '../auth/acl.js'
+import { requireManager } from '../auth/acl.js'
 import type { Db } from '../db/index.js'
 import { hashPassword } from '../auth/password.js'
 import { sessions, users, type Role } from '../db/schema.js'
 
-const ROLES: Role[] = ['admin', 'operator']
+const ROLES: Role[] = ['admin', 'maitre', 'operator']
 
 export function userRoutes(db: Db) {
   return async function register(app: FastifyInstance) {
-    // Every route in this plugin is admin-only.
-    app.addHook('preHandler', requireAdmin)
+    // Admin or maître d'. A maître is further restricted below: they may only
+    // create waiters and only modify waiters — never admins or other maîtres,
+    // and never roles. Their own password goes through /api/auth/password.
+    app.addHook('preHandler', requireManager)
 
     app.get('/api/users', async () => {
       const rows = await db
@@ -45,6 +47,13 @@ export function userRoutes(db: Db) {
       if (!ROLES.includes(role)) {
         return reply.code(400).send({ error: 'invalid_role', allowed: ROLES })
       }
+      if (req.user!.role === 'maitre' && role !== 'operator') {
+        req.log.warn(
+          { event: 'maitre_denied', by: req.user!.id, action: 'create', role },
+          'audit',
+        )
+        return reply.code(403).send({ error: 'forbidden' })
+      }
 
       const existing = (
         await db.select({ id: users.id }).from(users).where(eq(users.username, username)).limit(1)
@@ -75,6 +84,16 @@ export function userRoutes(db: Db) {
       const body = req.body as Record<string, unknown> | undefined
       const target = (await db.select().from(users).where(eq(users.id, id)).limit(1))[0]
       if (!target) return reply.code(404).send({ error: 'not_found' })
+
+      // A maître may only touch waiters, and may not reassign roles at all —
+      // no promoting a waiter (or themselves) into an admin.
+      if (req.user!.role === 'maitre' && (target.role !== 'operator' || body?.role !== undefined)) {
+        req.log.warn(
+          { event: 'maitre_denied', by: req.user!.id, action: 'update', targetId: id },
+          'audit',
+        )
+        return reply.code(403).send({ error: 'forbidden' })
+      }
 
       const patch: Partial<typeof users.$inferInsert> = {}
       if (typeof body?.displayName === 'string' && body.displayName.trim()) {

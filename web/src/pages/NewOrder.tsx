@@ -13,42 +13,89 @@ function escapeHtml(s: string): string {
 }
 
 /**
- * Auto-print fallback when no CUPS printer is configured. This deliberately
- * prints an HTML ticket, not the PDF: browsers cannot script-print a PDF
- * inside an iframe (Chrome prints the surrounding page instead — which, on a
- * dark theme, comes out as blank sheets). Same-origin HTML iframes print
- * reliably everywhere. The print dialog still appears; browsers never allow
- * fully silent printing.
+ * Auto-print fallback when no CUPS printer is configured: the order sheet
+ * (foglio ordine), mirroring the server-rendered order.pdf. This deliberately
+ * prints HTML, not the PDF: browsers cannot script-print a PDF inside an
+ * iframe (Chrome prints the surrounding page instead — which, on a dark
+ * theme, comes out as blank sheets). Same-origin HTML iframes print reliably
+ * everywhere. The print dialog still appears; browsers never allow fully
+ * silent printing.
  */
-function autoPrintTicket(order: OrderDetail, coversLabel: string) {
-  const items = order.items
-    .map(
-      (i) =>
-        `<div class="item">${i.qty} × ${escapeHtml(i.nameSnapshot)}</div>` +
-        (i.note ? `<div class="note">» ${escapeHtml(i.note)}</div>` : ''),
-    )
-    .join('')
+function autoPrintOrderSheet(
+  order: OrderDetail,
+  config: AppConfig,
+  labels: { orderWord: string; coverCharge: string; total: string; notePrefix: string },
+) {
+  const esc = escapeHtml
+  const text = (s: string) => esc(s).replaceAll('\n', '<br>')
+  const money = (cents: number) => `€ ${formatMoney(cents)}`
 
   const time = new Date(order.createdAt * 1000).toLocaleTimeString([], {
     hour: '2-digit',
     minute: '2-digit',
   })
 
+  const groups: { name: string; items: OrderDetail['items'] }[] = []
+  for (const item of order.items) {
+    const g = groups.find((x) => x.name === item.categoryNameSnapshot)
+    if (g) g.items.push(item)
+    else groups.push({ name: item.categoryNameSnapshot, items: [item] })
+  }
+
+  const blocks = groups
+    .map((g, i) => {
+      const alt = config.orderCategoryStyle === 'alternating' && i % 2 === 1
+      const sep =
+        config.orderCategoryStyle === 'separator' && i > 0 ? '<div class="sep"></div>' : ''
+      const lines = g.items
+        .map(
+          (it) =>
+            `<div class="line"><span>${it.qty} × ${esc(it.nameSnapshot)}</span><span>${money(
+              it.priceCentsSnapshot * it.qty,
+            )}</span></div>` + (it.note ? `<div class="inote">» ${esc(it.note)}</div>` : ''),
+        )
+        .join('')
+      return `${sep}<div class="block${alt ? ' alt' : ''}"><div class="cat">${esc(g.name)}</div>${lines}</div>`
+    })
+    .join('')
+
+  const coperto =
+    order.covers > 0 && order.coverChargeCents > 0
+      ? `<div class="line coperto"><span>${order.covers} × ${esc(labels.coverCharge)}</span><span>${money(
+          order.covers * order.coverChargeCents,
+        )}</span></div>`
+      : ''
+
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>
     @page { margin: 5mm; }
     body { font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; color: #000; background: #fff; margin: 0; }
-    .num { font-size: 30px; font-weight: 800; text-align: center; margin: 0; }
-    .sub { text-align: center; font-size: 15px; margin: 2px 0 0; }
-    hr { border: 0; border-top: 2px dashed #000; margin: 10px 0; }
-    .item { font-size: 19px; font-weight: 700; margin: 5px 0; }
-    .note { font-style: italic; font-size: 14px; margin: 0 0 4px 14px; }
+    img.hf { display: block; max-width: 100%; height: auto; margin: 0 auto 4px; }
+    .htext { text-align: center; font-size: ${config.orderHeaderFontSize}pt; color: #333; margin: 0 0 4px; }
+    .info { font-size: 17px; font-weight: 800; text-align: center; margin: 2px 0; }
+    hr { border: 0; border-top: 2px dashed #000; margin: 8px 0; }
+    .block { padding: 3px 5px; }
+    .block.alt { background: #f0f0f0; }
+    .sep { border-top: 1px solid #999; margin: 5px 0; }
+    .cat { font-size: 11px; font-weight: 700; text-transform: uppercase; color: #555; margin: 2px 0; }
+    .line { display: flex; justify-content: space-between; gap: 8px; font-size: 15px; margin: 2px 0; }
+    .line.coperto { padding: 3px 5px; }
+    .inote { font-style: italic; font-size: 12px; margin: 0 0 3px 14px; }
+    .total { display: flex; justify-content: space-between; font-size: 18px; font-weight: 800; background: #e5e5e5; padding: 6px; margin-top: 8px; }
+    .note { font-style: italic; font-size: 14px; margin: 4px 0; }
+    .disclaimer { font-size: ${config.orderDisclaimerFontSize}pt; font-weight: 700; color: #555; text-align: center; margin: 8px 0 0; }
+    .ftext { text-align: center; font-size: ${config.orderFooterFontSize}pt; color: #444; margin: 8px 0 0; }
   </style></head><body>
-    <p class="num">#${String(order.dailyNumber).padStart(3, '0')}</p>
-    <p class="sub">${escapeHtml(order.customerName ?? '')} · ${time}</p>
-    ${order.covers > 0 ? `<p class="sub">${escapeHtml(coversLabel)}: ${order.covers}</p>` : ''}
+    ${config.orderHeaderImage ? `<img class="hf" style="width:${config.orderHeaderImageWidthPct}%" src="${config.orderHeaderImage}">` : ''}
+    ${config.orderHeaderText ? `<p class="htext">${text(config.orderHeaderText)}</p>` : ''}
+    <p class="info">${esc(labels.orderWord)} #${String(order.dailyNumber).padStart(3, '0')} · ${order.serviceDay} · ${time}${order.customerName ? ` · ${esc(order.customerName)}` : ''}</p>
     <hr>
-    ${items}
-    ${order.note ? `<hr><div class="note">${escapeHtml(order.note)}</div>` : ''}
+    ${coperto}
+    ${blocks}
+    <div class="total"><span>${esc(labels.total)}</span><span>${money(order.totalCents)}</span></div>
+    ${order.note ? `<hr><div class="note">${esc(labels.notePrefix)} ${esc(order.note)}</div>` : ''}
+    ${config.orderDisclaimer ? `<p class="disclaimer">${text(config.orderDisclaimer)}</p>` : ''}
+    ${config.orderFooterText ? `<p class="ftext">${text(config.orderFooterText)}</p>` : ''}
+    ${config.orderFooterImage ? `<img class="hf" style="width:${config.orderFooterImageWidthPct}%" src="${config.orderFooterImage}">` : ''}
   </body></html>`
 
   const frame = document.createElement('iframe')
@@ -64,7 +111,7 @@ function autoPrintTicket(order: OrderDetail, coversLabel: string) {
       frame.contentWindow?.focus()
       frame.contentWindow?.print()
     } catch {
-      window.open(api.kitchenPdfUrl(order.id), '_blank')
+      window.open(api.orderPdfUrl(order.id), '_blank')
     }
   }
   document.body.appendChild(frame)
@@ -143,7 +190,8 @@ export default function NewOrder() {
     try {
       const order = await api.createOrder({
         customerName: customerName.trim(),
-        covers,
+        // No coperto configured → no covers to count on this order.
+        covers: coverChargeCents > 0 ? covers : 0,
         note: note.trim() || undefined,
         items: lines.map((l) => ({ productId: l.productId, qty: l.qty })),
       })
@@ -153,9 +201,14 @@ export default function NewOrder() {
       setCovers(1)
       setNote('')
       setToast(t('orderSent', { n: order.dailyNumber }))
-      // No CUPS printer? Hand the kitchen ticket to the browser's print dialog.
+      // No CUPS printer? Hand the order sheet to the browser's print dialog.
       if (config && !config.printerConfigured) {
-        autoPrintTicket(order, t('covers'))
+        autoPrintOrderSheet(order, config, {
+          orderWord: t('cartTitle'),
+          coverCharge: t('coverCharge'),
+          total: t('total'),
+          notePrefix: t('notePrefix'),
+        })
       }
     } catch (err) {
       setError(
@@ -228,46 +281,49 @@ export default function NewOrder() {
             />
           </label>
 
-          <div className="field">
-            <span
-              style={{
-                display: 'block',
-                fontSize: 13,
-                color: 'var(--text-dim)',
-                marginBottom: 6,
-                fontWeight: 600,
-              }}
-            >
-              {t('covers')}
-              {coverChargeCents > 0 && (
-                <span style={{ fontWeight: 400 }}> · €{formatMoney(coverChargeCents)} cad.</span>
-              )}
-            </span>
-            <div className="qty-controls">
-              <button
-                className="qty-btn"
-                onClick={() => setCovers((c) => Math.max(0, c - 1))}
-                aria-label={t('oneLess', { name: t('covers') })}
+          {coverChargeCents > 0 && (
+            <div className="field">
+              <span
+                style={{
+                  display: 'block',
+                  fontSize: 13,
+                  color: 'var(--text-dim)',
+                  marginBottom: 6,
+                  fontWeight: 600,
+                }}
               >
-                −
-              </button>
-              <span className="qty" style={{ minWidth: 34, fontSize: 18 }}>
-                {covers}
-              </span>
-              <button
-                className="qty-btn"
-                onClick={() => setCovers((c) => Math.min(99, c + 1))}
-                aria-label={t('oneMore', { name: t('covers') })}
-              >
-                +
-              </button>
-              {coverChargeCents > 0 && covers > 0 && (
-                <span className="line-total" style={{ marginLeft: 'auto' }}>
-                  €{formatMoney(covers * coverChargeCents)}
+                {t('covers')}
+                <span style={{ fontWeight: 400 }}>
+                  {' '}
+                  · €{formatMoney(coverChargeCents)} {t('each')}
                 </span>
-              )}
+              </span>
+              <div className="qty-controls">
+                <button
+                  className="qty-btn"
+                  onClick={() => setCovers((c) => Math.max(0, c - 1))}
+                  aria-label={t('oneLess', { name: t('covers') })}
+                >
+                  −
+                </button>
+                <span className="qty" style={{ minWidth: 34, fontSize: 18 }}>
+                  {covers}
+                </span>
+                <button
+                  className="qty-btn"
+                  onClick={() => setCovers((c) => Math.min(99, c + 1))}
+                  aria-label={t('oneMore', { name: t('covers') })}
+                >
+                  +
+                </button>
+                {covers > 0 && (
+                  <span className="line-total" style={{ marginLeft: 'auto' }}>
+                    €{formatMoney(covers * coverChargeCents)}
+                  </span>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           {lines.length === 0 ? (
             <p className="muted">{t('tapToAdd')}</p>

@@ -8,7 +8,9 @@
 Ordering system for a temporary restaurant. Runs on a single Debian server on the
 venue Wi-Fi; waiters connect from their phones over the LAN.
 
-- **Admin** — manages categories, products, prices and users.
+- **Admin** — manages categories, products, prices, users and settings.
+- **Maître d'** (caposala) — like an admin for the menu, all orders and reports,
+  but no Settings page and can only create/manage waiter accounts.
 - **Operator** (waiter) — takes orders and prints them. Cannot change the menu.
 
 ## Stack

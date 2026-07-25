@@ -14,6 +14,10 @@ export type PaperSize = (typeof PAPER_SIZES)[number]
 export const PDF_LANGS = ['it', 'en', 'es', 'fr', 'pt'] as const
 export type PdfLang = (typeof PDF_LANGS)[number]
 
+// How the order sheet visually separates one category of products from the next.
+export const CATEGORY_STYLES = ['alternating', 'separator'] as const
+export type CategoryStyle = (typeof CATEGORY_STYLES)[number]
+
 export type AppSettings = {
   restaurantName: string
   coverChargeCents: number
@@ -24,6 +28,20 @@ export type AppSettings = {
   /** data: URLs (image/png or image/jpeg), empty string = none */
   logoImage: string
   backgroundImage: string
+  // Order sheet (foglio ordine) — the document handed out when an order is taken.
+  orderHeaderText: string
+  orderHeaderImage: string
+  orderFooterText: string
+  orderFooterImage: string
+  orderDisclaimer: string
+  orderCategoryStyle: CategoryStyle
+  /** Font sizes in points. */
+  orderHeaderFontSize: number
+  orderFooterFontSize: number
+  orderDisclaimerFontSize: number
+  /** Width of the header/footer image as a % of the printable width. */
+  orderHeaderImageWidthPct: number
+  orderFooterImageWidthPct: number
 }
 
 const DEFAULTS: AppSettings = {
@@ -37,7 +55,27 @@ const DEFAULTS: AppSettings = {
   footerText: '',
   logoImage: '',
   backgroundImage: '',
+  orderHeaderText: '',
+  orderHeaderImage: '',
+  orderFooterText: '',
+  orderFooterImage: '',
+  orderDisclaimer: '',
+  orderCategoryStyle: 'alternating',
+  orderHeaderFontSize: 10,
+  orderFooterFontSize: 9,
+  orderDisclaimerFontSize: 8,
+  orderHeaderImageWidthPct: 100,
+  orderFooterImageWidthPct: 100,
 }
+
+// Bounds for the admin-tunable numeric settings of the order sheet.
+const INT_SETTINGS = [
+  ['orderHeaderFontSize', 6, 36],
+  ['orderFooterFontSize', 6, 36],
+  ['orderDisclaimerFontSize', 6, 36],
+  ['orderHeaderImageWidthPct', 10, 100],
+  ['orderFooterImageWidthPct', 10, 100],
+] as const
 
 // Uploaded images ride along in JSON bodies; keep them phone-photo-proof.
 export const MAX_IMAGE_BYTES = 700 * 1024
@@ -56,7 +94,25 @@ export async function loadSettings(db: Db): Promise<AppSettings> {
   if (paper && (PAPER_SIZES as readonly string[]).includes(paper)) s.paperSize = paper as PaperSize
   const lang = map.get('pdfLang')
   if (lang && (PDF_LANGS as readonly string[]).includes(lang)) s.pdfLang = lang as PdfLang
-  for (const key of ['headerText', 'footerText', 'logoImage', 'backgroundImage'] as const) {
+  const catStyle = map.get('orderCategoryStyle')
+  if (catStyle && (CATEGORY_STYLES as readonly string[]).includes(catStyle)) {
+    s.orderCategoryStyle = catStyle as CategoryStyle
+  }
+  for (const [key, min, max] of INT_SETTINGS) {
+    const v = Number(map.get(key))
+    if (Number.isInteger(v) && v >= min && v <= max) s[key] = v
+  }
+  for (const key of [
+    'headerText',
+    'footerText',
+    'logoImage',
+    'backgroundImage',
+    'orderHeaderText',
+    'orderHeaderImage',
+    'orderFooterText',
+    'orderFooterImage',
+    'orderDisclaimer',
+  ] as const) {
     const v = map.get(key)
     if (v !== undefined) s[key] = v
   }
@@ -97,13 +153,33 @@ export async function saveSettings(
     }
     writes.push(['pdfLang', patch.pdfLang as string])
   }
-  for (const key of ['headerText', 'footerText'] as const) {
+  if (patch.orderCategoryStyle !== undefined) {
+    if (!(CATEGORY_STYLES as readonly string[]).includes(patch.orderCategoryStyle as string)) {
+      return { field: 'orderCategoryStyle', error: 'invalid_category_style' }
+    }
+    writes.push(['orderCategoryStyle', patch.orderCategoryStyle as string])
+  }
+  for (const [key, min, max] of INT_SETTINGS) {
+    const v = patch[key]
+    if (v === undefined) continue
+    if (typeof v !== 'number' || !Number.isInteger(v) || v < min || v > max) {
+      return { field: key, error: 'invalid_number' }
+    }
+    writes.push([key, String(v)])
+  }
+  for (const key of ['headerText', 'footerText', 'orderHeaderText', 'orderFooterText'] as const) {
     if (patch[key] !== undefined) {
       if (typeof patch[key] !== 'string') return { field: key, error: 'invalid_text' }
       writes.push([key, (patch[key] as string).slice(0, 300)])
     }
   }
-  for (const key of ['logoImage', 'backgroundImage'] as const) {
+  if (patch.orderDisclaimer !== undefined) {
+    if (typeof patch.orderDisclaimer !== 'string') {
+      return { field: 'orderDisclaimer', error: 'invalid_text' }
+    }
+    writes.push(['orderDisclaimer', patch.orderDisclaimer.slice(0, 500)])
+  }
+  for (const key of ['logoImage', 'backgroundImage', 'orderHeaderImage', 'orderFooterImage'] as const) {
     const v = patch[key]
     if (v === undefined) continue
     if (v === '') {

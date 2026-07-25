@@ -34,3 +34,14 @@ export function requireRole(...allowed: Role[]) {
 }
 
 export const requireAdmin = requireRole('admin')
+
+/**
+ * Admin or maître d' (caposala). The maître runs the room: menu, every order,
+ * reports and waiter accounts — but not Settings, and no touching admin or
+ * other maître accounts (enforced inside the user routes).
+ */
+export const requireManager = requireRole('admin', 'maitre')
+
+export function isManager(user: { role: string }): boolean {
+  return user.role === 'admin' || user.role === 'maitre'
+}
