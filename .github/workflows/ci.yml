@@ -20,8 +20,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 22 is what the Debian venue server runs; 24 is the canary.
-        node: [22, 24]
+        # 24 (Active LTS) is what the Debian venue server runs; 26 is the canary.
+        node: [24, 26]
 
     steps:
       - uses: actions/checkout@v7
@@ -42,7 +42,7 @@ jobs:
 
       # The exact bits a release would ship: server/dist + the built PWA.
       - name: Upload build artifact
-        if: matrix.node == 22
+        if: matrix.node == 24
         uses: actions/upload-artifact@v7
         with:
           name: fooddesk-build

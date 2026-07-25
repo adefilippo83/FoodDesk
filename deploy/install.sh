@@ -12,8 +12,8 @@ SRC_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 [ "$(id -u)" -eq 0 ] || { echo "run as root: sudo deploy/install.sh"; exit 1; }
 
 command -v node >/dev/null || {
-  echo "node not found. Install Node 22 LTS first:"
-  echo "  curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y nodejs"
+  echo "node not found. Install Node 24 LTS first:"
+  echo "  curl -fsSL https://deb.nodesource.com/setup_24.x | bash - && apt-get install -y nodejs"
   exit 1
 }
 command -v sqlite3 >/dev/null || apt-get install -y sqlite3
