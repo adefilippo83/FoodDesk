@@ -53,6 +53,25 @@ Environment variables:
 | `CURRENCY_SYMBOL` | `€` | Currency symbol on receipts and totals |
 | `SERVICE_DAY_CUTOFF_HOUR` | `5` | Orders before this hour count as the previous service day |
 
+## Docker
+
+Every push to `main` publishes `ghcr.io/adefilippo83/fooddesk:edge`; every
+`v*` tag publishes `:latest` and `:X.Y.Z` (amd64 + arm64). One command runs
+everything:
+
+```bash
+docker run -d --name fooddesk -p 3000:3000 -v fooddesk-data:/data \
+  ghcr.io/adefilippo83/fooddesk:latest
+docker logs fooddesk   # the generated admin password is printed on first start
+```
+
+The SQLite database lives in the `/data` volume. All the usual environment
+variables apply; for printing, set `KITCHEN_PRINTER` plus `CUPS_SERVER=<host>`
+so the container's `lp` talks to a CUPS server on the host or LAN. See
+[deploy/docker-compose.yml](deploy/docker-compose.yml) for a ready-made
+compose file. Pull requests only validate that the image builds; nothing is
+published until the merge.
+
 ## Design notes
 
 - **Money is integer cents.** No floats anywhere in the money path.

@@ -1,0 +1,19 @@
+# Everything rebuilt or irrelevant inside the image
+node_modules
+**/node_modules
+server/dist
+server/public
+server/data
+*.db
+*.db-wal
+*.db-shm
+*.tsbuildinfo
+
+# Repo/dev noise
+.git
+.github
+e2e
+test-results
+playwright-report
+deploy
+README.md
