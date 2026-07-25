@@ -79,6 +79,9 @@ export const orders = sqliteTable(
     cancelledBy: integer('cancelled_by').references(() => users.id),
     // Kitchen display: set when every item is done, cleared if one reopens.
     completedAt: integer('completed_at'),
+    // Idempotency: a client-generated key so a network retry of the same
+    // submission can never create a second order.
+    clientKey: text('client_key'),
     note: text('note'),
     totalCents: integer('total_cents').notNull(),
     createdBy: integer('created_by')
@@ -92,6 +95,8 @@ export const orders = sqliteTable(
   },
   (t) => [
     uniqueIndex('orders_day_number_unique').on(t.serviceDay, t.dailyNumber),
+    // NULLs are distinct in SQLite, so key-less orders are unaffected.
+    uniqueIndex('orders_client_key_unique').on(t.clientKey),
     index('orders_created_by_idx').on(t.createdBy),
   ],
 )

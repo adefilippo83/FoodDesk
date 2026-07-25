@@ -4,7 +4,8 @@ import type { Db } from '../db/index.js'
 import { kitchenQueue } from '../print/service.js'
 import { kitchenFeatureEnabled } from './kitchen.js'
 import { renderOrderSheet, renderReceipt } from '../print/pdf.js'
-import { loadSettings, saveSettings } from '../settings.js'
+import { createHash } from 'node:crypto'
+import { imageBuffer, loadSettings, saveSettings } from '../settings.js'
 import type { Order, OrderItem } from '../db/schema.js'
 
 export function settingsRoutes(db: Db) {
@@ -17,17 +18,23 @@ export function settingsRoutes(db: Db) {
     /**
      * What a waiter's client needs: coperto amount, printer state, and the
      * order-sheet layout fields the browser auto-print fallback renders.
+     * Images travel as versioned, immutably-cached URLs — not as megabytes
+     * of base64 re-downloaded on every New Order mount.
      */
     app.get('/api/config', { preHandler: requireAuth }, async () => {
       const s = await loadSettings(db)
+      const assetUrl = (kind: 'header' | 'footer', dataUrl: string) =>
+        dataUrl
+          ? `/api/order-assets/${kind}?v=${createHash('sha1').update(dataUrl).digest('hex').slice(0, 8)}`
+          : ''
       return {
         restaurantName: s.restaurantName,
         coverChargeCents: s.coverChargeCents,
         printerConfigured: Boolean(kitchenQueue()),
         orderHeaderText: s.orderHeaderText,
-        orderHeaderImage: s.orderHeaderImage,
+        orderHeaderImageUrl: assetUrl('header', s.orderHeaderImage),
         orderFooterText: s.orderFooterText,
-        orderFooterImage: s.orderFooterImage,
+        orderFooterImageUrl: assetUrl('footer', s.orderFooterImage),
         orderDisclaimer: s.orderDisclaimer,
         orderCategoryStyle: s.orderCategoryStyle,
         orderHeaderFontSize: s.orderHeaderFontSize,
@@ -36,6 +43,26 @@ export function settingsRoutes(db: Db) {
         orderHeaderImageWidthPct: s.orderHeaderImageWidthPct,
         orderFooterImageWidthPct: s.orderFooterImageWidthPct,
       }
+    })
+
+    /**
+     * The order-sheet header/footer images as plain image responses. The
+     * ?v= content hash in the URL changes on upload, so the response itself
+     * can be cached forever.
+     */
+    app.get('/api/order-assets/:kind', { preHandler: requireAuth }, async (req, reply) => {
+      const kind = (req.params as { kind: string }).kind
+      if (kind !== 'header' && kind !== 'footer') {
+        return reply.code(404).send({ error: 'not_found' })
+      }
+      const s = await loadSettings(db)
+      const dataUrl = kind === 'header' ? s.orderHeaderImage : s.orderFooterImage
+      const buf = dataUrl ? imageBuffer(dataUrl) : null
+      if (!buf) return reply.code(404).send({ error: 'not_found' })
+      return reply
+        .header('content-type', dataUrl.startsWith('data:image/png') ? 'image/png' : 'image/jpeg')
+        .header('cache-control', 'public, max-age=31536000, immutable')
+        .send(buf)
     })
 
     app.get('/api/settings', { preHandler: requireAdmin }, async () => loadSettings(db))
@@ -77,6 +104,7 @@ export function settingsRoutes(db: Db) {
         cancelledAt: null,
         cancelledBy: null,
         completedAt: null,
+        clientKey: null,
         note: null,
         totalCents: 2 * 650 + 3 * 500 + 3 * s.coverChargeCents,
         createdBy: 0,

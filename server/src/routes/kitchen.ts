@@ -1,8 +1,9 @@
-import { and, asc, eq, inArray, isNull } from 'drizzle-orm'
+import { and, asc, eq, gt, inArray, isNull, or } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 import { requireRole } from '../auth/acl.js'
 import type { Db } from '../db/index.js'
 import { orderItems, orders, users } from '../db/schema.js'
+import { notifyOrdersChanged } from '../lib/events.js'
 import { serviceDayOf } from '../lib/serviceDay.js'
 
 /**
@@ -35,9 +36,15 @@ export function kitchenRoutes(db: Db) {
       }
     })
 
-    /** Today's active orders with their items and per-item done state. */
+    // A cancelled order must not just vanish from the display — a cook who
+    // is mid-dish needs to SEE the cancellation. Keep it on screen, marked,
+    // for a grace window before it drops off.
+    const CANCELLED_VISIBLE_S = 10 * 60
+
+    /** Today's active orders (plus freshly cancelled ones) with item state. */
     app.get('/api/kitchen/orders', async () => {
       const day = serviceDayOf()
+      const now = Math.floor(Date.now() / 1000)
       const orderRows = await db
         .select({
           id: orders.id,
@@ -46,12 +53,18 @@ export function kitchenRoutes(db: Db) {
           covers: orders.covers,
           note: orders.note,
           createdAt: orders.createdAt,
+          cancelledAt: orders.cancelledAt,
           completedAt: orders.completedAt,
           createdByName: users.displayName,
         })
         .from(orders)
         .innerJoin(users, eq(users.id, orders.createdBy))
-        .where(and(eq(orders.serviceDay, day), isNull(orders.cancelledAt)))
+        .where(
+          and(
+            eq(orders.serviceDay, day),
+            or(isNull(orders.cancelledAt), gt(orders.cancelledAt, now - CANCELLED_VISIBLE_S)),
+          ),
+        )
         .orderBy(asc(orders.dailyNumber))
 
       const ids = orderRows.map((o) => o.id)
@@ -121,6 +134,7 @@ export function kitchenRoutes(db: Db) {
         },
         'audit',
       )
+      notifyOrdersChanged()
       return result
     })
   }

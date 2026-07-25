@@ -1,4 +1,3 @@
-import { eq } from 'drizzle-orm'
 import type { Db } from './db/index.js'
 import { settings } from './db/schema.js'
 

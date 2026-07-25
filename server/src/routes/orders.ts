@@ -4,6 +4,7 @@ import type { FastifyInstance } from 'fastify'
 import { isManager, requireFloorStaff, requireManager } from '../auth/acl.js'
 import type { Db } from '../db/index.js'
 import { categories, orderItems, orders, products, users, type Order } from '../db/schema.js'
+import { notifyOrdersChanged } from '../lib/events.js'
 import { isServiceDay, serviceDayOf } from '../lib/serviceDay.js'
 import { renderKitchenTicket, renderOrderSheet, renderReceipt } from '../print/pdf.js'
 import { kitchenQueue, printKitchenTicket } from '../print/service.js'
@@ -55,6 +56,28 @@ export function orderRoutes(db: Db) {
       const note =
         typeof body?.note === 'string' && body.note.trim() ? body.note.trim().slice(0, 500) : null
 
+      // Idempotency: a retry of a submission that actually landed (flaky
+      // venue Wi-Fi) must return the original order, never create a twin.
+      const clientKey =
+        typeof body?.clientKey === 'string' && body.clientKey.trim()
+          ? body.clientKey.trim().slice(0, 64)
+          : null
+      const replayOf = async () => {
+        const existing = (
+          await db.select().from(orders).where(eq(orders.clientKey, clientKey!)).limit(1)
+        )[0]
+        if (!existing) return null
+        const existingItems = await db
+          .select()
+          .from(orderItems)
+          .where(eq(orderItems.orderId, existing.id))
+        return { ...existing, items: existingItems }
+      }
+      if (clientKey) {
+        const replay = await replayOf()
+        if (replay) return reply.code(200).send(replay)
+      }
+
       // Prices come from the database, never from the client. A tampered
       // payload cannot discount anything.
       const ids = [...new Set(parsed.map((i) => i.productId))]
@@ -85,51 +108,63 @@ export function orderRoutes(db: Db) {
       // must not change tonight's bills.
       const { coverChargeCents } = await loadSettings(db)
 
-      const created = db.transaction((tx) => {
-        // Per-day sequence, allocated inside the transaction so two waiters
-        // submitting at once cannot land on the same ticket number.
-        const last = tx
-          .select({ max: sql<number | null>`max(${orders.dailyNumber})` })
-          .from(orders)
-          .where(eq(orders.serviceDay, serviceDay))
-          .get()
-        const dailyNumber = (last?.max ?? 0) + 1
+      let created
+      try {
+        created = db.transaction((tx) => {
+          // Per-day sequence, allocated inside the transaction so two waiters
+          // submitting at once cannot land on the same ticket number.
+          const last = tx
+            .select({ max: sql<number | null>`max(${orders.dailyNumber})` })
+            .from(orders)
+            .where(eq(orders.serviceDay, serviceDay))
+            .get()
+          const dailyNumber = (last?.max ?? 0) + 1
 
-        const totalCents =
-          parsed.reduce((sum, i) => sum + byId.get(i.productId)!.priceCents * i.qty, 0) +
-          covers * coverChargeCents
+          const totalCents =
+            parsed.reduce((sum, i) => sum + byId.get(i.productId)!.priceCents * i.qty, 0) +
+            covers * coverChargeCents
 
-        const order = tx
-          .insert(orders)
-          .values({
-            dailyNumber,
-            serviceDay,
-            customerName,
-            covers,
-            coverChargeCents,
-            note,
-            totalCents,
-            createdBy: userId,
-          })
-          .returning()
-          .get()
-
-        for (const item of parsed) {
-          const p = byId.get(item.productId)!
-          tx.insert(orderItems)
+          const order = tx
+            .insert(orders)
             .values({
-              orderId: order.id,
-              productId: p.id,
-              nameSnapshot: p.name,
-              priceCentsSnapshot: p.priceCents,
-              categoryNameSnapshot: p.categoryName,
-              qty: item.qty,
-              note: item.note ?? null,
+              dailyNumber,
+              serviceDay,
+              customerName,
+              covers,
+              coverChargeCents,
+              note,
+              totalCents,
+              createdBy: userId,
+              clientKey,
             })
-            .run()
+            .returning()
+            .get()
+
+          for (const item of parsed) {
+            const p = byId.get(item.productId)!
+            tx.insert(orderItems)
+              .values({
+                orderId: order.id,
+                productId: p.id,
+                nameSnapshot: p.name,
+                priceCentsSnapshot: p.priceCents,
+                categoryNameSnapshot: p.categoryName,
+                qty: item.qty,
+                note: item.note ?? null,
+              })
+              .run()
+          }
+          return order
+        })
+      } catch (err) {
+        // Two identical submissions racing: the loser of the unique-index
+        // race replays the winner's order.
+        if (clientKey && err instanceof Error && err.message.includes('UNIQUE')) {
+          const replay = await replayOf()
+          if (replay) return reply.code(200).send(replay)
         }
-        return order
-      })
+        throw err
+      }
 
       const items = await db.select().from(orderItems).where(eq(orderItems.orderId, created.id))
 
@@ -137,6 +172,7 @@ export function orderRoutes(db: Db) {
       // slow or jammed printer shows up as printError on the order instead.
       printKitchenTicket(db, created).catch((err) => req.log.error(err, 'kitchen print crashed'))
 
+      notifyOrdersChanged()
       return reply.code(201).send({ ...created, items })
     })
 
@@ -204,6 +240,7 @@ export function orderRoutes(db: Db) {
         },
         'audit',
       )
+      notifyOrdersChanged()
       return updated
     })
 

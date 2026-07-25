@@ -73,9 +73,11 @@ export default function AdminMenu() {
 
   // Refs so drag callbacks always see the current order, never a stale render.
   const categoriesRef = useRef(categories)
-  categoriesRef.current = categories
   const productsRef = useRef(products)
-  productsRef.current = products
+  useEffect(() => {
+    categoriesRef.current = categories
+    productsRef.current = products
+  }, [categories, products])
 
   async function load() {
     try {

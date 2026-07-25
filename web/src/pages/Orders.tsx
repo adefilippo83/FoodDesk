@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { ApiError, api, formatMoney, type OrderDetail, type OrderSummary } from '../api'
 import { useAuth } from '../auth'
 import { useI18n } from '../i18n'
+import { useOrdersEvents } from '../useOrdersEvents'
 
 function PrintStatus({ order }: { order: OrderSummary }) {
   const { t } = useI18n()
@@ -79,11 +80,13 @@ export default function Orders() {
 
   useEffect(() => {
     void load()
-    // Someone else's order should appear without a manual refresh.
-    const timer = setInterval(() => void load(), 15000)
+    // SSE brings changes instantly; this slow poll is only the safety net.
+    const timer = setInterval(() => void load(), 60000)
     return () => clearInterval(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useOrdersEvents(() => void load())
 
   const dayTotal = orders.reduce((sum, o) => sum + o.totalCents, 0)
 

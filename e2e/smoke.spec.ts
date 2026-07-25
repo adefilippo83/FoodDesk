@@ -1,0 +1,59 @@
+import { expect, test } from '@playwright/test'
+
+/**
+ * One end-to-end pass over the venue's real workflow, against the production
+ * build: sign in → build the menu → add a kitchen account → take an order →
+ * see it in the order list → work it on the kitchen display until completed.
+ */
+test('login → menu → order → kitchen display', async ({ page }) => {
+  // ---- sign in as the seeded admin ----
+  await page.goto('/')
+  await page.getByLabel('Username').fill('admin')
+  await page.getByLabel('Password').fill('playwright123')
+  await page.getByRole('button', { name: 'Sign in' }).click()
+  await expect(page.getByRole('link', { name: 'Orders' })).toBeVisible()
+
+  // ---- build a one-product menu ----
+  await page.getByRole('link', { name: 'Menu' }).click()
+  await page.getByPlaceholder('New category, e.g. Starters').fill('Drinks')
+  await page.getByRole('button', { name: 'Add' }).first().click()
+  await expect(page.getByRole('cell', { name: 'Drinks' })).toBeVisible()
+
+  await page.getByPlaceholder('Product name').fill('Beer')
+  await page.getByPlaceholder('8.50').fill('5')
+  await page.getByRole('button', { name: 'Add' }).nth(1).click()
+  await expect(page.getByRole('cell', { name: 'Beer', exact: true })).toBeVisible()
+
+  // ---- create a kitchen account: this switches the Kitchen page on ----
+  await page.getByRole('link', { name: 'Staff' }).click()
+  await page.getByPlaceholder('username', { exact: true }).fill('chef')
+  await page.getByPlaceholder('password (8+ chars)').fill('chefpass123')
+  await page.getByRole('combobox').last().selectOption('kitchen')
+  await page.getByRole('button', { name: 'Add' }).click()
+  await expect(page.getByRole('cell', { name: 'chef' }).first()).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Kitchen' })).toBeVisible()
+
+  // ---- take an order ----
+  await page.getByRole('link', { name: 'New order' }).click()
+  await page.getByRole('button', { name: /Beer/ }).click()
+  await page.getByLabel(/Customer/).fill('Mario')
+  await page.getByRole('button', { name: 'Send order' }).click()
+  await expect(page.getByText(/Order #\d+ sent/)).toBeVisible()
+
+  // ---- the order list shows it ----
+  await page.getByRole('link', { name: 'Orders' }).click()
+  await expect(page.getByRole('cell', { name: 'Mario' })).toBeVisible()
+  await expect(page.getByText('001')).toBeVisible()
+
+  // ---- work it on the kitchen display ----
+  await page.getByRole('link', { name: 'Kitchen' }).click()
+  await expect(page.getByText('#001')).toBeVisible()
+  const item = page.getByRole('button', { name: /1×\s*Beer/ })
+  await item.click()
+  // Last item done → the order moves to the Completed section.
+  await expect(page.getByText(/Completed · 1/)).toBeVisible()
+
+  // ---- and the waiters' list now flags it ready ----
+  await page.getByRole('link', { name: 'Orders' }).click()
+  await expect(page.getByText('ready')).toBeVisible()
+})

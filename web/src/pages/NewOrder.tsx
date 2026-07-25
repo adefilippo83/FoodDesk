@@ -85,7 +85,7 @@ function autoPrintOrderSheet(
     .disclaimer { font-size: ${config.orderDisclaimerFontSize}pt; font-weight: 700; color: #555; text-align: center; margin: 8px 0 0; }
     .ftext { text-align: center; font-size: ${config.orderFooterFontSize}pt; color: #444; margin: 8px 0 0; }
   </style></head><body>
-    ${config.orderHeaderImage ? `<img class="hf" style="width:${config.orderHeaderImageWidthPct}%" src="${config.orderHeaderImage}">` : ''}
+    ${config.orderHeaderImageUrl ? `<img class="hf" style="width:${config.orderHeaderImageWidthPct}%" src="${config.orderHeaderImageUrl}">` : ''}
     ${config.orderHeaderText ? `<p class="htext">${text(config.orderHeaderText)}</p>` : ''}
     <p class="info">${esc(labels.orderWord)} #${String(order.dailyNumber).padStart(3, '0')} · ${order.serviceDay} · ${time}${order.customerName ? ` · ${esc(order.customerName)}` : ''}</p>
     <hr>
@@ -95,7 +95,7 @@ function autoPrintOrderSheet(
     ${order.note ? `<hr><div class="note">${esc(labels.notePrefix)} ${esc(order.note)}</div>` : ''}
     ${config.orderDisclaimer ? `<p class="disclaimer">${text(config.orderDisclaimer)}</p>` : ''}
     ${config.orderFooterText ? `<p class="ftext">${text(config.orderFooterText)}</p>` : ''}
-    ${config.orderFooterImage ? `<img class="hf" style="width:${config.orderFooterImageWidthPct}%" src="${config.orderFooterImage}">` : ''}
+    ${config.orderFooterImageUrl ? `<img class="hf" style="width:${config.orderFooterImageWidthPct}%" src="${config.orderFooterImageUrl}">` : ''}
   </body></html>`
 
   const frame = document.createElement('iframe')
@@ -132,6 +132,10 @@ export default function NewOrder() {
   const [toast, setToast] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const customerRef = useRef<HTMLInputElement>(null)
+  // One key per intended order, stable across retries of the same submit: if
+  // the first attempt landed despite a network error, the retry replays it
+  // server-side instead of creating a duplicate.
+  const orderKeyRef = useRef<string | null>(null)
 
   useEffect(() => {
     api
@@ -188,14 +192,21 @@ export default function NewOrder() {
     setSubmitting(true)
     setError(null)
     try {
+      // crypto.randomUUID needs a secure context; the venue LAN is plain http.
+      orderKeyRef.current ??=
+        typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`
       const order = await api.createOrder({
         customerName: customerName.trim(),
         // No coperto configured → no covers to count on this order.
         covers: coverChargeCents > 0 ? covers : 0,
         note: note.trim() || undefined,
+        clientKey: orderKeyRef.current,
         items: lines.map((l) => ({ productId: l.productId, qty: l.qty })),
       })
       // Clear straight away — the waiter is already walking to the next table.
+      orderKeyRef.current = null
       setLines([])
       setCustomerName('')
       setCovers(1)

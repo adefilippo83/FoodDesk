@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
 import { after, before, describe, it } from 'node:test'
+import { eq } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
+import type { Db } from '../src/db/index.js'
+import { orders } from '../src/db/schema.js'
 import { login, makeTestApp, makeUser } from './helpers.js'
 
 /**
@@ -11,6 +14,7 @@ import { login, makeTestApp, makeUser } from './helpers.js'
 describe('kitchen display', () => {
   let app: FastifyInstance
   let close: () => void
+  let db: Db
   let adminCookie: string
   let maitreCookie: string
   let waiterCookie: string
@@ -22,6 +26,7 @@ describe('kitchen display', () => {
     const t = await makeTestApp()
     app = t.app
     close = t.close
+    db = t.db
     await makeUser(t.db, 'admin', 'admin')
     await makeUser(t.db, 'giulia', 'maitre')
     await makeUser(t.db, 'marco', 'operator')
@@ -171,6 +176,39 @@ describe('kitchen display', () => {
       payload: { done: true },
     })
     assert.equal(missing.statusCode, 404)
+  })
+
+  it('keeps a freshly cancelled order on the display, marked, then drops it', async () => {
+    const cancelled = await app.inject({
+      method: 'POST',
+      url: `/api/orders/${orderId}/cancel`,
+      headers: { cookie: adminCookie },
+    })
+    assert.equal(cancelled.statusCode, 200)
+
+    const display = await app.inject({
+      method: 'GET',
+      url: '/api/kitchen/orders',
+      headers: { cookie: chefCookie },
+    })
+    const row = display.json().orders.find((o: { id: number }) => o.id === orderId)
+    assert.ok(row, 'a just-cancelled order must stay visible to the kitchen')
+    assert.ok(row.cancelledAt, 'and must carry its cancelled state')
+
+    // Age the cancellation past the grace window: it must drop off.
+    await db
+      .update(orders)
+      .set({ cancelledAt: Math.floor(Date.now() / 1000) - 11 * 60 })
+      .where(eq(orders.id, orderId))
+    const later = await app.inject({
+      method: 'GET',
+      url: '/api/kitchen/orders',
+      headers: { cookie: chefCookie },
+    })
+    assert.equal(
+      later.json().orders.find((o: { id: number }) => o.id === orderId),
+      undefined,
+    )
   })
 
   it('locks a kitchen account out of everything else', async () => {
