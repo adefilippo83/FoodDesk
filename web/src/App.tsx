@@ -1,6 +1,7 @@
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from './auth'
 import { LangToggle, useI18n } from './i18n'
+import Kitchen from './pages/Kitchen'
 import Login from './pages/Login'
 import NewOrder from './pages/NewOrder'
 import Orders from './pages/Orders'
@@ -8,7 +9,7 @@ import AdminMenu from './pages/AdminMenu'
 import AdminUsers from './pages/AdminUsers'
 import Reports from './pages/Reports'
 import Settings from './pages/Settings'
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { ApiError, api } from './api'
 
 /**
@@ -24,6 +25,16 @@ function AdminOnly({ children }: { children: ReactNode }) {
 function ManagerOnly({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   return user?.role === 'admin' || user?.role === 'maitre' ? (
+    <>{children}</>
+  ) : (
+    <Navigate to="/" replace />
+  )
+}
+
+/** The kitchen display: kitchen accounts, plus admin and maître d'. */
+function KitchenAccess({ children }: { children: ReactNode }) {
+  const { user } = useAuth()
+  return user?.role === 'admin' || user?.role === 'maitre' || user?.role === 'kitchen' ? (
     <>{children}</>
   ) : (
     <Navigate to="/" replace />
@@ -125,13 +136,37 @@ export default function App() {
   const { user, loading, logout } = useAuth()
   const { t } = useI18n()
   const [showPassword, setShowPassword] = useState(false)
+  const [kitchenEnabled, setKitchenEnabled] = useState(false)
+
+  const managerRole = user?.role === 'admin' || user?.role === 'maitre'
+
+  // The Kitchen entry exists only while an active kitchen account does.
+  // AdminUsers fires 'fd-users-changed' so the link appears/disappears live.
+  useEffect(() => {
+    if (!managerRole) return
+    const refresh = () =>
+      void api
+        .features()
+        .then((f) => setKitchenEnabled(f.kitchenEnabled))
+        .catch(() => {})
+    refresh()
+    window.addEventListener('fd-users-changed', refresh)
+    return () => window.removeEventListener('fd-users-changed', refresh)
+  }, [managerRole])
 
   if (loading) return <div className="empty">{t('loading')}</div>
   if (!user) return <Login />
 
   const isAdmin = user.role === 'admin'
   const isManager = isAdmin || user.role === 'maitre'
-  const roleLabel = isAdmin ? t('roleAdmin') : user.role === 'maitre' ? t('roleMaitre') : t('roleWaiter')
+  const isKitchen = user.role === 'kitchen'
+  const roleLabel = isAdmin
+    ? t('roleAdmin')
+    : user.role === 'maitre'
+      ? t('roleMaitre')
+      : isKitchen
+        ? t('roleKitchen')
+        : t('roleWaiter')
 
   return (
     <div className="app">
@@ -140,12 +175,21 @@ export default function App() {
           Food<span>Desk</span>
         </div>
         <nav className="nav">
-          <NavLink to="/" end className={({ isActive }) => (isActive ? 'active' : '')}>
-            {t('navNewOrder')}
-          </NavLink>
-          <NavLink to="/orders" className={({ isActive }) => (isActive ? 'active' : '')}>
-            {t('navOrders')}
-          </NavLink>
+          {!isKitchen && (
+            <>
+              <NavLink to="/" end className={({ isActive }) => (isActive ? 'active' : '')}>
+                {t('navNewOrder')}
+              </NavLink>
+              <NavLink to="/orders" className={({ isActive }) => (isActive ? 'active' : '')}>
+                {t('navOrders')}
+              </NavLink>
+            </>
+          )}
+          {(isKitchen || (isManager && kitchenEnabled)) && (
+            <NavLink to="/kitchen" className={({ isActive }) => (isActive ? 'active' : '')}>
+              {t('navKitchen')}
+            </NavLink>
+          )}
           {isManager && (
             <>
               <NavLink to="/menu" className={({ isActive }) => (isActive ? 'active' : '')}>
@@ -184,8 +228,16 @@ export default function App() {
 
       <main>
         <Routes>
-          <Route path="/" element={<NewOrder />} />
+          <Route path="/" element={isKitchen ? <Navigate to="/kitchen" replace /> : <NewOrder />} />
           <Route path="/orders" element={<Orders />} />
+          <Route
+            path="/kitchen"
+            element={
+              <KitchenAccess>
+                <Kitchen />
+              </KitchenAccess>
+            }
+          />
           <Route
             path="/menu"
             element={

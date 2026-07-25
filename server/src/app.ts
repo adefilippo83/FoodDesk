@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { SESSION_COOKIE, resolveSession } from './auth/session.js'
 import type { Db } from './db/index.js'
 import { authRoutes } from './routes/auth.js'
+import { kitchenRoutes } from './routes/kitchen.js'
 import { menuRoutes } from './routes/menu.js'
 import { orderRoutes } from './routes/orders.js'
 import { reportRoutes } from './routes/reports.js'
@@ -89,6 +90,7 @@ export async function buildApp(
   await app.register(userRoutes(db))
   await app.register(menuRoutes(db))
   await app.register(orderRoutes(db))
+  await app.register(kitchenRoutes(db))
   await app.register(reportRoutes(db))
   await app.register(settingsRoutes(db))
 

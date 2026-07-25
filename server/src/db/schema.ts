@@ -12,7 +12,7 @@ export const users = sqliteTable(
     username: text('username').notNull(),
     passwordHash: text('password_hash').notNull(),
     displayName: text('display_name').notNull(),
-    role: text('role', { enum: ['admin', 'maitre', 'operator'] }).notNull(),
+    role: text('role', { enum: ['admin', 'maitre', 'operator', 'kitchen'] }).notNull(),
     active: integer('active', { mode: 'boolean' }).notNull().default(true),
     createdAt: integer('created_at').notNull().default(sql`(unixepoch())`),
   },
@@ -77,6 +77,8 @@ export const orders = sqliteTable(
     // Cancelled orders keep their row and number forever — audit, not delete.
     cancelledAt: integer('cancelled_at'),
     cancelledBy: integer('cancelled_by').references(() => users.id),
+    // Kitchen display: set when every item is done, cleared if one reopens.
+    completedAt: integer('completed_at'),
     note: text('note'),
     totalCents: integer('total_cents').notNull(),
     createdBy: integer('created_by')
@@ -110,6 +112,8 @@ export const orderItems = sqliteTable(
     categoryNameSnapshot: text('category_name_snapshot').notNull(),
     qty: integer('qty').notNull(),
     note: text('note'),
+    // Kitchen display: when the kitchen marked this line as prepared.
+    doneAt: integer('done_at'),
   },
   (t) => [index('order_items_order_id_idx').on(t.orderId)],
 )

@@ -44,7 +44,7 @@ describe("maître d'", () => {
     })
     assert.equal(waiter.statusCode, 201)
 
-    for (const role of ['admin', 'maitre']) {
+    for (const role of ['admin', 'maitre', 'kitchen']) {
       const res = await app.inject({
         method: 'POST',
         url: '/api/users',

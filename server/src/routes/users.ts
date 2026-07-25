@@ -5,7 +5,7 @@ import type { Db } from '../db/index.js'
 import { hashPassword } from '../auth/password.js'
 import { sessions, users, type Role } from '../db/schema.js'
 
-const ROLES: Role[] = ['admin', 'maitre', 'operator']
+const ROLES: Role[] = ['admin', 'maitre', 'operator', 'kitchen']
 
 export function userRoutes(db: Db) {
   return async function register(app: FastifyInstance) {
@@ -47,6 +47,8 @@ export function userRoutes(db: Db) {
       if (!ROLES.includes(role)) {
         return reply.code(400).send({ error: 'invalid_role', allowed: ROLES })
       }
+      // A maître d' may only create waiters — not admins, other maîtres, nor
+      // kitchen accounts (those are the admin's call).
       if (req.user!.role === 'maitre' && role !== 'operator') {
         req.log.warn(
           { event: 'maitre_denied', by: req.user!.id, action: 'create', role },
@@ -85,8 +87,8 @@ export function userRoutes(db: Db) {
       const target = (await db.select().from(users).where(eq(users.id, id)).limit(1))[0]
       if (!target) return reply.code(404).send({ error: 'not_found' })
 
-      // A maître may only touch waiters, and may not reassign roles at all —
-      // no promoting a waiter (or themselves) into an admin.
+      // A maître may only touch waiter accounts, and may not reassign roles
+      // at all — no promoting anyone (or themselves) upward.
       if (req.user!.role === 'maitre' && (target.role !== 'operator' || body?.role !== undefined)) {
         req.log.warn(
           { event: 'maitre_denied', by: req.user!.id, action: 'update', targetId: id },

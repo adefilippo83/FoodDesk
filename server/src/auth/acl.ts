@@ -45,3 +45,9 @@ export const requireManager = requireRole('admin', 'maitre')
 export function isManager(user: { role: string }): boolean {
   return user.role === 'admin' || user.role === 'maitre'
 }
+
+/**
+ * Everyone who works the floor: takes orders, reads the menu. A kitchen
+ * account is deliberately NOT here — it can only reach the kitchen display.
+ */
+export const requireFloorStaff = requireRole('admin', 'maitre', 'operator')
