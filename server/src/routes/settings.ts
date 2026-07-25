@@ -2,12 +2,18 @@ import type { FastifyInstance } from 'fastify'
 import { requireAdmin, requireAuth } from '../auth/acl.js'
 import type { Db } from '../db/index.js'
 import { kitchenQueue } from '../print/service.js'
+import { kitchenFeatureEnabled } from './kitchen.js'
 import { renderOrderSheet, renderReceipt } from '../print/pdf.js'
 import { loadSettings, saveSettings } from '../settings.js'
 import type { Order, OrderItem } from '../db/schema.js'
 
 export function settingsRoutes(db: Db) {
   return async function register(app: FastifyInstance) {
+    /** Cheap feature flags — the UI decides which doors to draw. */
+    app.get('/api/features', { preHandler: requireAuth }, async () => ({
+      kitchenEnabled: await kitchenFeatureEnabled(db),
+    }))
+
     /**
      * What a waiter's client needs: coperto amount, printer state, and the
      * order-sheet layout fields the browser auto-print fallback renders.
@@ -70,6 +76,7 @@ export function settingsRoutes(db: Db) {
         coverChargeCents: s.coverChargeCents,
         cancelledAt: null,
         cancelledBy: null,
+        completedAt: null,
         note: null,
         totalCents: 2 * 650 + 3 * 500 + 3 * s.coverChargeCents,
         createdBy: 0,
@@ -88,6 +95,7 @@ export function settingsRoutes(db: Db) {
           categoryNameSnapshot: 'Antipasti',
           qty: 2,
           note: null,
+          doneAt: null,
         },
         {
           id: 2,
@@ -98,6 +106,7 @@ export function settingsRoutes(db: Db) {
           categoryNameSnapshot: 'Bevande',
           qty: 3,
           note: null,
+          doneAt: null,
         },
       ] satisfies OrderItem[]
 

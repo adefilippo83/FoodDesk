@@ -12,6 +12,8 @@ venue Wi-Fi; waiters connect from their phones over the LAN.
 - **Maître d'** (caposala) — like an admin for the menu, all orders and reports,
   but no Settings page and can only create/manage waiter accounts.
 - **Operator** (waiter) — takes orders and prints them. Cannot change the menu.
+- **Kitchen** — sees only the kitchen display (`/kitchen`): today's active orders
+  on a tablet, tap an item to mark it done; the order completes with its last item.
 
 ## Stack
 

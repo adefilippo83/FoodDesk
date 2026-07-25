@@ -1,4 +1,4 @@
-export type Role = 'admin' | 'maitre' | 'operator'
+export type Role = 'admin' | 'maitre' | 'operator' | 'kitchen'
 
 export type Me = { id: number; username: string; displayName: string; role: Role }
 export type Category = { id: number; name: string; sortOrder: number; active: boolean }
@@ -23,6 +23,7 @@ export type OrderSummary = {
   covers: number
   cancelledAt: number | null
   cancelledByName: string | null
+  completedAt: number | null
   note: string | null
   totalCents: number
   createdAt: number
@@ -39,6 +40,26 @@ export type OrderItem = {
   note: string | null
 }
 export type OrderDetail = OrderSummary & { items: OrderItem[]; coverChargeCents: number }
+
+export type KitchenItem = {
+  id: number
+  qty: number
+  name: string
+  category: string
+  note: string | null
+  doneAt: number | null
+}
+export type KitchenOrder = {
+  id: number
+  dailyNumber: number
+  customerName: string | null
+  covers: number
+  note: string | null
+  createdAt: number
+  completedAt: number | null
+  createdByName: string
+  items: KitchenItem[]
+}
 
 export type CategoryStyle = 'alternating' | 'separator'
 
@@ -174,7 +195,14 @@ export const api = {
     ),
   order: (id: number) => request<OrderDetail>('GET', `/api/orders/${id}`),
   reprint: (id: number) => request<{ ok: true; printedAt: number }>('POST', `/api/orders/${id}/print`),
+  kitchenOrders: () =>
+    request<{ serviceDay: string; orders: KitchenOrder[] }>('GET', '/api/kitchen/orders'),
+  setItemDone: (id: number, done: boolean) =>
+    request<{ doneAt: number | null; orderCompleted: boolean }>('PUT', `/api/kitchen/items/${id}`, {
+      done,
+    }),
   config: () => request<AppConfig>('GET', '/api/config'),
+  features: () => request<{ kitchenEnabled: boolean }>('GET', '/api/features'),
   settings: () => request<AppSettings>('GET', '/api/settings'),
   saveSettings: (patch: Partial<AppSettings>) => request<AppSettings>('PUT', '/api/settings', patch),
   settingsPreviewUrl: (kind: 'receipt' | 'order' = 'receipt') =>

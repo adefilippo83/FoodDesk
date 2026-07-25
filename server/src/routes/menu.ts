@@ -1,6 +1,6 @@
 import { and, asc, eq } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
-import { isManager, requireAuth, requireManager } from '../auth/acl.js'
+import { isManager, requireFloorStaff, requireManager } from '../auth/acl.js'
 import type { Db } from '../db/index.js'
 import { categories, orderItems, products } from '../db/schema.js'
 
@@ -18,9 +18,9 @@ function parsePriceCents(value: unknown): number | null {
 
 export function menuRoutes(db: Db) {
   return async function register(app: FastifyInstance) {
-    // ---- Reads: any signed-in user ----
+    // ---- Reads: floor staff (kitchen accounts see only their display) ----
 
-    app.get('/api/menu', { preHandler: requireAuth }, async () => {
+    app.get('/api/menu', { preHandler: requireFloorStaff }, async () => {
       const cats = await db
         .select()
         .from(categories)
@@ -41,7 +41,7 @@ export function menuRoutes(db: Db) {
       }))
     })
 
-    app.get('/api/categories', { preHandler: requireAuth }, async (req) => {
+    app.get('/api/categories', { preHandler: requireFloorStaff }, async (req) => {
       const includeInactive =
         isManager(req.user!) && (req.query as { includeInactive?: string }).includeInactive === 'true'
       const rows = await db
@@ -51,7 +51,7 @@ export function menuRoutes(db: Db) {
       return includeInactive ? rows : rows.filter((c) => c.active)
     })
 
-    app.get('/api/products', { preHandler: requireAuth }, async (req) => {
+    app.get('/api/products', { preHandler: requireFloorStaff }, async (req) => {
       const q = req.query as { categoryId?: string; includeInactive?: string }
       const includeInactive = isManager(req.user!) && q.includeInactive === 'true'
       const rows = await db

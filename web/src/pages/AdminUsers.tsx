@@ -10,7 +10,13 @@ export default function AdminUsers() {
   // A maître only manages waiters; the server enforces the same rule.
   const canManage = (u: User) => me?.role === 'admin' || u.role === 'operator'
   const roleLabel = (r: Role) =>
-    r === 'admin' ? t('roleAdmin') : r === 'maitre' ? t('roleMaitre') : t('roleWaiter')
+    r === 'admin'
+      ? t('roleAdmin')
+      : r === 'maitre'
+        ? t('roleMaitre')
+        : r === 'kitchen'
+          ? t('roleKitchen')
+          : t('roleWaiter')
   const [users, setUsers] = useState<User[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -54,6 +60,8 @@ export default function AdminUsers() {
       setPassword('')
       setError(null)
       await load()
+      // The top bar listens: a first kitchen account switches its link on.
+      window.dispatchEvent(new Event('fd-users-changed'))
     } catch (err) {
       setError(
         err instanceof ApiError && err.code === 'username_taken'
@@ -83,6 +91,7 @@ export default function AdminUsers() {
       await api.updateUser(u.id, { active })
       setError(null)
       await load()
+      window.dispatchEvent(new Event('fd-users-changed'))
     } catch (err) {
       setError(
         err instanceof ApiError && err.code === 'last_admin'
@@ -136,6 +145,7 @@ export default function AdminUsers() {
               onChange={(e) => setRole(e.target.value as Role)}
             >
               <option value="operator">{t('optionWaiter')}</option>
+              <option value="kitchen">{t('optionKitchen')}</option>
               <option value="maitre">{t('optionMaitre')}</option>
               <option value="admin">{t('optionAdmin')}</option>
             </select>

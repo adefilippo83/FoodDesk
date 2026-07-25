@@ -152,8 +152,13 @@ export default function Orders() {
                     })}
                   </td>
                   <td className="num">€{formatMoney(o.totalCents)}</td>
-                  <td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
                     <PrintStatus order={o} />
+                    {o.completedAt !== null && o.cancelledAt === null && (
+                      <span className="badge ok" style={{ marginLeft: 4 }}>
+                        {t('readyBadge')}
+                      </span>
+                    )}
                   </td>
                   <td className="num" style={{ whiteSpace: 'nowrap' }}>
                     <button className="btn small" onClick={() => void api.order(o.id).then(setOpen)}>

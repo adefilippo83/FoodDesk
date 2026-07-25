@@ -1,7 +1,7 @@
 import { and, desc, eq, inArray, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/sqlite-core'
 import type { FastifyInstance } from 'fastify'
-import { isManager, requireAuth, requireManager } from '../auth/acl.js'
+import { isManager, requireFloorStaff, requireManager } from '../auth/acl.js'
 import type { Db } from '../db/index.js'
 import { categories, orderItems, orders, products, users, type Order } from '../db/schema.js'
 import { isServiceDay, serviceDayOf } from '../lib/serviceDay.js'
@@ -30,7 +30,9 @@ function parseItems(raw: unknown): IncomingItem[] | { error: string } {
 
 export function orderRoutes(db: Db) {
   return async function register(app: FastifyInstance) {
-    app.addHook('preHandler', requireAuth)
+    // Floor staff only: a kitchen account has no business creating or
+    // browsing orders outside its display.
+    app.addHook('preHandler', requireFloorStaff)
 
     /** Both roles may take orders — that is the operator's whole job. */
     app.post('/api/orders', async (req, reply) => {
@@ -243,6 +245,7 @@ export function orderRoutes(db: Db) {
           covers: orders.covers,
           cancelledAt: orders.cancelledAt,
           cancelledByName: cancellers.displayName,
+          completedAt: orders.completedAt,
           note: orders.note,
           totalCents: orders.totalCents,
           createdAt: orders.createdAt,
