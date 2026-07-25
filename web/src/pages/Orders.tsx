@@ -33,6 +33,7 @@ export default function Orders() {
   const [reprinting, setReprinting] = useState<number | null>(null)
   const [confirmingCancel, setConfirmingCancel] = useState<number | null>(null)
   const [cancelling, setCancelling] = useState(false)
+  const [confirmingItemCancel, setConfirmingItemCancel] = useState<number | null>(null)
 
   async function reprint(id: number) {
     setReprinting(id)
@@ -47,6 +48,20 @@ export default function Orders() {
       )
     } finally {
       setReprinting(null)
+      await load()
+    }
+  }
+
+  async function cancelItem(orderId: number, itemId: number) {
+    try {
+      await api.cancelOrderItem(orderId, itemId)
+      setError(null)
+      // Re-fetch: the total changed, and the whole order may have cancelled.
+      setOpen(await api.order(orderId))
+    } catch {
+      setError(t('errCancelItem'))
+    } finally {
+      setConfirmingItemCancel(null)
       await load()
     }
   }
@@ -246,7 +261,7 @@ export default function Orders() {
               <table>
                 <tbody>
                   {open.items.map((i) => (
-                    <tr key={i.id}>
+                    <tr key={i.id} className={i.cancelledAt !== null ? 'cancelled' : ''}>
                       <td className="num" style={{ width: 40 }}>
                         {i.qty}×
                       </td>
@@ -259,6 +274,29 @@ export default function Orders() {
                         )}
                       </td>
                       <td className="num">€{formatMoney(i.priceCentsSnapshot * i.qty)}</td>
+                      <td className="num" style={{ width: 40 }}>
+                        {open.cancelledAt === null &&
+                          i.cancelledAt === null &&
+                          (confirmingItemCancel === i.id ? (
+                            <button
+                              className="btn small danger"
+                              autoFocus
+                              onBlur={() => setConfirmingItemCancel(null)}
+                              onClick={() => void cancelItem(open.id, i.id)}
+                            >
+                              {t('confirmCancel')}
+                            </button>
+                          ) : (
+                            <button
+                              className="btn small danger"
+                              title={t('cancelItem')}
+                              aria-label={t('cancelItem')}
+                              onClick={() => setConfirmingItemCancel(i.id)}
+                            >
+                              ✕
+                            </button>
+                          ))}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

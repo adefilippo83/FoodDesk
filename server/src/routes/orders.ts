@@ -244,6 +244,72 @@ export function orderRoutes(db: Db) {
       return updated
     })
 
+    /**
+     * Cancel a single line: admin and maître anywhere, a waiter on their own
+     * orders (fixing a mis-tap). Audited soft-cancel, total recomputed; when
+     * the last active line goes, the whole order is cancelled with it.
+     */
+    app.post('/api/orders/:id/items/:itemId/cancel', async (req, reply) => {
+      const id = Number((req.params as { id: string }).id)
+      const itemId = Number((req.params as { itemId: string }).itemId)
+      const order = await loadVisibleOrder(id, req.user!)
+      if (order === 'not_found') return reply.code(404).send({ error: 'not_found' })
+      if (order === 'forbidden') return reply.code(403).send({ error: 'forbidden' })
+      if (order.cancelledAt) return reply.code(409).send({ error: 'order_cancelled' })
+
+      const item = (
+        await db.select().from(orderItems).where(eq(orderItems.id, itemId)).limit(1)
+      )[0]
+      if (!item || item.orderId !== id) return reply.code(404).send({ error: 'not_found' })
+
+      const now = Math.floor(Date.now() / 1000)
+      const result = db.transaction((tx) => {
+        if (!item.cancelledAt) {
+          tx.update(orderItems)
+            .set({ cancelledAt: now, cancelledBy: req.user!.id })
+            .where(eq(orderItems.id, itemId))
+            .run()
+        }
+        const all = tx.select().from(orderItems).where(eq(orderItems.orderId, id)).all()
+        const active = all.filter((i) => i.cancelledAt === null)
+
+        const totalCents =
+          active.reduce((sum, i) => sum + i.priceCentsSnapshot * i.qty, 0) +
+          order.covers * order.coverChargeCents
+        const orderCancelled = active.length === 0
+        const completedAt =
+          !orderCancelled && active.every((i) => i.doneAt !== null)
+            ? (order.completedAt ?? now)
+            : null
+
+        const updated = tx
+          .update(orders)
+          .set({
+            totalCents,
+            completedAt,
+            ...(orderCancelled ? { cancelledAt: now, cancelledBy: req.user!.id } : {}),
+          })
+          .where(eq(orders.id, id))
+          .returning()
+          .get()!
+        return { updated, items: all, orderCancelled }
+      })
+
+      req.log.info(
+        {
+          event: 'order_item_cancelled',
+          by: req.user!.id,
+          orderId: id,
+          itemId,
+          orderCancelled: result.orderCancelled,
+          totalCents: result.updated.totalCents,
+        },
+        'audit',
+      )
+      notifyOrdersChanged()
+      return { ...result.updated, items: result.items }
+    })
+
     /** Re-send the kitchen ticket to CUPS — the jam-recovery button. */
     app.post('/api/orders/:id/print', async (req, reply) => {
       const id = Number((req.params as { id: string }).id)

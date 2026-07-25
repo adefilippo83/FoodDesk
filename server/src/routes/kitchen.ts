@@ -85,6 +85,7 @@ export function kitchenRoutes(db: Db) {
               category: i.categoryNameSnapshot,
               note: i.note,
               doneAt: i.doneAt,
+              cancelledAt: i.cancelledAt,
             })),
         })),
       }
@@ -99,11 +100,13 @@ export function kitchenRoutes(db: Db) {
       }
       const item = (await db.select().from(orderItems).where(eq(orderItems.id, id)).limit(1))[0]
       if (!item) return reply.code(404).send({ error: 'not_found' })
+      // A cancelled line is out of the game — nothing left to prepare.
+      if (item.cancelledAt) return reply.code(409).send({ error: 'item_cancelled' })
 
       const now = Math.floor(Date.now() / 1000)
       // Item state and the order's completion flag move together: the order is
-      // completed exactly when its last pending item is marked done, and drops
-      // back to open the moment any item is reopened.
+      // completed exactly when its last pending active item is marked done,
+      // and drops back to open the moment any item is reopened.
       const result = db.transaction((tx) => {
         const updated = tx
           .update(orderItems)
@@ -114,7 +117,13 @@ export function kitchenRoutes(db: Db) {
         const pending = tx
           .select({ id: orderItems.id })
           .from(orderItems)
-          .where(and(eq(orderItems.orderId, item.orderId), isNull(orderItems.doneAt)))
+          .where(
+            and(
+              eq(orderItems.orderId, item.orderId),
+              isNull(orderItems.doneAt),
+              isNull(orderItems.cancelledAt),
+            ),
+          )
           .all()
         const orderCompleted = pending.length === 0
         tx.update(orders)

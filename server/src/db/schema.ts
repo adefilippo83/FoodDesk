@@ -119,6 +119,9 @@ export const orderItems = sqliteTable(
     note: text('note'),
     // Kitchen display: when the kitchen marked this line as prepared.
     doneAt: integer('done_at'),
+    // Line-level cancellation: audited like order cancellation, never deleted.
+    cancelledAt: integer('cancelled_at'),
+    cancelledBy: integer('cancelled_by').references(() => users.id),
   },
   (t) => [index('order_items_order_id_idx').on(t.orderId)],
 )

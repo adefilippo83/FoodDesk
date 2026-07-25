@@ -38,6 +38,7 @@ export type OrderItem = {
   categoryNameSnapshot: string
   qty: number
   note: string | null
+  cancelledAt: number | null
 }
 export type OrderDetail = OrderSummary & { items: OrderItem[]; coverChargeCents: number }
 
@@ -48,6 +49,7 @@ export type KitchenItem = {
   category: string
   note: string | null
   doneAt: number | null
+  cancelledAt: number | null
 }
 export type KitchenOrder = {
   id: number
@@ -194,6 +196,8 @@ export const api = {
     items: { productId: number; qty: number; note?: string }[]
   }) => request<OrderDetail>('POST', '/api/orders', input),
   cancelOrder: (id: number) => request<OrderSummary>('POST', `/api/orders/${id}/cancel`),
+  cancelOrderItem: (orderId: number, itemId: number) =>
+    request<OrderDetail>('POST', `/api/orders/${orderId}/items/${itemId}/cancel`),
   orders: (day?: string) =>
     request<{ serviceDay: string; orders: OrderSummary[] }>(
       'GET',

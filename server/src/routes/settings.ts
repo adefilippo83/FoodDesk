@@ -124,6 +124,8 @@ export function settingsRoutes(db: Db) {
           qty: 2,
           note: null,
           doneAt: null,
+          cancelledAt: null,
+          cancelledBy: null,
         },
         {
           id: 2,
@@ -135,6 +137,8 @@ export function settingsRoutes(db: Db) {
           qty: 3,
           note: null,
           doneAt: null,
+          cancelledAt: null,
+          cancelledBy: null,
         },
       ] satisfies OrderItem[]
 

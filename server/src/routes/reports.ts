@@ -32,6 +32,7 @@ type ItemRow = {
   item: string
   qty: number
   unitCents: number
+  cancelledAt: number | null
 }
 
 async function loadDay(db: Db, day: string): Promise<{ orders: OrderRow[]; items: ItemRow[] }> {
@@ -60,6 +61,7 @@ async function loadDay(db: Db, day: string): Promise<{ orders: OrderRow[]; items
           item: orderItems.nameSnapshot,
           qty: orderItems.qty,
           unitCents: orderItems.priceCentsSnapshot,
+          cancelledAt: orderItems.cancelledAt,
         })
         .from(orderItems)
         .innerJoin(orders, eq(orders.id, orderItems.orderId))
@@ -74,7 +76,8 @@ type Tally = { name: string; qty: number; revenueCents: number }
 function buildReport(day: string, data: { orders: OrderRow[]; items: ItemRow[] }) {
   const active = data.orders.filter((o) => !o.cancelledAt)
   const activeIds = new Set(active.map((o) => o.id))
-  const activeItems = data.items.filter((i) => activeIds.has(i.orderId))
+  // Line-cancelled items earn nothing, exactly like cancelled orders.
+  const activeItems = data.items.filter((i) => activeIds.has(i.orderId) && !i.cancelledAt)
 
   const revenueCents = active.reduce((s, o) => s + o.totalCents, 0)
   const totalCovers = active.reduce((s, o) => s + o.covers, 0)
@@ -144,8 +147,9 @@ function toCsv(data: { orders: OrderRow[]; items: ItemRow[] }): string {
     const cancelled = o.cancelledAt ? 'yes' : ''
     const base = [String(o.dailyNumber).padStart(3, '0'), time, esc(o.customerName), esc(o.waiter)]
     for (const i of byOrder.get(o.id) ?? []) {
+      const lineCancelled = o.cancelledAt || i.cancelledAt ? 'yes' : ''
       lines.push(
-        [...base, esc(i.category), esc(i.item), i.qty, money(i.unitCents), money(i.qty * i.unitCents), cancelled].join(';'),
+        [...base, esc(i.category), esc(i.item), i.qty, money(i.unitCents), money(i.qty * i.unitCents), lineCancelled].join(';'),
       )
     }
     if (o.covers > 0 && o.coverChargeCents > 0) {
