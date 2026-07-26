@@ -12,5 +12,6 @@
     }
   },
   "postCreateCommand": "npm ci && npm run build",
-  "postStartCommand": "sh .devcontainer/start-demo.sh"
+  "postStartCommand": "sh .devcontainer/start-demo.sh",
+  "postAttachCommand": "sh .devcontainer/start-demo.sh"
 }
