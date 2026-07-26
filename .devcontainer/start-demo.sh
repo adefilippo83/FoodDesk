@@ -7,6 +7,7 @@ cd "$(dirname "$0")/.."
 export ADMIN_USERNAME=admin
 export ADMIN_PASSWORD=fooddesk-demo
 
+node server/dist/db/migrate.js
 node server/dist/db/seed.js
 nohup node server/dist/index.js > /tmp/fooddesk.log 2>&1 &
 echo "FoodDesk demo running on port 3000 — sign in with admin / fooddesk-demo"
