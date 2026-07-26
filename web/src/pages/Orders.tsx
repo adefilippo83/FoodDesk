@@ -129,7 +129,7 @@ export default function Orders() {
         <div className="empty">{t('noOrdersToday')}</div>
       ) : (
         <div className="card table-scroll">
-          <table>
+          <table className="orders-table">
             <thead>
               <tr>
                 <th>#</th>
@@ -144,10 +144,10 @@ export default function Orders() {
             <tbody>
               {orders.map((o) => (
                 <tr key={o.id} className={o.cancelledAt ? 'cancelled' : ''}>
-                  <td>
+                  <td data-label="#">
                     <strong>{String(o.dailyNumber).padStart(3, '0')}</strong>
                   </td>
-                  <td>
+                  <td data-label={t('customer')}>
                     {o.customerName ?? <span className="muted">—</span>}
                     {o.cancelledAt !== null && (
                       <>
@@ -162,15 +162,17 @@ export default function Orders() {
                       </>
                     )}
                   </td>
-                  <td>{o.createdByName}</td>
-                  <td className="muted">
+                  <td data-label={t('colWaiter')}>{o.createdByName}</td>
+                  <td data-label={t('colTime')} className="muted">
                     {new Date(o.createdAt * 1000).toLocaleTimeString([], {
                       hour: '2-digit',
                       minute: '2-digit',
                     })}
                   </td>
-                  <td className="num">€{formatMoney(o.totalCents)}</td>
-                  <td style={{ whiteSpace: 'nowrap' }}>
+                  <td data-label={t('total')} className="num">
+                    €{formatMoney(o.totalCents)}
+                  </td>
+                  <td data-label={t('colKitchen')} style={{ whiteSpace: 'nowrap' }}>
                     <PrintStatus order={o} />
                     {o.completedAt !== null && o.cancelledAt === null && (
                       <span className="badge ok" style={{ marginLeft: 4 }}>

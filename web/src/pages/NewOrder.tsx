@@ -132,6 +132,7 @@ export default function NewOrder() {
   const [toast, setToast] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const customerRef = useRef<HTMLInputElement>(null)
+  const cartRef = useRef<HTMLElement>(null)
   // One key per intended order, stable across retries of the same submit: if
   // the first attempt landed despite a network error, the retry replays it
   // server-side instead of creating a duplicate.
@@ -277,7 +278,7 @@ export default function NewOrder() {
           )}
         </div>
 
-        <aside className="card cart">
+        <aside className="card cart" ref={cartRef}>
           <h2>{t('cartTitle')}</h2>
 
           <label className="field">
@@ -403,6 +404,29 @@ export default function NewOrder() {
           </div>
         </aside>
       </div>
+
+      {/* Phone-only (hidden ≥900px): the cart lives below the fold, but the
+          running total and the send button must always be under the thumb. */}
+      {lines.length > 0 && (
+        <div className="mobile-orderbar">
+          <button
+            className="mobile-orderbar-summary"
+            onClick={() => cartRef.current?.scrollIntoView({ behavior: 'smooth' })}
+          >
+            <span className="count">
+              🛒 {lines.reduce((n, l) => n + l.qty, 0)}
+            </span>
+            <span className="amount">€{formatMoney(total)}</span>
+          </button>
+          <button
+            className="btn primary"
+            disabled={submitting}
+            onClick={() => void submit()}
+          >
+            {submitting ? t('sending') : t('sendOrder')}
+          </button>
+        </div>
+      )}
 
       {toast && <div className="toast">{toast}</div>}
     </>

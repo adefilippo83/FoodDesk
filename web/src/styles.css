@@ -498,6 +498,7 @@ tr.inactive td {
 /* Links styled as buttons (Receipt / Kitchen PDF) */
 a.btn {
   text-decoration: none;
+  color: var(--text); /* otherwise the browser's visited-link purple leaks in */
 }
 
 /* Compact language picker in the top bar */
@@ -543,6 +544,149 @@ tr.cancelled td {
 
 tr.cancelled td .badge {
   text-decoration: none;
+}
+
+/* ---------- phones ---------- */
+
+/* New order: fixed summary bar so total and send stay under the thumb while
+   the cart itself lives below the menu. Hidden on desktop (sticky cart). */
+.mobile-orderbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  z-index: 40;
+}
+
+.mobile-orderbar-summary {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: var(--tap);
+  padding: 0 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  font-weight: 700;
+  font-size: 16px;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-orderbar-summary .amount {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (min-width: 900px) {
+  .mobile-orderbar {
+    display: none;
+  }
+}
+
+@media (max-width: 899.98px) {
+  /* Keep the cart's send button clear of the fixed bar. */
+  .order-layout {
+    padding-bottom: 84px;
+  }
+}
+
+@media (max-width: 700px) {
+  /* Topbar: one compact row, nav on its own swipeable line. */
+  .topbar {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 12px;
+    padding-top: max(8px, env(safe-area-inset-top));
+  }
+
+  .nav {
+    order: 10;
+    width: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    margin: 0 -12px;
+    padding: 0 12px;
+  }
+
+  .nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nav a {
+    flex: 0 0 auto;
+  }
+
+  .who {
+    font-size: 12px;
+  }
+
+  .who strong {
+    font-size: 13px;
+  }
+
+  main {
+    padding: 12px;
+  }
+
+  /* Orders: rows become cards, headers become inline labels. */
+  .orders-table thead {
+    display: none;
+  }
+
+  .orders-table,
+  .orders-table tbody {
+    display: block;
+  }
+
+  .orders-table tr {
+    display: block;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 4px 12px;
+    margin-bottom: 10px;
+    background: var(--bg);
+  }
+
+  .orders-table td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 0;
+    padding: 7px 0;
+    text-align: left;
+  }
+
+  .orders-table td[data-label]::before {
+    content: attr(data-label);
+    color: var(--text-dim);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    flex-shrink: 0;
+  }
+
+  /* The action-buttons row: no label, buttons wrap freely. */
+  .orders-table td:not([data-label]) {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 6px;
+    border-top: 1px solid var(--border);
+    margin-top: 2px;
+    padding-top: 10px;
+    white-space: normal !important;
+  }
 }
 
 /* ---------- kitchen display (tablet) ---------- */
