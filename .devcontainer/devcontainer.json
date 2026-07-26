@@ -1,0 +1,16 @@
+{
+  "name": "FoodDesk demo",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": { "version": "24" }
+  },
+  "forwardPorts": [3000],
+  "portsAttributes": {
+    "3000": {
+      "label": "FoodDesk",
+      "onAutoForward": "openBrowser"
+    }
+  },
+  "postCreateCommand": "npm ci && npm run build",
+  "postStartCommand": "sh .devcontainer/start-demo.sh"
+}

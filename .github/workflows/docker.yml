@@ -44,13 +44,46 @@ jobs:
             type=semver,pattern={{version}}
             type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
 
-      # PRs build amd64 only (fast validation, no push); main and tags build
-      # and publish the full multi-arch image.
+      # Build once for the runner's own architecture and load it locally, so
+      # the image can actually be booted — not just compiled.
       - uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
-          push: ${{ github.event_name != 'pull_request' }}
+          platforms: linux/amd64
+          load: true
+          tags: fooddesk:smoke
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # The image must boot, migrate, seed and serve a login — every PR.
+      - name: Smoke test the image
+        run: |
+          docker run -d --name smoke -p 3000:3000 \
+            -e ADMIN_PASSWORD=smoke-test-pass1 fooddesk:smoke
+          ok=""
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:3000/api/health >/dev/null; then ok=1; break; fi
+            sleep 1
+          done
+          if [ -z "$ok" ]; then
+            echo "::error::server never became healthy"; docker logs smoke; exit 1
+          fi
+          curl -sf -X POST http://127.0.0.1:3000/api/auth/login \
+            -H 'content-type: application/json' \
+            -d '{"username":"admin","password":"smoke-test-pass1"}' \
+            | grep -q '"role":"admin"' \
+            || { echo "::error::admin login failed"; docker logs smoke; exit 1; }
+          echo "image boots, migrates, seeds and serves logins"
+          docker rm -f smoke
+
+      # Publish the full multi-arch image — main and tags only. The amd64
+      # half comes straight from the cache warmed above.
+      - uses: docker/build-push-action@v6
+        if: github.event_name != 'pull_request'
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
