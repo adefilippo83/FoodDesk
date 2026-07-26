@@ -74,6 +74,12 @@ compose file. On every pull request the image is built **and booted** — the
 CI smoke test waits for `/api/health` and performs a real login before the
 image may be published on merge.
 
+### Live demo
+
+**https://fooddesk.fly.dev** — sign in with **admin / fooddesk-demo**. It is a
+shared throwaway instance redeployed from `main` (the machine sleeps when idle;
+the first request takes a few seconds to wake it).
+
 ### Try it in your browser
 
 Click the *Open in GitHub Codespaces* badge above: the codespace builds the

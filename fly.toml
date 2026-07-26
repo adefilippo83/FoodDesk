@@ -1,0 +1,28 @@
+# Fly.io public demo — https://fooddesk.fly.dev
+# Deployed by CI on pushes to main (see .github/workflows/docker.yml).
+# The machine auto-stops when idle and wakes on the first request.
+app = "fooddesk"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  COOKIE_SECURE = "true"
+  RESTAURANT_NAME = "FoodDesk Demo"
+
+[mounts]
+  source = "data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory = "256mb"

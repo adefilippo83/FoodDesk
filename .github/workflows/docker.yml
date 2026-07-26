@@ -88,3 +88,20 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # Public demo at https://fooddesk.fly.dev — follows main automatically,
+  # but only after the image passed its smoke test.
+  demo:
+    name: Deploy demo (Fly.io)
+    runs-on: ubuntu-latest
+    needs: image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - run: flyctl deploy --remote-only --ha=false
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
