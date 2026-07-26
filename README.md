@@ -76,9 +76,17 @@ image may be published on merge.
 
 ### Live demo
 
-**https://fooddesk.fly.dev** — sign in with **admin / fooddesk-demo**. It is a
-shared throwaway instance redeployed from `main` (the machine sleeps when idle;
-the first request takes a few seconds to wake it).
+**https://fooddesk.fly.dev** — a shared instance redeployed from `main`, loaded
+with a sample sagra evening and **reset every 6 hours** (the machine sleeps
+when idle; the first request takes a few seconds to wake it). Demo accounts
+(password **fooddesk-demo** for all):
+
+| Username | Role |
+|---|---|
+| `admin` | admin |
+| `giulia` | maître d' |
+| `mario`, `lucia` | waiters |
+| `cucina` | kitchen display |
 
 ### Try it in your browser
 

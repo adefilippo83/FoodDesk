@@ -1,0 +1,33 @@
+name: Demo reset
+
+# Restores the public demo (https://fooddesk.fly.dev) to its canonical fake
+# dataset every 6 hours — and on demand from the Actions tab.
+on:
+  schedule:
+    - cron: '15 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reset:
+    name: Reset demo data
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      # The machine auto-stops when idle; the first request wakes it.
+      - name: Wake the demo machine
+        run: |
+          for i in $(seq 1 12); do
+            curl -sf -m 15 https://fooddesk.fly.dev/api/health >/dev/null && exit 0
+            sleep 5
+          done
+          echo "::error::demo never woke up"; exit 1
+
+      - name: Reseed the demo dataset
+        run: flyctl ssh console -a fooddesk -C "sh -c 'cd /app && DATABASE_FILE=/data/fooddesk.db node server/dist/db/seed-demo.js'"
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
