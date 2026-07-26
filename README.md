@@ -4,6 +4,7 @@
 [![CodeQL](https://github.com/adefilippo83/FoodDesk/actions/workflows/codeql.yml/badge.svg)](https://github.com/adefilippo83/FoodDesk/actions/workflows/codeql.yml)
 [![Release](https://img.shields.io/github/v/release/adefilippo83/FoodDesk?include_prereleases&sort=semver)](https://github.com/adefilippo83/FoodDesk/releases)
 [![Node](https://img.shields.io/badge/node-24.x-339933?logo=node.js&logoColor=white)](deploy/README.md)
+[![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue)](LICENSE)
 [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/adefilippo83/FoodDesk)
 
 Ordering system for a temporary restaurant. Runs on a single Debian server on the
@@ -172,3 +173,9 @@ otherwise attaches `fooddesk-v1.0.0.tar.gz` — unpack it on the server and run
 
 See [deploy/README.md](deploy/README.md) — on the Debian server it is one command:
 `sudo deploy/install.sh`.
+
+## License
+
+FoodDesk is free software, released under the [GNU General Public License v3.0](LICENSE):
+you may use, study, modify and redistribute it, but derivative works must stay
+under the same license.
