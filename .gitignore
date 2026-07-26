@@ -8,6 +8,7 @@ server/public/
 
 # Runtime data — the venue database lives outside the repo
 server/data/
+data/
 *.db
 *.db-wal
 *.db-shm

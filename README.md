@@ -4,6 +4,7 @@
 [![CodeQL](https://github.com/adefilippo83/FoodDesk/actions/workflows/codeql.yml/badge.svg)](https://github.com/adefilippo83/FoodDesk/actions/workflows/codeql.yml)
 [![Release](https://img.shields.io/github/v/release/adefilippo83/FoodDesk?include_prereleases&sort=semver)](https://github.com/adefilippo83/FoodDesk/releases)
 [![Node](https://img.shields.io/badge/node-24.x-339933?logo=node.js&logoColor=white)](deploy/README.md)
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/adefilippo83/FoodDesk)
 
 Ordering system for a temporary restaurant. Runs on a single Debian server on the
 venue Wi-Fi; waiters connect from their phones over the LAN.
@@ -69,8 +70,17 @@ The SQLite database lives in the `/data` volume. All the usual environment
 variables apply; for printing, set `KITCHEN_PRINTER` plus `CUPS_SERVER=<host>`
 so the container's `lp` talks to a CUPS server on the host or LAN. See
 [deploy/docker-compose.yml](deploy/docker-compose.yml) for a ready-made
-compose file. Pull requests only validate that the image builds; nothing is
-published until the merge.
+compose file. On every pull request the image is built **and booted** — the
+CI smoke test waits for `/api/health` and performs a real login before the
+image may be published on merge.
+
+### Try it in your browser
+
+Click the *Open in GitHub Codespaces* badge above: the codespace builds the
+app, starts it, and forwards port 3000 to an HTTPS URL. Sign in with
+**admin / fooddesk-demo**. Each visitor gets their own throwaway instance
+(free Codespaces quota applies); make the forwarded port public from the
+Ports panel if you want to share the running demo with someone else.
 
 ## Design notes
 
