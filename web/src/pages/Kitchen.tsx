@@ -7,6 +7,34 @@ function minutesSince(ts: number): number {
   return Math.max(0, Math.floor((Date.now() / 1000 - ts) / 60))
 }
 
+type TodoGroup = { category: string; items: { name: string; qty: number }[] }
+
+/**
+ * The workbench view: everything still to prepare, summed per product and
+ * grouped by category ("10× Bistecca"), so each station knows its numbers
+ * at a glance. Derived purely from the orders already on screen.
+ */
+function buildTodo(orders: KitchenOrder[]): TodoGroup[] {
+  const groups: TodoGroup[] = []
+  for (const o of orders) {
+    if (o.cancelledAt !== null) continue
+    for (const i of o.items) {
+      if (i.doneAt !== null || i.cancelledAt !== null) continue
+      let g = groups.find((x) => x.category === i.category)
+      if (!g) {
+        g = { category: i.category, items: [] }
+        groups.push(g)
+      }
+      const item = g.items.find((x) => x.name === i.name)
+      if (item) item.qty += i.qty
+      else g.items.push({ name: i.name, qty: i.qty })
+    }
+  }
+  // Biggest workload first within each station.
+  for (const g of groups) g.items.sort((a, b) => b.qty - a.qty)
+  return groups
+}
+
 function OrderCard({
   order,
   onToggle,
@@ -70,6 +98,15 @@ export default function Kitchen() {
   const { t } = useI18n()
   const [orders, setOrders] = useState<KitchenOrder[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // The workbench bar is collapsible; each tablet remembers its choice.
+  const [todoOpen, setTodoOpen] = useState(() => localStorage.getItem('fd_kds_todo') !== 'closed')
+
+  function toggleTodo() {
+    setTodoOpen((open) => {
+      localStorage.setItem('fd_kds_todo', open ? 'closed' : 'open')
+      return !open
+    })
+  }
 
   async function load() {
     try {
@@ -154,9 +191,34 @@ export default function Kitchen() {
     return active.length > 0 && active.every((i) => i.doneAt !== null)
   })
 
+  const todo = buildTodo(orders)
+
   return (
     <>
       {error && <div className="error">{error}</div>}
+
+      {todo.length > 0 && (
+        <div className="kds-todo">
+          <button className="kds-todo-toggle" onClick={toggleTodo}>
+            {t('kdsTodo')} ·{' '}
+            {todo.reduce((n, g) => n + g.items.reduce((m, i) => m + i.qty, 0), 0)}{' '}
+            {todoOpen ? '▾' : '▸'}
+          </button>
+          {todoOpen &&
+            todo.map((g) => (
+              <div className="kds-todo-group" key={g.category}>
+                <div className="kds-todo-cat">{g.category}</div>
+                <div className="kds-todo-items">
+                  {g.items.map((i) => (
+                    <span className="kds-todo-item" key={i.name}>
+                      <span className="kds-todo-qty">{i.qty}×</span> {i.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+        </div>
+      )}
 
       {open.length === 0 ? (
         <div className="empty">{t('kdsNoOrders')}</div>

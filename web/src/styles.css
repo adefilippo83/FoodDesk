@@ -691,6 +691,67 @@ tr.cancelled td .badge {
 
 /* ---------- kitchen display (tablet) ---------- */
 
+/* "To prepare" workbench bar: per-product totals grouped by category,
+   collapsible to just the label + total count. */
+.kds-todo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 10px 26px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  margin-bottom: 14px;
+}
+
+.kds-todo-toggle {
+  align-self: center;
+  min-height: 36px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  white-space: nowrap;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.kds-todo-cat {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 5px;
+}
+
+.kds-todo-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.kds-todo-item {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.kds-todo-qty {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
 .kds-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));

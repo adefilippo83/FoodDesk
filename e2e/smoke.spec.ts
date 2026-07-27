@@ -48,9 +48,19 @@ test('login → menu → order → kitchen display', async ({ page }) => {
   // ---- work it on the kitchen display ----
   await page.getByRole('link', { name: 'Kitchen' }).click()
   await expect(page.getByText('#001')).toBeVisible()
+
+  // The workbench summary counts the pending beer, collapses and re-expands.
+  await expect(page.getByRole('button', { name: /To prepare · 1/ })).toBeVisible()
+  await expect(page.locator('.kds-todo-item')).toHaveText(/1×\s*Beer/)
+  await page.getByRole('button', { name: /To prepare/ }).click()
+  await expect(page.locator('.kds-todo-item')).toHaveCount(0)
+  await page.getByRole('button', { name: /To prepare/ }).click()
+  await expect(page.locator('.kds-todo-item')).toHaveCount(1)
+
   const item = page.getByRole('button', { name: /1×\s*Beer/ })
   await item.click()
-  // Last item done → the order moves to the Completed section.
+  // Last item done → nothing left to prepare, order moves to Completed.
+  await expect(page.locator('.kds-todo')).toHaveCount(0)
   await expect(page.getByText(/Completed · 1/)).toBeVisible()
 
   // ---- and the waiters' list now flags it ready ----
