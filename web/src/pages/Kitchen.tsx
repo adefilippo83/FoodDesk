@@ -197,51 +197,57 @@ export default function Kitchen() {
     <>
       {error && <div className="error">{error}</div>}
 
-      {todo.length > 0 && (
-        <div className="kds-todo">
-          <button className="kds-todo-toggle" onClick={toggleTodo}>
-            {t('kdsTodo')} ·{' '}
-            {todo.reduce((n, g) => n + g.items.reduce((m, i) => m + i.qty, 0), 0)}{' '}
-            {todoOpen ? '▾' : '▸'}
-          </button>
-          {todoOpen &&
-            todo.map((g) => (
-              <div className="kds-todo-group" key={g.category}>
-                <div className="kds-todo-cat">{g.category}</div>
-                <div className="kds-todo-items">
-                  {g.items.map((i) => (
-                    <span className="kds-todo-item" key={i.name}>
-                      <span className="kds-todo-qty">{i.qty}×</span> {i.name}
-                    </span>
-                  ))}
+      {/* On wide screens the workbench summary sits in a left sidebar
+          (issue #25); on narrow ones it stays as a bar above the grid. */}
+      <div className="kds-layout">
+        {todo.length > 0 && (
+          <div className={`kds-todo ${todoOpen ? '' : 'closed'}`}>
+            <button className="kds-todo-toggle" onClick={toggleTodo}>
+              {t('kdsTodo')} ·{' '}
+              {todo.reduce((n, g) => n + g.items.reduce((m, i) => m + i.qty, 0), 0)}{' '}
+              {todoOpen ? '▾' : '▸'}
+            </button>
+            {todoOpen &&
+              todo.map((g) => (
+                <div className="kds-todo-group" key={g.category}>
+                  <div className="kds-todo-cat">{g.category}</div>
+                  <div className="kds-todo-items">
+                    {g.items.map((i) => (
+                      <span className="kds-todo-item" key={i.name}>
+                        <span className="kds-todo-qty">{i.qty}×</span> {i.name}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
-        </div>
-      )}
-
-      {open.length === 0 ? (
-        <div className="empty">{t('kdsNoOrders')}</div>
-      ) : (
-        <div className="kds-grid">
-          {open.map((o) => (
-            <OrderCard key={o.id} order={o} onToggle={toggle} />
-          ))}
-        </div>
-      )}
-
-      {completed.length > 0 && (
-        <>
-          <h2 className="kds-section">
-            {t('kdsCompleted')} · {completed.length}
-          </h2>
-          <div className="kds-grid">
-            {completed.map((o) => (
-              <OrderCard key={o.id} order={o} onToggle={toggle} />
-            ))}
+              ))}
           </div>
-        </>
-      )}
+        )}
+
+        <div className="kds-main">
+          {open.length === 0 ? (
+            <div className="empty">{t('kdsNoOrders')}</div>
+          ) : (
+            <div className="kds-grid">
+              {open.map((o) => (
+                <OrderCard key={o.id} order={o} onToggle={toggle} />
+              ))}
+            </div>
+          )}
+
+          {completed.length > 0 && (
+            <>
+              <h2 className="kds-section">
+                {t('kdsCompleted')} · {completed.length}
+              </h2>
+              <div className="kds-grid">
+                {completed.map((o) => (
+                  <OrderCard key={o.id} order={o} onToggle={toggle} />
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
     </>
   )
 }

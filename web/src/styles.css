@@ -691,8 +691,21 @@ tr.cancelled td .badge {
 
 /* ---------- kitchen display (tablet) ---------- */
 
-/* "To prepare" workbench bar: per-product totals grouped by category,
-   collapsible to just the label + total count. */
+/* "To prepare" workbench summary: per-product totals grouped by category,
+   collapsible to just the label + total count. A bar above the grid on
+   narrow screens, a sticky left sidebar on wide ones. */
+.kds-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: stretch;
+}
+
+.kds-main {
+  flex: 1;
+  min-width: 0;
+}
+
 .kds-todo {
   display: flex;
   flex-wrap: wrap;
@@ -702,7 +715,33 @@ tr.cancelled td .badge {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 10px 14px;
-  margin-bottom: 14px;
+}
+
+@media (min-width: 1000px) {
+  .kds-layout {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  .kds-todo {
+    flex: 0 0 240px;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 12px;
+    position: sticky;
+    top: 76px;
+    max-height: calc(100dvh - 92px);
+    overflow-y: auto;
+  }
+
+  .kds-todo.closed {
+    flex-basis: auto;
+  }
+
+  .kds-todo .kds-todo-toggle {
+    align-self: flex-start;
+  }
 }
 
 .kds-todo-toggle {
