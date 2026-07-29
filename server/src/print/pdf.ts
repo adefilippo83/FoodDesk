@@ -444,10 +444,17 @@ export function renderOrderSheet(
       return h + 2
     }
 
-    // ---- coperto first ----
+    // ---- coperto first, set apart from the products by the same thin
+    // separator used between category groups (issue #27) ----
     if (order.covers > 0 && order.coverChargeCents > 0) {
       line(`${order.covers} × ${L.coverCharge}`, order.covers * order.coverChargeCents)
       doc.y += 2
+      doc
+        .moveTo(d.margin, doc.y + 1)
+        .lineTo(d.margin + d.innerW, doc.y + 1)
+        .strokeColor('#999')
+        .stroke()
+      doc.y += 5
     }
 
     // ---- products grouped by category (order of first appearance) ----
@@ -516,30 +523,63 @@ export function renderOrderSheet(
       doc.moveDown(0.3)
     }
 
-    // ---- disclaimer ----
+    // ---- disclaimer + footer ----
+    // On fixed page sizes these are pinned to the bottom of the page, no
+    // matter how short the order is (issue #26). Roll paper keeps flowing:
+    // its page height hugs the content and blank space is wasted paper.
+    const GAP = 8
+    const footerImg = s.orderFooterImage ? imageBuffer(s.orderFooterImage) : null
+    let footerImgH = 0
+    if (footerImg) {
+      const w = (d.innerW * s.orderFooterImageWidthPct) / 100
+      const dims = imageDims(footerImg)
+      footerImgH = dims ? (w * dims.h) / dims.w : 16 * MM
+    }
+    let bottomH = 0
     if (s.orderDisclaimer) {
-      doc.moveDown(0.4)
-      doc
-        .font('Helvetica-Bold')
-        .fontSize(s.orderDisclaimerFontSize)
-        .fillColor('#555')
-        .text(s.orderDisclaimer, d.margin, doc.y, { width: d.innerW, align: 'center' })
-      doc.fillColor('#000')
+      doc.font('Helvetica-Bold').fontSize(s.orderDisclaimerFontSize)
+      bottomH += doc.heightOfString(s.orderDisclaimer, { width: d.innerW }) + GAP
     }
-
-    // ---- footer ----
     if (s.orderFooterText) {
-      doc.moveDown(0.5)
-      doc
-        .font('Helvetica')
-        .fontSize(s.orderFooterFontSize)
-        .fillColor('#444')
-        .text(s.orderFooterText, d.margin, doc.y, { width: d.innerW, align: 'center' })
-      doc.fillColor('#000')
+      doc.font('Helvetica').fontSize(s.orderFooterFontSize)
+      bottomH += doc.heightOfString(s.orderFooterText, { width: d.innerW }) + GAP
     }
-    if (s.orderFooterImage) {
-      doc.y += 4
-      scaledImage(s.orderFooterImage, s.orderFooterImageWidthPct)
+    if (footerImg) bottomH += footerImgH + GAP
+
+    if (bottomH > 0) {
+      doc.y += GAP
+      if (d.fixedH !== null) {
+        const pinnedTop = d.fixedH - d.margin - bottomH
+        // Pin only when there is room; a long order just flows past it.
+        if (pinnedTop > doc.y) doc.y = pinnedTop
+      }
+      if (s.orderDisclaimer) {
+        doc
+          .font('Helvetica-Bold')
+          .fontSize(s.orderDisclaimerFontSize)
+          .fillColor('#555')
+          .text(s.orderDisclaimer, d.margin, doc.y, { width: d.innerW, align: 'center' })
+        doc.fillColor('#000')
+        doc.y += GAP
+      }
+      if (s.orderFooterText) {
+        doc
+          .font('Helvetica')
+          .fontSize(s.orderFooterFontSize)
+          .fillColor('#444')
+          .text(s.orderFooterText, d.margin, doc.y, { width: d.innerW, align: 'center' })
+        doc.fillColor('#000')
+        doc.y += GAP
+      }
+      if (footerImg) {
+        const w = (d.innerW * s.orderFooterImageWidthPct) / 100
+        try {
+          doc.image(footerImg, d.margin + (d.innerW - w) / 2, doc.y, { width: w })
+          doc.y += footerImgH
+        } catch {
+          // ignore bad image data
+        }
+      }
     }
   })
 }
