@@ -1,4 +1,5 @@
 import cookie from '@fastify/cookie'
+import rateLimit from '@fastify/rate-limit'
 import fastifyStatic from '@fastify/static'
 import Fastify, { type FastifyInstance } from 'fastify'
 import { existsSync } from 'node:fs'
@@ -34,6 +35,10 @@ export async function buildApp(
   })
 
   await app.register(cookie)
+  // Not global: only the routes doing expensive scrypt work (login, password
+  // change) opt in, capping how fast one IP can burn CPU on them. The
+  // per-username lockout still handles targeted guessing.
+  await app.register(rateLimit, { global: false })
 
   const CSP = [
     "default-src 'self'",

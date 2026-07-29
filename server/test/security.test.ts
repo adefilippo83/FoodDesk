@@ -209,4 +209,37 @@ describe('security hardening', () => {
     const after = await app.inject({ method: 'GET', url: '/api/auth/me', headers: { cookie: phone } })
     assert.equal(after.statusCode, 401)
   })
+
+  // ---- per-IP rate limiting (kept last: these exhaust the IP's budget) ----
+
+  it('rate limits login attempts per IP, even across usernames', async () => {
+    // Rotating usernames sidesteps the per-username lockout — the per-IP
+    // rate limit is what stops the scrypt burn.
+    let limited = false
+    for (let i = 0; i < 30 && !limited; i++) {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/auth/login',
+        payload: { username: `ghost-${i}`, password: 'wrong-password-1' },
+      })
+      if (res.statusCode === 429 && res.body.includes('Rate limit')) limited = true
+      else assert.equal(res.statusCode, 401)
+    }
+    assert.ok(limited, 'login must rate limit within 30 attempts')
+  })
+
+  it('rate limits password changes per IP', async () => {
+    let limited = false
+    for (let i = 0; i < 15 && !limited; i++) {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/auth/password',
+        headers: { cookie: adminCookie },
+        payload: { currentPassword: 'definitely-wrong', newPassword: 'whatever-123' },
+      })
+      if (res.statusCode === 429 && res.body.includes('Rate limit')) limited = true
+      else assert.equal(res.statusCode, 403)
+    }
+    assert.ok(limited, 'password change must rate limit within 15 attempts')
+  })
 })

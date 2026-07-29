@@ -201,7 +201,7 @@ export const api = {
   orders: (day?: string) =>
     request<{ serviceDay: string; orders: OrderSummary[] }>(
       'GET',
-      day ? `/api/orders?day=${day}` : '/api/orders',
+      day ? `/api/orders?day=${encodeURIComponent(day)}` : '/api/orders',
     ),
   order: (id: number) => request<OrderDetail>('GET', `/api/orders/${id}`),
   reprint: (id: number) => request<{ ok: true; printedAt: number }>('POST', `/api/orders/${id}/print`),
@@ -231,9 +231,9 @@ export const api = {
       '/api/reports/days',
     ),
   dailyReport: (day?: string) =>
-    request<DailyReport>('GET', day ? `/api/reports/daily?day=${day}` : '/api/reports/daily'),
-  dailyCsvUrl: (day: string) => `/api/reports/daily.csv?day=${day}`,
-  dailyPdfUrl: (day: string) => `/api/reports/daily.pdf?day=${day}`,
+    request<DailyReport>('GET', day ? `/api/reports/daily?day=${encodeURIComponent(day)}` : '/api/reports/daily'),
+  dailyCsvUrl: (day: string) => `/api/reports/daily.csv?day=${encodeURIComponent(day)}`,
+  dailyPdfUrl: (day: string) => `/api/reports/daily.pdf?day=${encodeURIComponent(day)}`,
 
   users: () => request<User[]>('GET', '/api/users'),
   createUser: (input: { username: string; password: string; displayName: string; role: Role }) =>

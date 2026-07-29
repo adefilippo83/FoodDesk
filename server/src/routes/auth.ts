@@ -20,7 +20,12 @@ const DUMMY_HASH = await hashPassword('timing-equalizer')
 
 export function authRoutes(db: Db) {
   return async function register(app: FastifyInstance) {
-    app.post('/api/auth/login', async (req, reply) => {
+    // Generous for a venue full of phones (each has its own LAN IP behind
+    // nginx), tight enough that one machine cannot hammer scrypt.
+    app.post(
+      '/api/auth/login',
+      { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } },
+      async (req, reply) => {
       const body = req.body as { username?: unknown; password?: unknown } | undefined
       const username = typeof body?.username === 'string' ? body.username.trim() : ''
       const password = typeof body?.password === 'string' ? body.password : ''
@@ -78,7 +83,13 @@ export function authRoutes(db: Db) {
     })
 
     /** Self-service password change — current password required, any role. */
-    app.post('/api/auth/password', { preHandler: requireAuth }, async (req, reply) => {
+    app.post(
+      '/api/auth/password',
+      {
+        preHandler: requireAuth,
+        config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+      },
+      async (req, reply) => {
       const body = req.body as { currentPassword?: unknown; newPassword?: unknown } | undefined
       const current = typeof body?.currentPassword === 'string' ? body.currentPassword : ''
       const next = typeof body?.newPassword === 'string' ? body.newPassword : ''
