@@ -18,7 +18,7 @@
   "dependencies": {
     "@fastify/cookie": "^11.0.2",
     "@fastify/static": "^10.1.0",
-    "better-sqlite3": "^12.11.1",
+    "better-sqlite3": "^13.0.1",
     "drizzle-orm": "^0.45.2",
     "fastify": "^5.10.0",
     "pdfkit": "^0.19.1"
