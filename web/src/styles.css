@@ -377,6 +377,17 @@ label.field span {
   font-variant-numeric: tabular-nums;
 }
 
+/* Remaining stock on tracked products; red when nearly gone. */
+.product-btn .stock {
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.product-btn .stock.low {
+  color: var(--danger);
+}
+
 .cart-line {
   display: grid;
   grid-template-columns: 1fr auto;

@@ -70,6 +70,8 @@ export default function AdminMenu() {
   const [pCategory, setPCategory] = useState<number | ''>('')
   const [editing, setEditing] = useState<number | null>(null)
   const [editPrice, setEditPrice] = useState('')
+  const [editingStock, setEditingStock] = useState<number | null>(null)
+  const [stockValue, setStockValue] = useState('')
 
   // Refs so drag callbacks always see the current order, never a stale render.
   const categoriesRef = useRef(categories)
@@ -147,6 +149,21 @@ export default function AdminMenu() {
     if (cents === null) return setError(t('errPriceFormat'))
     setError(null)
     void run(() => api.updateProduct(productId, { priceCents: cents }), t('errUpdatePrice'))
+  }
+
+  function commitStock(productId: number) {
+    const raw = stockValue.trim()
+    setEditingStock(null)
+    let value: number | null
+    if (raw === '' || raw === '∞') {
+      value = null // empty = stop tracking stock for this product
+    } else {
+      const n = Number(raw)
+      if (!Number.isInteger(n) || n < 0) return setError(t('errStockFormat'))
+      value = n
+    }
+    setError(null)
+    void run(() => api.updateProduct(productId, { stockRemaining: value }), t('errUpdateStock'))
   }
 
   function addProduct() {
@@ -315,6 +332,7 @@ export default function AdminMenu() {
                   <th>{t('name')}</th>
                   <th>{t('category')}</th>
                   <th className="num">{t('price')}</th>
+                  <th className="num">{t('stock')}</th>
                   <th />
                 </tr>
               </thead>
@@ -382,6 +400,34 @@ export default function AdminMenu() {
                           }}
                         >
                           €{formatMoney(p.priceCents)}
+                        </button>
+                      )}
+                    </td>
+                    <td className="num">
+                      {editingStock === p.id ? (
+                        <input
+                          className="input"
+                          style={{ width: 80, textAlign: 'right' }}
+                          inputMode="numeric"
+                          autoFocus
+                          value={stockValue}
+                          onChange={(e) => setStockValue(e.target.value)}
+                          onBlur={() => commitStock(p.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') commitStock(p.id)
+                            if (e.key === 'Escape') setEditingStock(null)
+                          }}
+                        />
+                      ) : (
+                        <button
+                          className="btn small"
+                          title={t('stockHint')}
+                          onClick={() => {
+                            setEditingStock(p.id)
+                            setStockValue(p.stockRemaining === null ? '' : String(p.stockRemaining))
+                          }}
+                        >
+                          {p.stockRemaining === null ? '∞' : p.stockRemaining}
                         </button>
                       )}
                     </td>

@@ -1,4 +1,4 @@
-import { ne } from 'drizzle-orm'
+import { eq, ne } from 'drizzle-orm'
 import { hashPassword } from '../auth/password.js'
 import { serviceDayOf } from '../lib/serviceDay.js'
 import { createDb } from './index.js'
@@ -194,6 +194,16 @@ for (const [index, o] of EVENING.entries()) {
     })
   }
 }
+
+// A couple of stock-tracked products so the demo shows the feature.
+await db
+  .update(products)
+  .set({ stockRemaining: 15 })
+  .where(eq(products.id, byName.get('Porchetta')!.id))
+await db
+  .update(products)
+  .set({ stockRemaining: 8 })
+  .where(eq(products.id, byName.get('Tiramisù')!.id))
 
 console.log(
   `demo data ready: ${MENU.length} categories, ${byName.size} products, ` +

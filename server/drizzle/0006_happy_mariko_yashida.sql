@@ -1,0 +1,1 @@
+ALTER TABLE `products` ADD `stock_remaining` integer;

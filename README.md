@@ -134,7 +134,7 @@ npm test          # 105 server tests; `npm run test:e2e` for the browser smoke t
 | `DATABASE_FILE` | `./data/fooddesk.db` | SQLite file location |
 | `PORT` / `HOST` | `3000` / `0.0.0.0` | Binds all interfaces so phones can reach it |
 | `COOKIE_SECURE` | `false` | Set `true` when served over TLS |
-| `ADMIN_USERNAME` / `ADMIN_PASSWORD` | `admin` / generated | Seed-time admin credentials |
+| `ADMIN_USERNAME` / `ADMIN_PASSWORD` | `admin` / generated | Seed-time admin credentials. Setting `ADMIN_PASSWORD` and re-running the seed on an existing database resets the admin password (emergency recovery) |
 | `KITCHEN_PRINTER` | unset | CUPS queue name (`lpstat -p` lists queues). Unset ⇒ browser print dialog fallback |
 | `RESTAURANT_NAME` | `FoodDesk` | Default receipt header — the Settings page overrides this |
 | `PDF_LANG` | `it` | Default document language (it/en/es/fr/pt) — Settings overrides |

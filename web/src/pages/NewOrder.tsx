@@ -69,6 +69,10 @@ function autoPrintOrderSheet(
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>
     @page { margin: 5mm; }
     body { font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; color: #000; background: #fff; margin: 0; }
+    /* Disclaimer and footer sit at the bottom of the printed page, like on
+       the server-rendered order.pdf (issue #32). */
+    .sheet { display: flex; flex-direction: column; min-height: calc(100vh - 2mm); }
+    .spacer { flex: 1; }
     img.hf { display: block; max-width: 100%; height: auto; margin: 0 auto 4px; }
     .htext { text-align: center; font-size: ${config.orderHeaderFontSize}pt; color: #333; margin: 0 0 4px; }
     .info { font-size: 17px; font-weight: 800; text-align: center; margin: 2px 0; }
@@ -85,17 +89,20 @@ function autoPrintOrderSheet(
     .disclaimer { font-size: ${config.orderDisclaimerFontSize}pt; font-weight: 700; color: #555; text-align: center; margin: 8px 0 0; }
     .ftext { text-align: center; font-size: ${config.orderFooterFontSize}pt; color: #444; margin: 8px 0 0; }
   </style></head><body>
-    ${config.orderHeaderImageUrl ? `<img class="hf" style="width:${config.orderHeaderImageWidthPct}%" src="${config.orderHeaderImageUrl}">` : ''}
-    ${config.orderHeaderText ? `<p class="htext">${text(config.orderHeaderText)}</p>` : ''}
-    <p class="info">${esc(labels.orderWord)} #${String(order.dailyNumber).padStart(3, '0')} · ${order.serviceDay} · ${time}${order.customerName ? ` · ${esc(order.customerName)}` : ''}</p>
-    <hr>
-    ${coperto}
-    ${blocks}
-    <div class="total"><span>${esc(labels.total)}</span><span>${money(order.totalCents)}</span></div>
-    ${order.note ? `<hr><div class="note">${esc(labels.notePrefix)} ${esc(order.note)}</div>` : ''}
-    ${config.orderDisclaimer ? `<p class="disclaimer">${text(config.orderDisclaimer)}</p>` : ''}
-    ${config.orderFooterText ? `<p class="ftext">${text(config.orderFooterText)}</p>` : ''}
-    ${config.orderFooterImageUrl ? `<img class="hf" style="width:${config.orderFooterImageWidthPct}%" src="${config.orderFooterImageUrl}">` : ''}
+    <div class="sheet">
+      ${config.orderHeaderImageUrl ? `<img class="hf" style="width:${config.orderHeaderImageWidthPct}%" src="${config.orderHeaderImageUrl}">` : ''}
+      ${config.orderHeaderText ? `<p class="htext">${text(config.orderHeaderText)}</p>` : ''}
+      <p class="info">${esc(labels.orderWord)} #${String(order.dailyNumber).padStart(3, '0')} · ${order.serviceDay} · ${time}${order.customerName ? ` · ${esc(order.customerName)}` : ''}</p>
+      <hr>
+      ${coperto}${coperto ? '<div class="sep"></div>' : ''}
+      ${blocks}
+      <div class="total"><span>${esc(labels.total)}</span><span>${money(order.totalCents)}</span></div>
+      ${order.note ? `<hr><div class="note">${esc(labels.notePrefix)} ${esc(order.note)}</div>` : ''}
+      <div class="spacer"></div>
+      ${config.orderDisclaimer ? `<p class="disclaimer">${text(config.orderDisclaimer)}</p>` : ''}
+      ${config.orderFooterText ? `<p class="ftext">${text(config.orderFooterText)}</p>` : ''}
+      ${config.orderFooterImageUrl ? `<img class="hf" style="width:${config.orderFooterImageWidthPct}%" src="${config.orderFooterImageUrl}">` : ''}
+    </div>
   </body></html>`
 
   const frame = document.createElement('iframe')
@@ -223,11 +230,18 @@ export default function NewOrder() {
         })
       }
     } catch (err) {
+      const code = err && typeof err === 'object' && 'code' in err ? err.code : ''
       setError(
-        err && typeof err === 'object' && 'code' in err && err.code === 'products_unavailable'
-          ? t('errProductGone')
-          : t('errSendOrder'),
+        code === 'out_of_stock'
+          ? t('errOutOfStock')
+          : code === 'products_unavailable'
+            ? t('errProductGone')
+            : t('errSendOrder'),
       )
+      // The menu just changed under the waiter's feet — show them reality.
+      if (code === 'out_of_stock' || code === 'products_unavailable') {
+        api.menu().then(setMenu).catch(() => {})
+      }
     } finally {
       setSubmitting(false)
     }
@@ -271,7 +285,15 @@ export default function NewOrder() {
               {current.products.map((p) => (
                 <button key={p.id} className="product-btn" onClick={() => add(p)}>
                   <span className="name">{p.name}</span>
-                  <span className="price">€{formatMoney(p.priceCents)}</span>
+                  <span className="price">
+                    €{formatMoney(p.priceCents)}
+                    {p.stockRemaining !== null && (
+                      <span className={`stock ${p.stockRemaining <= 5 ? 'low' : ''}`}>
+                        {' '}
+                        · ×{p.stockRemaining}
+                      </span>
+                    )}
+                  </span>
                 </button>
               ))}
             </div>

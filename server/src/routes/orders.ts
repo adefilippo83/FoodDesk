@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, sql } from 'drizzle-orm'
+import { and, desc, eq, gte, inArray, isNotNull, lte, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/sqlite-core'
 import type { FastifyInstance } from 'fastify'
 import { isManager, requireFloorStaff, requireManager } from '../auth/acl.js'
@@ -87,6 +87,7 @@ export function orderRoutes(db: Db) {
           name: products.name,
           priceCents: products.priceCents,
           active: products.active,
+          stockRemaining: products.stockRemaining,
           categoryName: categories.name,
         })
         .from(products)
@@ -100,6 +101,18 @@ export function orderRoutes(db: Db) {
       const inactive = ids.filter((id) => !byId.get(id)!.active)
       if (inactive.length) {
         return reply.code(409).send({ error: 'products_unavailable', unavailable: inactive })
+      }
+
+      // Stock-tracked products must cover the requested quantities. This is
+      // the friendly pre-check; the transaction below re-verifies atomically.
+      const short = parsed.filter((i) => {
+        const p = byId.get(i.productId)!
+        return p.stockRemaining !== null && p.stockRemaining < i.qty
+      })
+      if (short.length) {
+        return reply
+          .code(409)
+          .send({ error: 'out_of_stock', unavailable: short.map((i) => i.productId) })
       }
 
       const serviceDay = serviceDayOf()
@@ -153,6 +166,27 @@ export function orderRoutes(db: Db) {
                 note: item.note ?? null,
               })
               .run()
+            // Stock: the conditional update is the race guard — two waiters
+            // grabbing the last portions cannot both win. At zero the
+            // product takes itself off the menu (issue #31).
+            if (p.stockRemaining !== null) {
+              const res = tx
+                .update(products)
+                .set({ stockRemaining: sql`${products.stockRemaining} - ${item.qty}` })
+                .where(
+                  and(
+                    eq(products.id, p.id),
+                    isNotNull(products.stockRemaining),
+                    gte(products.stockRemaining, item.qty),
+                  ),
+                )
+                .run()
+              if (res.changes === 0) throw new Error('OUT_OF_STOCK')
+              tx.update(products)
+                .set({ active: false })
+                .where(and(eq(products.id, p.id), lte(products.stockRemaining, 0)))
+                .run()
+            }
           }
           return order
         })
@@ -162,6 +196,10 @@ export function orderRoutes(db: Db) {
         if (clientKey && err instanceof Error && err.message.includes('UNIQUE')) {
           const replay = await replayOf()
           if (replay) return reply.code(200).send(replay)
+        }
+        // Lost the race for the last portions: the transaction rolled back.
+        if (err instanceof Error && err.message === 'OUT_OF_STOCK') {
+          return reply.code(409).send({ error: 'out_of_stock', unavailable: ids })
         }
         throw err
       }
@@ -269,6 +307,22 @@ export function orderRoutes(db: Db) {
             .set({ cancelledAt: now, cancelledBy: req.user!.id })
             .where(eq(orderItems.id, itemId))
             .run()
+          // Stock-tracked products get the portions back; one that had sold
+          // out through this very line returns to the menu.
+          tx.update(products)
+            .set({ stockRemaining: sql`${products.stockRemaining} + ${item.qty}` })
+            .where(and(eq(products.id, item.productId), isNotNull(products.stockRemaining)))
+            .run()
+          tx.update(products)
+            .set({ active: true })
+            .where(
+              and(
+                eq(products.id, item.productId),
+                eq(products.active, false),
+                eq(products.stockRemaining, item.qty),
+              ),
+            )
+            .run()
         }
         const all = tx.select().from(orderItems).where(eq(orderItems.orderId, id)).all()
         const active = all.filter((i) => i.cancelledAt === null)
@@ -303,6 +357,76 @@ export function orderRoutes(db: Db) {
           itemId,
           orderCancelled: result.orderCancelled,
           totalCents: result.updated.totalCents,
+        },
+        'audit',
+      )
+      notifyOrdersChanged()
+      return { ...result.updated, items: result.items }
+    })
+
+    /**
+     * Reduce a line's quantity — fixing a mis-tap without cancelling the
+     * whole line (issue #30). Same visibility rules as line cancellation;
+     * only downward (adding dishes is a different feature), and dropping to
+     * zero is expressed as cancelling the line instead.
+     */
+    app.post('/api/orders/:id/items/:itemId/quantity', async (req, reply) => {
+      const id = Number((req.params as { id: string }).id)
+      const itemId = Number((req.params as { itemId: string }).itemId)
+      const qty = Number((req.body as { qty?: unknown } | undefined)?.qty)
+      if (!Number.isInteger(qty) || qty < 1) return reply.code(400).send({ error: 'invalid_qty' })
+
+      const order = await loadVisibleOrder(id, req.user!)
+      if (order === 'not_found') return reply.code(404).send({ error: 'not_found' })
+      if (order === 'forbidden') return reply.code(403).send({ error: 'forbidden' })
+      if (order.cancelledAt) return reply.code(409).send({ error: 'order_cancelled' })
+
+      const item = (
+        await db.select().from(orderItems).where(eq(orderItems.id, itemId)).limit(1)
+      )[0]
+      if (!item || item.orderId !== id) return reply.code(404).send({ error: 'not_found' })
+      if (item.cancelledAt) return reply.code(409).send({ error: 'item_cancelled' })
+      if (qty >= item.qty) return reply.code(400).send({ error: 'only_reduction_allowed' })
+
+      const delta = item.qty - qty
+      const result = db.transaction((tx) => {
+        tx.update(orderItems).set({ qty }).where(eq(orderItems.id, itemId)).run()
+        tx.update(products)
+          .set({ stockRemaining: sql`${products.stockRemaining} + ${delta}` })
+          .where(and(eq(products.id, item.productId), isNotNull(products.stockRemaining)))
+          .run()
+        tx.update(products)
+          .set({ active: true })
+          .where(
+            and(
+              eq(products.id, item.productId),
+              eq(products.active, false),
+              eq(products.stockRemaining, delta),
+            ),
+          )
+          .run()
+        const all = tx.select().from(orderItems).where(eq(orderItems.orderId, id)).all()
+        const active = all.filter((i) => i.cancelledAt === null)
+        const totalCents =
+          active.reduce((sum, i) => sum + i.priceCentsSnapshot * i.qty, 0) +
+          order.covers * order.coverChargeCents
+        const updated = tx
+          .update(orders)
+          .set({ totalCents })
+          .where(eq(orders.id, id))
+          .returning()
+          .get()!
+        return { updated, items: all }
+      })
+
+      req.log.info(
+        {
+          event: 'order_item_qty_changed',
+          by: req.user!.id,
+          orderId: id,
+          itemId,
+          from: item.qty,
+          to: qty,
         },
         'audit',
       )

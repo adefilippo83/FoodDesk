@@ -52,6 +52,9 @@ export const products = sqliteTable(
     priceCents: integer('price_cents').notNull(),
     sortOrder: integer('sort_order').notNull().default(0),
     active: integer('active', { mode: 'boolean' }).notNull().default(true),
+    // Stock tracking (issue #31): null = untracked. Decremented on every
+    // order; at zero the product deactivates itself.
+    stockRemaining: integer('stock_remaining'),
     createdAt: integer('created_at').notNull().default(sql`(unixepoch())`),
   },
   (t) => [index('products_category_id_idx').on(t.categoryId)],

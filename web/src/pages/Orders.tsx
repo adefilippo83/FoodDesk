@@ -34,6 +34,7 @@ export default function Orders() {
   const [confirmingCancel, setConfirmingCancel] = useState<number | null>(null)
   const [cancelling, setCancelling] = useState(false)
   const [confirmingItemCancel, setConfirmingItemCancel] = useState<number | null>(null)
+  const [confirmingItemQty, setConfirmingItemQty] = useState<number | null>(null)
 
   async function reprint(id: number) {
     setReprinting(id)
@@ -62,6 +63,19 @@ export default function Orders() {
       setError(t('errCancelItem'))
     } finally {
       setConfirmingItemCancel(null)
+      await load()
+    }
+  }
+
+  async function reduceItem(orderId: number, itemId: number, qty: number) {
+    try {
+      await api.updateOrderItemQty(orderId, itemId, qty)
+      setError(null)
+      setOpen(await api.order(orderId))
+    } catch {
+      setError(t('errChangeQty'))
+    } finally {
+      setConfirmingItemQty(null)
       await load()
     }
   }
@@ -246,7 +260,14 @@ export default function Orders() {
         >
           <div
             className="card"
-            style={{ width: '100%', maxWidth: 420 }}
+            style={{
+              width: '100%',
+              maxWidth: 420,
+              // Long orders scroll inside; the action buttons stay reachable.
+              maxHeight: 'calc(100dvh - 32px)',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
             onClick={(e) => e.stopPropagation()}
           >
             <h2>
@@ -259,7 +280,7 @@ export default function Orders() {
                 </span>
               )}
             </h2>
-            <div className="table-scroll">
+            <div className="table-scroll" style={{ overflowY: 'auto', minHeight: 0 }}>
               <table>
                 <tbody>
                   {open.items.map((i) => (
@@ -276,28 +297,56 @@ export default function Orders() {
                         )}
                       </td>
                       <td className="num">€{formatMoney(i.priceCentsSnapshot * i.qty)}</td>
-                      <td className="num" style={{ width: 40 }}>
-                        {open.cancelledAt === null &&
-                          i.cancelledAt === null &&
-                          (confirmingItemCancel === i.id ? (
-                            <button
-                              className="btn small danger"
-                              autoFocus
-                              onBlur={() => setConfirmingItemCancel(null)}
-                              onClick={() => void cancelItem(open.id, i.id)}
-                            >
-                              {t('confirmCancel')}
-                            </button>
-                          ) : (
-                            <button
-                              className="btn small danger"
-                              title={t('cancelItem')}
-                              aria-label={t('cancelItem')}
-                              onClick={() => setConfirmingItemCancel(i.id)}
-                            >
-                              ✕
-                            </button>
-                          ))}
+                      <td className="num" style={{ whiteSpace: 'nowrap' }}>
+                        {open.cancelledAt === null && i.cancelledAt === null && (
+                          <>
+                            {i.qty > 1 &&
+                              (confirmingItemQty === i.id ? (
+                                <button
+                                  className="btn small danger"
+                                  autoFocus
+                                  onBlur={() => setConfirmingItemQty(null)}
+                                  onClick={() => void reduceItem(open.id, i.id, i.qty - 1)}
+                                >
+                                  {t('confirmCancel')}
+                                </button>
+                              ) : (
+                                <button
+                                  className="btn small"
+                                  title={t('reduceQty')}
+                                  aria-label={t('reduceQty')}
+                                  onClick={() => {
+                                    setConfirmingItemQty(i.id)
+                                    setConfirmingItemCancel(null)
+                                  }}
+                                >
+                                  −
+                                </button>
+                              ))}{' '}
+                            {confirmingItemCancel === i.id ? (
+                              <button
+                                className="btn small danger"
+                                autoFocus
+                                onBlur={() => setConfirmingItemCancel(null)}
+                                onClick={() => void cancelItem(open.id, i.id)}
+                              >
+                                {t('confirmCancel')}
+                              </button>
+                            ) : (
+                              <button
+                                className="btn small danger"
+                                title={t('cancelItem')}
+                                aria-label={t('cancelItem')}
+                                onClick={() => {
+                                  setConfirmingItemCancel(i.id)
+                                  setConfirmingItemQty(null)
+                                }}
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </>
+                        )}
                       </td>
                     </tr>
                   ))}

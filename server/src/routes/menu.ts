@@ -37,7 +37,12 @@ export function menuRoutes(db: Db) {
         name: c.name,
         products: prods
           .filter((p) => p.categoryId === c.id)
-          .map((p) => ({ id: p.id, name: p.name, priceCents: p.priceCents })),
+          .map((p) => ({
+            id: p.id,
+            name: p.name,
+            priceCents: p.priceCents,
+            stockRemaining: p.stockRemaining,
+          })),
       }))
     })
 
@@ -192,6 +197,17 @@ export function menuRoutes(db: Db) {
       }
       if (typeof body?.sortOrder === 'number') patch.sortOrder = body.sortOrder
       if (typeof body?.active === 'boolean') patch.active = body.active
+      // Stock tracking (issue #31): a number sets the remaining portions,
+      // null switches tracking off for this product.
+      if (body?.stockRemaining !== undefined) {
+        const v = body.stockRemaining
+        if (v === null) patch.stockRemaining = null
+        else if (typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 100_000) {
+          patch.stockRemaining = v
+        } else {
+          return reply.code(400).send({ error: 'invalid_stock' })
+        }
+      }
       if (Object.keys(patch).length === 0) return reply.code(400).send({ error: 'nothing_to_update' })
 
       const updated = (await db.update(products).set(patch).where(eq(products.id, id)).returning())[0]!

@@ -138,7 +138,7 @@ npm test          # 105 test server; `npm run test:e2e` per lo smoke test browse
 | `DATABASE_FILE` | `./data/fooddesk.db` | Posizione del file SQLite |
 | `PORT` / `HOST` | `3000` / `0.0.0.0` | Ascolta su tutte le interfacce, per i telefoni |
 | `COOKIE_SECURE` | `false` | Metti `true` dietro TLS |
-| `ADMIN_USERNAME` / `ADMIN_PASSWORD` | `admin` / generata | Credenziali admin al seed |
+| `ADMIN_USERNAME` / `ADMIN_PASSWORD` | `admin` / generata | Credenziali admin al seed. Impostando `ADMIN_PASSWORD` e rilanciando il seed su un database esistente, la password admin viene reimpostata (recupero d'emergenza) |
 | `KITCHEN_PRINTER` | non impostata | Nome della coda CUPS (`lpstat -p` le elenca). Assente ⇒ stampa dal browser |
 | `RESTAURANT_NAME` | `FoodDesk` | Intestazione predefinita — la pagina Impostazioni la sovrascrive |
 | `PDF_LANG` | `it` | Lingua predefinita dei documenti (it/en/es/fr/pt) — Impostazioni sovrascrive |

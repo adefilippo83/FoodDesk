@@ -9,11 +9,13 @@ export type Product = {
   priceCents: number
   sortOrder: number
   active: boolean
+  /** null = stock tracking disabled for this product */
+  stockRemaining: number | null
 }
 export type MenuCategory = {
   id: number
   name: string
-  products: { id: number; name: string; priceCents: number }[]
+  products: { id: number; name: string; priceCents: number; stockRemaining: number | null }[]
 }
 export type OrderSummary = {
   id: number
@@ -184,7 +186,7 @@ export const api = {
     request<Product>('POST', '/api/products', input),
   updateProduct: (
     id: number,
-    patch: Partial<Pick<Product, 'name' | 'priceCents' | 'categoryId' | 'sortOrder' | 'active'>>,
+    patch: Partial<Pick<Product, 'name' | 'priceCents' | 'categoryId' | 'sortOrder' | 'active' | 'stockRemaining'>>,
   ) => request<Product>('PATCH', `/api/products/${id}`, patch),
   deleteProduct: (id: number) => request<{ ok: true }>('DELETE', `/api/products/${id}`),
 
@@ -198,6 +200,8 @@ export const api = {
   cancelOrder: (id: number) => request<OrderSummary>('POST', `/api/orders/${id}/cancel`),
   cancelOrderItem: (orderId: number, itemId: number) =>
     request<OrderDetail>('POST', `/api/orders/${orderId}/items/${itemId}/cancel`),
+  updateOrderItemQty: (orderId: number, itemId: number, qty: number) =>
+    request<OrderDetail>('POST', `/api/orders/${orderId}/items/${itemId}/quantity`, { qty }),
   orders: (day?: string) =>
     request<{ serviceDay: string; orders: OrderSummary[] }>(
       'GET',
