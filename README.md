@@ -107,8 +107,9 @@ docker logs fooddesk   # the generated admin password is printed on first start
 
 Every push to `main` publishes `:edge`; every `v*` tag publishes `:latest`
 and `:X.Y.Z` (amd64 + arm64). For printing from the container, set
-`KITCHEN_PRINTER` plus `CUPS_SERVER=<host>`. A ready-made
-[docker-compose.yml](deploy/docker-compose.yml) is included. On every pull
+`KITCHEN_PRINTER` plus `CUPS_SERVER=<host>`. For the full venue walkthrough
+— compose file, printing, backups, updates — see
+[deploy/README.md](deploy/README.md). On every pull
 request the image is built **and booted**: the CI smoke test waits for
 `/api/health` and performs a real login before anything may be published.
 

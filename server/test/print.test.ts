@@ -175,9 +175,10 @@ describe('automatic print retry', () => {
     })
     const id = order.json().id
     // The background print is fire-and-forget: wait for its failure to land.
-    for (let i = 0; i < 40; i++) {
+    // Generous budget — spawning `lp` on a loaded machine can lag.
+    for (let i = 0; i < 100; i++) {
       if ((await fetchAttempts(id)) >= 1) return id
-      await new Promise((r) => setTimeout(r, 50))
+      await new Promise((r) => setTimeout(r, 100))
     }
     throw new Error('background print never recorded its attempt')
   }

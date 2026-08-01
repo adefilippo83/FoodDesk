@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api, formatMoney, type AppConfig, type MenuCategory, type OrderDetail } from '../api'
 import { useI18n } from '../i18n'
+import { useOrdersEvents } from '../useOrdersEvents'
 
 type Line = { productId: number; name: string; priceCents: number; qty: number }
 
@@ -163,13 +164,37 @@ export default function NewOrder() {
     return () => clearTimeout(timer)
   }, [toast])
 
+  // Orders elsewhere consume stock: refresh the menu on every change so the
+  // counters (and the add caps below) track reality during the rush.
+  useOrdersEvents(() => void api.menu().then(setMenu).catch(() => {}))
+
   const coverChargeCents = config?.coverChargeCents ?? 0
   const total = useMemo(
     () => lines.reduce((sum, l) => sum + l.priceCents * l.qty, 0) + covers * coverChargeCents,
     [lines, covers, coverChargeCents],
   )
 
+  const stockById = useMemo(
+    () =>
+      new Map<number, number | null>(
+        (menu ?? []).flatMap((c) => c.products.map((p) => [p.id, p.stockRemaining] as const)),
+      ),
+    [menu],
+  )
+
+  /** True (and shows why) when the cart already holds all available stock. */
+  function stockCapped(productId: number, name: string): boolean {
+    const stock = stockById.get(productId)
+    if (stock === null || stock === undefined) return false
+    const current = lines.find((l) => l.productId === productId)?.qty ?? 0
+    if (current < stock) return false
+    setError(t('stockLimit', { n: stock, name }))
+    return true
+  }
+
   function add(product: { id: number; name: string; priceCents: number }) {
+    if (stockCapped(product.id, product.name)) return
+    setError(null)
     setLines((prev) => {
       const existing = prev.find((l) => l.productId === product.id)
       if (existing) {
@@ -183,6 +208,11 @@ export default function NewOrder() {
   }
 
   function changeQty(productId: number, delta: number) {
+    if (delta > 0) {
+      const name = lines.find((l) => l.productId === productId)?.name ?? ''
+      if (stockCapped(productId, name)) return
+      setError(null)
+    }
     setLines((prev) =>
       prev
         .map((l) => (l.productId === productId ? { ...l, qty: l.qty + delta } : l))

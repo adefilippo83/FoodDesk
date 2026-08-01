@@ -1,20 +1,28 @@
-# FoodDesk via Docker — the quickest way to try or run it:
+# FoodDesk on the venue box via Docker — see deploy/README.md for the full
+# walkthrough (printing, backups, updates).
+#
 #   docker compose up -d
 #   docker compose logs        # the generated admin password is printed once
 #
-# The database lives in the ./fooddesk-data folder next to this file, so a
-# plain copy of that folder is a backup.
+# The database lives in ./fooddesk-data next to this file: a plain copy (or
+# the sqlite3 .backup cron from the README) is a backup.
 services:
   fooddesk:
     image: ghcr.io/adefilippo83/fooddesk:latest
     ports:
-      - '3000:3000'
+      # Phones just type the server's IP, no port. Use '3000:3000' instead if
+      # something else already owns port 80 on this machine.
+      - '80:3000'
     volumes:
       - ./fooddesk-data:/data
     environment:
       RESTAURANT_NAME: FoodDesk
-      # Printing: point `lp` at a CUPS server reachable from the container.
+      # Printing: name the CUPS queue and point `lp` at the host's CUPS
+      # (see deploy/README.md for the one-time CUPS setup).
       # KITCHEN_PRINTER: kitchen
-      # CUPS_SERVER: 192.168.1.10
+      # CUPS_SERVER: host.docker.internal:631
       # ADMIN_PASSWORD: set-me-before-first-start
+    extra_hosts:
+      # Lets the container reach services on the host (e.g. CUPS).
+      - 'host.docker.internal:host-gateway'
     restart: unless-stopped

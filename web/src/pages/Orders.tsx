@@ -34,7 +34,6 @@ export default function Orders() {
   const [confirmingCancel, setConfirmingCancel] = useState<number | null>(null)
   const [cancelling, setCancelling] = useState(false)
   const [confirmingItemCancel, setConfirmingItemCancel] = useState<number | null>(null)
-  const [confirmingItemQty, setConfirmingItemQty] = useState<number | null>(null)
 
   async function reprint(id: number) {
     setReprinting(id)
@@ -67,15 +66,18 @@ export default function Orders() {
     }
   }
 
-  async function reduceItem(orderId: number, itemId: number, qty: number) {
+  async function changeItemQty(orderId: number, itemId: number, qty: number) {
     try {
       await api.updateOrderItemQty(orderId, itemId, qty)
       setError(null)
       setOpen(await api.order(orderId))
-    } catch {
-      setError(t('errChangeQty'))
+    } catch (err) {
+      setError(
+        err instanceof ApiError && err.code === 'out_of_stock'
+          ? t('errOutOfStock')
+          : t('errChangeQty'),
+      )
     } finally {
-      setConfirmingItemQty(null)
       await load()
     }
   }
@@ -300,29 +302,24 @@ export default function Orders() {
                       <td className="num" style={{ whiteSpace: 'nowrap' }}>
                         {open.cancelledAt === null && i.cancelledAt === null && (
                           <>
-                            {i.qty > 1 &&
-                              (confirmingItemQty === i.id ? (
-                                <button
-                                  className="btn small danger"
-                                  autoFocus
-                                  onBlur={() => setConfirmingItemQty(null)}
-                                  onClick={() => void reduceItem(open.id, i.id, i.qty - 1)}
-                                >
-                                  {t('confirmCancel')}
-                                </button>
-                              ) : (
-                                <button
-                                  className="btn small"
-                                  title={t('reduceQty')}
-                                  aria-label={t('reduceQty')}
-                                  onClick={() => {
-                                    setConfirmingItemQty(i.id)
-                                    setConfirmingItemCancel(null)
-                                  }}
-                                >
-                                  −
-                                </button>
-                              ))}{' '}
+                            {i.qty > 1 && (
+                              <button
+                                className="btn small"
+                                title={t('reduceQty')}
+                                aria-label={t('reduceQty')}
+                                onClick={() => void changeItemQty(open.id, i.id, i.qty - 1)}
+                              >
+                                −
+                              </button>
+                            )}{' '}
+                            <button
+                              className="btn small"
+                              title={t('addQty')}
+                              aria-label={t('addQty')}
+                              onClick={() => void changeItemQty(open.id, i.id, i.qty + 1)}
+                            >
+                              +
+                            </button>{' '}
                             {confirmingItemCancel === i.id ? (
                               <button
                                 className="btn small danger"
@@ -337,10 +334,7 @@ export default function Orders() {
                                 className="btn small danger"
                                 title={t('cancelItem')}
                                 aria-label={t('cancelItem')}
-                                onClick={() => {
-                                  setConfirmingItemCancel(i.id)
-                                  setConfirmingItemQty(null)
-                                }}
+                                onClick={() => setConfirmingItemCancel(i.id)}
                               >
                                 ✕
                               </button>

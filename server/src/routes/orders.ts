@@ -365,16 +365,19 @@ export function orderRoutes(db: Db) {
     })
 
     /**
-     * Reduce a line's quantity — fixing a mis-tap without cancelling the
-     * whole line (issue #30). Same visibility rules as line cancellation;
-     * only downward (adding dishes is a different feature), and dropping to
-     * zero is expressed as cancelling the line instead.
+     * Change a line's quantity in either direction (issue #30 + follow-up).
+     * Same visibility rules as line cancellation. An increase behaves like a
+     * fresh order for the delta — the product must still be active and its
+     * stock must cover it — and sends the line back to the kitchen as
+     * pending. Dropping to zero is expressed as cancelling the line instead.
      */
     app.post('/api/orders/:id/items/:itemId/quantity', async (req, reply) => {
       const id = Number((req.params as { id: string }).id)
       const itemId = Number((req.params as { itemId: string }).itemId)
       const qty = Number((req.body as { qty?: unknown } | undefined)?.qty)
-      if (!Number.isInteger(qty) || qty < 1) return reply.code(400).send({ error: 'invalid_qty' })
+      if (!Number.isInteger(qty) || qty < 1 || qty > 99) {
+        return reply.code(400).send({ error: 'invalid_qty' })
+      }
 
       const order = await loadVisibleOrder(id, req.user!)
       if (order === 'not_found') return reply.code(404).send({ error: 'not_found' })
@@ -386,38 +389,88 @@ export function orderRoutes(db: Db) {
       )[0]
       if (!item || item.orderId !== id) return reply.code(404).send({ error: 'not_found' })
       if (item.cancelledAt) return reply.code(409).send({ error: 'item_cancelled' })
-      if (qty >= item.qty) return reply.code(400).send({ error: 'only_reduction_allowed' })
+      if (qty === item.qty) return reply.code(400).send({ error: 'nothing_to_update' })
 
-      const delta = item.qty - qty
-      const result = db.transaction((tx) => {
-        tx.update(orderItems).set({ qty }).where(eq(orderItems.id, itemId)).run()
-        tx.update(products)
-          .set({ stockRemaining: sql`${products.stockRemaining} + ${delta}` })
-          .where(and(eq(products.id, item.productId), isNotNull(products.stockRemaining)))
-          .run()
-        tx.update(products)
-          .set({ active: true })
-          .where(
-            and(
-              eq(products.id, item.productId),
-              eq(products.active, false),
-              eq(products.stockRemaining, delta),
-            ),
-          )
-          .run()
-        const all = tx.select().from(orderItems).where(eq(orderItems.orderId, id)).all()
-        const active = all.filter((i) => i.cancelledAt === null)
-        const totalCents =
-          active.reduce((sum, i) => sum + i.priceCentsSnapshot * i.qty, 0) +
-          order.covers * order.coverChargeCents
-        const updated = tx
-          .update(orders)
-          .set({ totalCents })
-          .where(eq(orders.id, id))
-          .returning()
-          .get()!
-        return { updated, items: all }
-      })
+      const delta = qty - item.qty
+      const now = Math.floor(Date.now() / 1000)
+      let result
+      try {
+        result = db.transaction((tx) => {
+          if (delta > 0) {
+            const product = tx
+              .select()
+              .from(products)
+              .where(eq(products.id, item.productId))
+              .get()
+            if (!product || !product.active) throw new Error('PRODUCT_UNAVAILABLE')
+            if (product.stockRemaining !== null) {
+              const res = tx
+                .update(products)
+                .set({ stockRemaining: sql`${products.stockRemaining} - ${delta}` })
+                .where(
+                  and(
+                    eq(products.id, item.productId),
+                    isNotNull(products.stockRemaining),
+                    gte(products.stockRemaining, delta),
+                  ),
+                )
+                .run()
+              if (res.changes === 0) throw new Error('OUT_OF_STOCK')
+              tx.update(products)
+                .set({ active: false })
+                .where(and(eq(products.id, item.productId), lte(products.stockRemaining, 0)))
+                .run()
+            }
+          } else {
+            const back = -delta
+            tx.update(products)
+              .set({ stockRemaining: sql`${products.stockRemaining} + ${back}` })
+              .where(and(eq(products.id, item.productId), isNotNull(products.stockRemaining)))
+              .run()
+            tx.update(products)
+              .set({ active: true })
+              .where(
+                and(
+                  eq(products.id, item.productId),
+                  eq(products.active, false),
+                  eq(products.stockRemaining, back),
+                ),
+              )
+              .run()
+          }
+
+          // More portions to cook → the line goes back to pending.
+          tx.update(orderItems)
+            .set({ qty, ...(delta > 0 ? { doneAt: null } : {}) })
+            .where(eq(orderItems.id, itemId))
+            .run()
+
+          const all = tx.select().from(orderItems).where(eq(orderItems.orderId, id)).all()
+          const active = all.filter((i) => i.cancelledAt === null)
+          const totalCents =
+            active.reduce((sum, i) => sum + i.priceCentsSnapshot * i.qty, 0) +
+            order.covers * order.coverChargeCents
+          const completedAt =
+            active.length > 0 && active.every((i) => i.doneAt !== null)
+              ? (order.completedAt ?? now)
+              : null
+          const updated = tx
+            .update(orders)
+            .set({ totalCents, completedAt })
+            .where(eq(orders.id, id))
+            .returning()
+            .get()!
+          return { updated, items: all }
+        })
+      } catch (err) {
+        if (err instanceof Error && err.message === 'OUT_OF_STOCK') {
+          return reply.code(409).send({ error: 'out_of_stock' })
+        }
+        if (err instanceof Error && err.message === 'PRODUCT_UNAVAILABLE') {
+          return reply.code(409).send({ error: 'products_unavailable' })
+        }
+        throw err
+      }
 
       req.log.info(
         {
