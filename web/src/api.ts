@@ -94,7 +94,13 @@ export type PaperSize = 'roll80' | 'a5' | 'a4' | 'letter'
 export type AppSettings = OrderSheetLayout & {
   restaurantName: string
   coverChargeCents: number
+  /** Receipt paper size. */
   paperSize: PaperSize
+  /** Order sheet and kitchen ticket paper sizes — independent since #34/#35. */
+  orderPaperSize: PaperSize
+  kitchenPaperSize: PaperSize
+  /** Read-only: the release the server is running. */
+  version: string
   pdfLang: 'it' | 'en' | 'es' | 'fr' | 'pt'
   headerText: string
   footerText: string
@@ -219,7 +225,7 @@ export const api = {
   features: () => request<{ kitchenEnabled: boolean }>('GET', '/api/features'),
   settings: () => request<AppSettings>('GET', '/api/settings'),
   saveSettings: (patch: Partial<AppSettings>) => request<AppSettings>('PUT', '/api/settings', patch),
-  settingsPreviewUrl: (kind: 'receipt' | 'order' = 'receipt') =>
+  settingsPreviewUrl: (kind: 'receipt' | 'order' | 'kitchen' = 'receipt') =>
     `/api/settings/preview.pdf?kind=${kind}&ts=${Date.now()}`,
   changePassword: (currentPassword: string, newPassword: string) =>
     request<{ ok: true }>('POST', '/api/auth/password', { currentPassword, newPassword }),
