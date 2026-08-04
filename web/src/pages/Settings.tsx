@@ -108,6 +108,25 @@ function ImageField({
   )
 }
 
+function PaperSizeSelect({ value, onSave }: { value: PaperSize; onSave: (p: PaperSize) => void }) {
+  const { t } = useI18n()
+  return (
+    <label className="field" style={{ flex: '1 1 180px' }}>
+      <span>{t('paperSize')}</span>
+      <select
+        className="input"
+        value={value}
+        onChange={(e) => onSave(e.target.value as PaperSize)}
+      >
+        <option value="roll80">{t('paperRoll80')}</option>
+        <option value="a5">A5</option>
+        <option value="a4">A4</option>
+        <option value="letter">Letter</option>
+      </select>
+    </label>
+  )
+}
+
 function FontSizeSelect({ value, onSave }: { value: number; onSave: (pt: number) => void }) {
   const { t } = useI18n()
   return (
@@ -210,19 +229,10 @@ export default function Settings() {
         <h2>{t('settingsPrintReceipt')}</h2>
 
         <div className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 4 }}>
-          <label className="field" style={{ flex: '1 1 180px' }}>
-            <span>{t('paperSize')}</span>
-            <select
-              className="input"
-              value={settings.paperSize}
-              onChange={(e) => void save({ paperSize: e.target.value as PaperSize })}
-            >
-              <option value="roll80">{t('paperRoll80')}</option>
-              <option value="a5">A5</option>
-              <option value="a4">A4</option>
-              <option value="letter">Letter</option>
-            </select>
-          </label>
+          <PaperSizeSelect
+            value={settings.paperSize}
+            onSave={(p) => void save({ paperSize: p })}
+          />
 
           <label className="field" style={{ flex: '1 1 140px' }}>
             <span>{t('pdfLangLabel')}</span>
@@ -286,8 +296,15 @@ export default function Settings() {
         </div>
       </div>
 
-      <div className="card">
+      <div className="card" style={{ marginBottom: 16 }}>
         <h2>{t('settingsPrintOrder')}</h2>
+
+        <div className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 4 }}>
+          <PaperSizeSelect
+            value={settings.orderPaperSize}
+            onSave={(p) => void save({ orderPaperSize: p })}
+          />
+        </div>
 
         <div className="row" style={{ alignItems: 'flex-start' }}>
           <label className="field" style={{ flex: 1 }}>
@@ -376,6 +393,33 @@ export default function Settings() {
           {saving && <span className="muted">{t('sending')}</span>}
         </div>
       </div>
+
+      <div className="card">
+        <h2>{t('settingsPrintKitchen')}</h2>
+
+        <div className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 4 }}>
+          <PaperSizeSelect
+            value={settings.kitchenPaperSize}
+            onSave={(p) => void save({ kitchenPaperSize: p })}
+          />
+        </div>
+
+        <div className="row" style={{ marginTop: 8 }}>
+          <a
+            className="btn"
+            href={api.settingsPreviewUrl('kitchen')}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {t('previewKitchenTicket')}
+          </a>
+          {saving && <span className="muted">{t('sending')}</span>}
+        </div>
+      </div>
+
+      <p className="muted" style={{ marginTop: 16, textAlign: 'center', fontSize: 13 }}>
+        FoodDesk · {t('versionLabel')} {settings.version}
+      </p>
 
       {toast && <div className="toast">{toast}</div>}
     </>
