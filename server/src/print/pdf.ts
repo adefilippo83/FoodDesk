@@ -67,6 +67,41 @@ const LABELS = {
 
 type Dims = { pageW: number; margin: number; innerW: number; fixedH: number | null }
 
+/**
+ * On fixed page sizes, starts a new page when fewer than `h` points remain.
+ * Layouts measure each block before drawing it and call this, so a row and
+ * its right-aligned price can never be torn across a page boundary (PDFKit's
+ * automatic break would strand the price on the wrong page). Roll paper is a
+ * single content-tall page — always a no-op there.
+ */
+function ensureRoom(doc: PDFKit.PDFDocument, d: Dims, h: number): boolean {
+  if (d.fixedH === null) return false
+  if (doc.y + h <= d.fixedH - d.margin) return false
+  doc.addPage()
+  return true
+}
+
+/** "1 / 3" centered inside the bottom margin — multi-page fixed sizes only. */
+function drawPageNumber(doc: PDFKit.PDFDocument, d: Dims, n: number, total: number) {
+  // Writing inside the bottom margin would trigger PDFKit's own page break;
+  // lift the margin for the duration of the stamp.
+  const prevBottom = doc.page.margins.bottom
+  doc.page.margins.bottom = 0
+  doc.save()
+  doc
+    .font('Helvetica')
+    .fontSize(8)
+    .fillColor('#666')
+    .text(`${n} / ${total}`, d.margin, d.fixedH! - d.margin + 8, {
+      width: d.innerW,
+      align: 'center',
+      lineBreak: false,
+    })
+  doc.restore()
+  doc.fillColor('#000')
+  doc.page.margins.bottom = prevBottom
+}
+
 function dimsFor(paper: PaperSize): Dims {
   switch (paper) {
     case 'roll80':
@@ -172,23 +207,30 @@ function drawCancelledStamp(
 }
 
 /**
- * Renders one page. On roll paper the layout runs twice: once on an oversized
- * probe page to measure the content, then on a page exactly that tall.
+ * Renders a document. On roll paper the layout runs twice: once on an
+ * oversized probe page to measure the content, then on a single page exactly
+ * that tall. Fixed sizes (A4/A5/Letter) paginate instead: layouts call
+ * ensureRoom() before each measured block, and per-page chrome (watermark,
+ * CANCELLED stamp, page numbers) is applied to every page.
  */
 async function render(
   s: AppSettings,
+  paper: PaperSize,
   cancelled: boolean,
   layout: (doc: PDFKit.PDFDocument, d: Dims) => void,
 ): Promise<Buffer> {
-  const d = dimsFor(s.paperSize)
+  const d = dimsFor(paper)
   const opts = (height: number) => ({
     size: [d.pageW, height] as [number, number],
     margins: { top: d.margin, bottom: d.margin, left: d.margin, right: d.margin },
+    bufferPages: true,
   })
 
   let pageH = d.fixedH
   if (pageH === null) {
-    const probe = new PDFDocument(opts(3000))
+    // Tall enough that a maximal order (100 items with notes) never overflows
+    // the probe — an overflow would silently truncate the real page.
+    const probe = new PDFDocument(opts(10000))
     probe.on('data', () => {})
     layout(probe, d)
     pageH = Math.max(probe.y + d.margin * 2, 40 * MM)
@@ -197,9 +239,20 @@ async function render(
 
   const doc = new PDFDocument(opts(pageH))
   const done = collect(doc)
+  // The watermark must sit behind the content: first page now, every later
+  // page the moment it is added (before anything is drawn on it).
   drawBackground(doc, s, d.pageW, pageH)
+  doc.on('pageAdded', () => drawBackground(doc, s, d.pageW, pageH))
   layout(doc, d)
-  if (cancelled) drawCancelledStamp(doc, s.pdfLang, d.pageW, pageH)
+
+  const range = doc.bufferedPageRange()
+  for (let i = range.start; i < range.start + range.count; i++) {
+    doc.switchToPage(i)
+    if (cancelled) drawCancelledStamp(doc, s.pdfLang, d.pageW, pageH)
+    if (d.fixedH !== null && range.count > 1) {
+      drawPageNumber(doc, d, i - range.start + 1, range.count)
+    }
+  }
   doc.end()
   return done
 }
@@ -223,6 +276,7 @@ function activeItems(items: OrderItem[]): OrderItem[] {
 }
 
 function dashes(doc: PDFKit.PDFDocument, d: Dims) {
+  ensureRoom(doc, d, 16)
   doc.moveDown(0.4)
   doc
     .moveTo(d.margin, doc.y)
@@ -245,7 +299,7 @@ export function renderKitchenTicket(
 ): Promise<Buffer> {
   const L = LABELS[s.pdfLang]
   const items = activeItems(allItems)
-  return render(s, order.cancelledAt !== null, (doc, d) => {
+  return render(s, s.kitchenPaperSize, order.cancelledAt !== null, (doc, d) => {
     doc.font('Helvetica-Bold').fontSize(26).text(`#${ticketNo(order)}`, { align: 'center' })
     doc
       .font('Helvetica')
@@ -260,7 +314,15 @@ export function renderKitchenTicket(
     dashes(doc, d)
 
     for (const item of items) {
-      doc.font('Helvetica-Bold').fontSize(15).text(`${item.qty} × ${item.nameSnapshot}`)
+      const label = `${item.qty} × ${item.nameSnapshot}`
+      doc.font('Helvetica-Bold').fontSize(15)
+      let h = doc.heightOfString(label, { width: d.innerW })
+      if (item.note) {
+        doc.font('Helvetica-Oblique').fontSize(11)
+        h += doc.heightOfString(`   » ${item.note}`, { width: d.innerW })
+      }
+      ensureRoom(doc, d, h)
+      doc.font('Helvetica-Bold').fontSize(15).text(label)
       if (item.note) {
         doc.font('Helvetica-Oblique').fontSize(11).text(`   » ${item.note}`)
       }
@@ -269,7 +331,9 @@ export function renderKitchenTicket(
 
     if (order.note) {
       dashes(doc, d)
-      doc.font('Helvetica-Oblique').fontSize(12).text(order.note)
+      doc.font('Helvetica-Oblique').fontSize(12)
+      ensureRoom(doc, d, doc.heightOfString(order.note, { width: d.innerW }))
+      doc.text(order.note)
     }
   })
 }
@@ -283,7 +347,7 @@ export function renderReceipt(
   const L = LABELS[s.pdfLang]
   const lang = s.pdfLang
   const items = activeItems(allItems)
-  return render(s, order.cancelledAt !== null, (doc, d) => {
+  return render(s, s.paperSize, order.cancelledAt !== null, (doc, d) => {
     drawLogo(doc, s, d)
     doc.font('Helvetica-Bold').fontSize(16).text(s.restaurantName, { align: 'center' })
     if (s.headerText) {
@@ -303,6 +367,18 @@ export function renderReceipt(
 
     const priceW = Math.min(22 * MM, d.innerW * 0.25)
     const line = (label: string, amountCents: number, opts?: { bold?: boolean; note?: string }) => {
+      // Measure first: the row must land on one page as a unit, or the price
+      // (drawn at the captured y) ends up stranded on the wrong page.
+      doc.font(opts?.bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(11)
+      let h = Math.max(
+        doc.heightOfString(label, { width: d.innerW - priceW }),
+        doc.heightOfString('0', { width: priceW }),
+      )
+      if (opts?.note) {
+        doc.font('Helvetica-Oblique').fontSize(9)
+        h += doc.heightOfString(`   ${opts.note}`, { width: d.innerW - priceW })
+      }
+      ensureRoom(doc, d, h)
       const y = doc.y
       doc
         .font(opts?.bold ? 'Helvetica-Bold' : 'Helvetica')
@@ -332,6 +408,7 @@ export function renderReceipt(
 
     dashes(doc, d)
 
+    ensureRoom(doc, d, 20)
     const y = doc.y
     doc.font('Helvetica-Bold').fontSize(14).text(L.total, d.margin, y)
     doc.text(money(order.totalCents, lang), d.margin, y, { width: d.innerW, align: 'right' })
@@ -361,14 +438,14 @@ export function renderOrderSheet(
   const L = LABELS[s.pdfLang]
   const lang = s.pdfLang
   const items = activeItems(allItems)
-  return render(s, order.cancelledAt !== null, (doc, d) => {
+  return render(s, s.orderPaperSize, order.cancelledAt !== null, (doc, d) => {
     // Centered image scaled to a % of the printable width, height proportional.
     const scaledImage = (dataUrl: string, pct: number) => {
       const img = imageBuffer(dataUrl)
       if (!img) return
       const w = (d.innerW * pct) / 100
       const dims = imageDims(img)
-      const h = dims ? (w * dims.h) / dims.w : (s.paperSize === 'roll80' ? 16 * MM : 24 * MM)
+      const h = dims ? (w * dims.h) / dims.w : (s.orderPaperSize === 'roll80' ? 16 * MM : 24 * MM)
       const x = d.margin + (d.innerW - w) / 2
       try {
         if (dims) doc.image(img, x, doc.y, { width: w })
@@ -447,6 +524,7 @@ export function renderOrderSheet(
     // ---- coperto first, set apart from the products by the same thin
     // separator used between category groups (issue #27) ----
     if (order.covers > 0 && order.coverChargeCents > 0) {
+      ensureRoom(doc, d, lineHeight(`${order.covers} × ${L.coverCharge}`) + 8)
       line(`${order.covers} × ${L.coverCharge}`, order.covers * order.coverChargeCents)
       doc.y += 2
       doc
@@ -467,6 +545,7 @@ export function renderOrderSheet(
 
     groups.forEach((g, i) => {
       if (s.orderCategoryStyle === 'separator' && i > 0) {
+        ensureRoom(doc, d, 8)
         doc
           .moveTo(d.margin, doc.y + 1)
           .lineTo(d.margin + d.innerW, doc.y + 1)
@@ -475,17 +554,27 @@ export function renderOrderSheet(
         doc.y += 5
       }
 
+      const shaded = s.orderCategoryStyle === 'alternating' && i % 2 === 1
       doc.font('Helvetica-Bold').fontSize(8)
-      let blockH = doc.heightOfString(g.name.toUpperCase(), { width: nameW - PAD * 2 }) + 2
-      for (const item of g.items) {
-        blockH += lineHeight(`${item.qty} × ${item.nameSnapshot}`, item.note ?? undefined)
-      }
+      const headerH = doc.heightOfString(g.name.toUpperCase(), { width: nameW - PAD * 2 }) + 2
+      const rowHs = g.items.map((item) =>
+        lineHeight(`${item.qty} × ${item.nameSnapshot}`, item.note ?? undefined),
+      )
 
-      if (s.orderCategoryStyle === 'alternating' && i % 2 === 1) {
-        doc.rect(d.margin, doc.y - PAD / 2, d.innerW, blockH + PAD).fill('#f0f0f0')
+      // Never leave the category header orphaned at the bottom of a page.
+      ensureRoom(doc, d, headerH + rowHs[0]!)
+
+      // The shading is painted per unit (header or row) rather than as one
+      // block rect, so a group split across pages stays shaded on both sides
+      // of the break. Adjacent same-color rects merge seamlessly, keeping the
+      // unsplit case pixel-identical to the old single rect.
+      const shade = (h: number) => {
+        if (!shaded) return
+        doc.rect(d.margin, doc.y - PAD / 2, d.innerW, h + PAD).fill('#f0f0f0')
         doc.fillColor('#000')
       }
 
+      shade(headerH)
       doc
         .fillColor('#555')
         .font('Helvetica-Bold')
@@ -493,15 +582,18 @@ export function renderOrderSheet(
         .text(g.name.toUpperCase(), d.margin + PAD, doc.y, { width: nameW - PAD * 2 })
       doc.fillColor('#000')
       doc.y += 2
-      for (const item of g.items) {
+      g.items.forEach((item, j) => {
+        ensureRoom(doc, d, rowHs[j]!)
+        shade(rowHs[j]!)
         line(`${item.qty} × ${item.nameSnapshot}`, item.priceCentsSnapshot * item.qty, item.note ?? undefined)
-      }
+      })
       doc.y += PAD
     })
 
     // ---- total, highlighted ----
     doc.y += 2
     const totalH = 24
+    ensureRoom(doc, d, totalH + 6)
     const rectY = doc.y
     doc.rect(d.margin, rectY, d.innerW, totalH).fill('#e5e5e5')
     doc.fillColor('#000').font('Helvetica-Bold').fontSize(14)
@@ -516,10 +608,9 @@ export function renderOrderSheet(
     // ---- kitchen note ----
     if (order.note) {
       dashes(doc, d)
-      doc
-        .font('Helvetica-Oblique')
-        .fontSize(11)
-        .text(`${L.note}: ${order.note}`, d.margin, doc.y, { width: d.innerW })
+      doc.font('Helvetica-Oblique').fontSize(11)
+      ensureRoom(doc, d, doc.heightOfString(`${L.note}: ${order.note}`, { width: d.innerW }))
+      doc.text(`${L.note}: ${order.note}`, d.margin, doc.y, { width: d.innerW })
       doc.moveDown(0.3)
     }
 
@@ -549,8 +640,11 @@ export function renderOrderSheet(
     if (bottomH > 0) {
       doc.y += GAP
       if (d.fixedH !== null) {
+        // No room left under the order? The whole footer moves to a fresh
+        // page rather than being torn across the break.
+        ensureRoom(doc, d, bottomH)
         const pinnedTop = d.fixedH - d.margin - bottomH
-        // Pin only when there is room; a long order just flows past it.
+        // Pin to the bottom of the (now last) page when there is room.
         if (pinnedTop > doc.y) doc.y = pinnedTop
       }
       if (s.orderDisclaimer) {

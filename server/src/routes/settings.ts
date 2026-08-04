@@ -3,9 +3,9 @@ import { requireAdmin, requireAuth } from '../auth/acl.js'
 import type { Db } from '../db/index.js'
 import { kitchenQueue } from '../print/service.js'
 import { kitchenFeatureEnabled } from './kitchen.js'
-import { renderOrderSheet, renderReceipt } from '../print/pdf.js'
+import { renderKitchenTicket, renderOrderSheet, renderReceipt } from '../print/pdf.js'
 import { createHash } from 'node:crypto'
-import { imageBuffer, loadSettings, saveSettings } from '../settings.js'
+import { APP_VERSION, imageBuffer, loadSettings, saveSettings } from '../settings.js'
 import type { Order, OrderItem } from '../db/schema.js'
 
 export function settingsRoutes(db: Db) {
@@ -65,7 +65,12 @@ export function settingsRoutes(db: Db) {
         .send(buf)
     })
 
-    app.get('/api/settings', { preHandler: requireAdmin }, async () => loadSettings(db))
+    // version rides along read-only so the Settings page can show which
+    // release is running (issue #33); saveSettings ignores it on PUT.
+    app.get('/api/settings', { preHandler: requireAdmin }, async () => ({
+      ...(await loadSettings(db)),
+      version: APP_VERSION,
+    }))
 
     // The one route allowed a large body: base64 logo/background uploads.
     app.put(
@@ -82,16 +87,18 @@ export function settingsRoutes(db: Db) {
           { event: 'settings_changed', by: req.user!.id, fields: Object.keys(body) },
           'audit',
         )
-        return loadSettings(db)
+        return { ...(await loadSettings(db)), version: APP_VERSION }
       },
     )
 
     /**
      * A sample document with the current settings — the admin preview button.
-     * ?kind=order previews the order sheet; anything else the receipt.
+     * ?kind=order previews the order sheet, ?kind=kitchen the kitchen ticket;
+     * anything else the receipt.
      */
     app.get('/api/settings/preview.pdf', { preHandler: requireAdmin }, async (req, reply) => {
-      const kind = (req.query as { kind?: string }).kind === 'order' ? 'order' : 'receipt'
+      const rawKind = (req.query as { kind?: string }).kind
+      const kind = rawKind === 'order' || rawKind === 'kitchen' ? rawKind : 'receipt'
       const s = await loadSettings(db)
       const now = Math.floor(Date.now() / 1000)
       const order = {
@@ -145,7 +152,9 @@ export function settingsRoutes(db: Db) {
       const pdf =
         kind === 'order'
           ? await renderOrderSheet(order, items, s)
-          : await renderReceipt(order, items, s)
+          : kind === 'kitchen'
+            ? await renderKitchenTicket(order, items, s)
+            : await renderReceipt(order, items, s)
       return reply
         .header('content-type', 'application/pdf')
         .header('content-disposition', 'inline; filename="preview.pdf"')

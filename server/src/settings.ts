@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import type { Db } from './db/index.js'
 import { settings } from './db/schema.js'
 
@@ -6,6 +7,18 @@ import { settings } from './db/schema.js'
  * variables act as defaults for a fresh install; once an admin saves a value
  * in the UI, the database wins.
  */
+
+/** The running release, from the server package.json (issue #33). */
+export const APP_VERSION: string = (() => {
+  try {
+    const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {
+      version?: unknown
+    }
+    return typeof pkg.version === 'string' ? pkg.version : 'unknown'
+  } catch {
+    return 'unknown'
+  }
+})()
 
 export const PAPER_SIZES = ['roll80', 'a5', 'a4', 'letter'] as const
 export type PaperSize = (typeof PAPER_SIZES)[number]
@@ -20,7 +33,12 @@ export type CategoryStyle = (typeof CATEGORY_STYLES)[number]
 export type AppSettings = {
   restaurantName: string
   coverChargeCents: number
+  /** Receipt paper. The legacy shared key — order/kitchen fall back to it. */
   paperSize: PaperSize
+  /** Order sheet (foglio ordine) paper — issue #34. */
+  orderPaperSize: PaperSize
+  /** Kitchen ticket (foglio cucina) paper — issue #35. */
+  kitchenPaperSize: PaperSize
   pdfLang: PdfLang
   headerText: string
   footerText: string
@@ -47,6 +65,8 @@ const DEFAULTS: AppSettings = {
   restaurantName: process.env.RESTAURANT_NAME ?? 'FoodDesk',
   coverChargeCents: 0,
   paperSize: 'roll80',
+  orderPaperSize: 'roll80',
+  kitchenPaperSize: 'roll80',
   pdfLang: (PDF_LANGS as readonly string[]).includes(process.env.PDF_LANG ?? '')
     ? (process.env.PDF_LANG as PdfLang)
     : 'it',
@@ -91,6 +111,14 @@ export async function loadSettings(db: Db): Promise<AppSettings> {
   if (Number.isInteger(cover) && cover >= 0) s.coverChargeCents = cover
   const paper = map.get('paperSize')
   if (paper && (PAPER_SIZES as readonly string[]).includes(paper)) s.paperSize = paper as PaperSize
+  // Installs that predate per-document sizes shared one paperSize for every
+  // printed document — keep that behavior until each size is saved on its own.
+  s.orderPaperSize = s.paperSize
+  s.kitchenPaperSize = s.paperSize
+  for (const key of ['orderPaperSize', 'kitchenPaperSize'] as const) {
+    const v = map.get(key)
+    if (v && (PAPER_SIZES as readonly string[]).includes(v)) s[key] = v as PaperSize
+  }
   const lang = map.get('pdfLang')
   if (lang && (PDF_LANGS as readonly string[]).includes(lang)) s.pdfLang = lang as PdfLang
   const catStyle = map.get('orderCategoryStyle')
@@ -140,11 +168,12 @@ export async function saveSettings(
     }
     writes.push(['coverChargeCents', String(v)])
   }
-  if (patch.paperSize !== undefined) {
-    if (!(PAPER_SIZES as readonly string[]).includes(patch.paperSize as string)) {
-      return { field: 'paperSize', error: 'invalid_paper_size' }
+  for (const key of ['paperSize', 'orderPaperSize', 'kitchenPaperSize'] as const) {
+    if (patch[key] === undefined) continue
+    if (!(PAPER_SIZES as readonly string[]).includes(patch[key] as string)) {
+      return { field: key, error: 'invalid_paper_size' }
     }
-    writes.push(['paperSize', patch.paperSize as string])
+    writes.push([key, patch[key] as string])
   }
   if (patch.pdfLang !== undefined) {
     if (!(PDF_LANGS as readonly string[]).includes(patch.pdfLang as string)) {
