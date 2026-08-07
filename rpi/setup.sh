@@ -93,8 +93,13 @@ install -m 755 "$SRC/rpi/90-fooddesk-ap-dns" \
   /etc/NetworkManager/dispatcher.d/90-fooddesk-ap-dns
 
 echo "== boot partition config template =="
-# Editable from any laptop after flashing — applied on first boot.
-cat > /boot/firmware/fooddesk.txt <<'TXT'
+# Editable from any laptop after flashing — applied on first boot. On a
+# running Pi the FAT boot partition sits at /boot/firmware; inside the
+# arm-runner chroot it is mounted at /boot (hiding the rootfs' firmware
+# directory), so fall back accordingly.
+BOOTFS=/boot/firmware
+[ -d "$BOOTFS" ] || BOOTFS=/boot
+cat > "$BOOTFS/fooddesk.txt" <<'TXT'
 # FoodDesk — edit before the first boot, then insert the SD card and power on.
 # Lines starting with # are ignored. After the first boot, the generated
 # credentials appear in fooddesk-info.txt next to this file.
