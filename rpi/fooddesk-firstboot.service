@@ -1,0 +1,17 @@
+[Unit]
+Description=FoodDesk first boot provisioning
+# Applies fooddesk.txt from the boot partition, seeds the admin account and
+# writes the credentials to fooddesk-info.txt. Runs once: the marker file is
+# only written when provisioning succeeds, so a failed run retries next boot.
+After=NetworkManager.service
+Before=fooddesk.service
+ConditionPathExists=!/etc/fooddesk/.initialized
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/opt/fooddesk/rpi/firstboot.sh
+ExecStartPost=/usr/bin/touch /etc/fooddesk/.initialized
+
+[Install]
+WantedBy=multi-user.target

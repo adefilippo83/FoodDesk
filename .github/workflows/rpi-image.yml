@@ -1,0 +1,90 @@
+# Bakes the flash-and-go Raspberry Pi appliance image: Raspberry Pi OS Lite
+# (arm64, Trixie) + FoodDesk behind nginx + a "FoodDesk" Wi-Fi access point.
+# The web/server build runs natively on the runner; only the arm64 package
+# install happens under QEMU (rpi/setup.sh), keeping emulation time short.
+name: Raspberry Pi image
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      suffix:
+        description: 'Image name suffix (e.g. beta)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+env:
+  BASE_IMAGE: https://downloads.raspberrypi.com/raspios_lite_arm64/images/raspios_lite_arm64-2026-06-19/2026-06-18-raspios-trixie-arm64-lite.img.xz
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      # Arch-independent: compiled JS and static assets go into the image;
+      # node_modules (x86) must not — the chroot installs its own arm64 deps.
+      - name: Build web + server on the runner
+        run: |
+          npm ci
+          npm run build
+          rm -rf node_modules server/node_modules web/node_modules
+
+      - name: Version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            v="${{ github.event.release.tag_name }}"
+          else
+            v="$(date +%Y%m%d)-$(git rev-parse --short HEAD)"
+          fi
+          suffix="${{ github.event.inputs.suffix }}"
+          [ -n "$suffix" ] && v="$v-$suffix"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-qemu-action@v4
+
+      - name: Bake image
+        uses: pguyot/arm-runner-action@v2
+        id: bake
+        with:
+          base_image: ${{ env.BASE_IMAGE }}
+          image_additional_mb: 1536
+          optimize_image: true
+          commands: |
+            bash rpi/setup.sh
+            cd / && rm -rf /FoodDesk
+
+      - name: Compress and checksum
+        run: |
+          name=fooddesk-rpi-${{ steps.version.outputs.version }}
+          mv ${{ steps.bake.outputs.image }} "$name.img"
+          xz -6 -T0 "$name.img"
+          sha256sum "$name.img.xz" > SHA256SUMS.txt
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: fooddesk-rpi-image
+          path: |
+            fooddesk-rpi-*.img.xz
+            SHA256SUMS.txt
+          retention-days: 7
+
+      - name: Attach to release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" \
+            fooddesk-rpi-*.img.xz SHA256SUMS.txt
