@@ -1,0 +1,3 @@
+# A partition on a USB disk appearing (stick plugged in, or present at boot)
+# starts the backup-mirror service for it. ID_BUS filters out the SD card.
+ACTION=="add", SUBSYSTEM=="block", ENV{DEVTYPE}=="partition", ENV{ID_BUS}=="usb", TAG+="systemd", ENV{SYSTEMD_WANTS}+="fooddesk-usb-backup@%k.service"

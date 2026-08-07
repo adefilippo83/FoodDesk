@@ -1,0 +1,11 @@
+[Unit]
+Description=Mirror FoodDesk backups to the USB stick every 15 minutes
+
+[Timer]
+# Two minutes after the on-disk snapshot (*:0/15), so the stick receives the
+# snapshot that was just taken.
+OnCalendar=*:2/15
+Persistent=false
+
+[Install]
+WantedBy=timers.target

@@ -39,8 +39,11 @@ cp "$SRC/package.json" "$SRC/package-lock.json" "$APP/"
 cp -a "$SRC/server/package.json" "$SRC/server/dist" "$SRC/server/public" "$SRC/server/drizzle" "$APP/server/"
 cp "$SRC/web/package.json" "$APP/web/"
 cp -a "$SRC/deploy" "$APP/deploy"
-cp "$SRC/rpi/firstboot.sh" "$SRC/rpi/printer-hotplug.sh" "$SRC/rpi/leaflet.mjs" "$APP/rpi/"
-chmod +x "$APP/rpi/firstboot.sh" "$APP/rpi/printer-hotplug.sh" "$APP/deploy/fooddesk-backup.sh"
+cp "$SRC/rpi/firstboot.sh" "$SRC/rpi/printer-hotplug.sh" "$SRC/rpi/usb-backup.sh" \
+  "$SRC/rpi/leaflet.mjs" "$APP/rpi/"
+chmod +x "$APP/rpi/firstboot.sh" "$APP/rpi/printer-hotplug.sh" "$APP/rpi/usb-backup.sh" \
+  "$APP/deploy/fooddesk-backup.sh"
+install -m 755 "$SRC/rpi/fooddesk-update.sh" /usr/local/bin/fooddesk-update
 chown fooddesk:fooddesk /var/lib/fooddesk
 
 cd "$APP"
@@ -54,11 +57,18 @@ cp "$APP/deploy/fooddesk-backup.service" /etc/systemd/system/
 cp "$APP/deploy/fooddesk-backup.timer" /etc/systemd/system/
 cp "$SRC/rpi/fooddesk-firstboot.service" /etc/systemd/system/
 cp "$SRC/rpi/fooddesk-printer-setup.service" /etc/systemd/system/
-systemctl enable fooddesk.service fooddesk-backup.timer fooddesk-firstboot.service cups ssh
+cp "$SRC/rpi/fooddesk-usb-backup@.service" /etc/systemd/system/
+cp "$SRC/rpi/fooddesk-usb-backup.service" /etc/systemd/system/
+cp "$SRC/rpi/fooddesk-usb-backup.timer" /etc/systemd/system/
+systemctl enable fooddesk.service fooddesk-backup.timer fooddesk-firstboot.service \
+  fooddesk-usb-backup.timer cups ssh
 
 echo "== printing (CUPS + USB hotplug) =="
 cp "$SRC/rpi/cupsd.conf" /etc/cups/cupsd.conf
 cp "$SRC/rpi/99-fooddesk-printer.rules" /etc/udev/rules.d/99-fooddesk-printer.rules
+
+echo "== USB stick backups =="
+cp "$SRC/rpi/99-fooddesk-usb-backup.rules" /etc/udev/rules.d/99-fooddesk-usb-backup.rules
 
 echo "== nginx =="
 cp "$APP/deploy/nginx-fooddesk.conf" /etc/nginx/sites-available/fooddesk
@@ -126,6 +136,32 @@ WIFI_COUNTRY=IT
 # Leave commented to generate a random admin password (recommended).
 #ADMIN_PASSWORD=
 TXT
+
+echo "== power-loss hardening =="
+# Festivals cut power without warning. Fewer SD writes = fewer corruption
+# windows and less card wear: logs live in RAM, no swapfile, no background
+# apt/man-db churn. The database itself is WAL SQLite (torn-write safe) and
+# is snapshotted every 15 minutes.
+mkdir -p /etc/systemd/journald.conf.d
+cat > /etc/systemd/journald.conf.d/fooddesk.conf <<'EOF'
+[Journal]
+Storage=volatile
+RuntimeMaxUse=64M
+EOF
+systemctl disable dphys-swapfile 2>/dev/null || true
+systemctl disable apt-daily.timer apt-daily-upgrade.timer man-db.timer 2>/dev/null || true
+
+echo "== hardware watchdog =="
+# The BCM watchdog reboots a wedged box mid-service; systemd pets it.
+mkdir -p /etc/systemd/system.conf.d
+cat > /etc/systemd/system.conf.d/fooddesk-watchdog.conf <<'EOF'
+[Manager]
+RuntimeWatchdogSec=15
+RebootWatchdogSec=2min
+EOF
+BOOTCFG=/boot/firmware/config.txt
+[ -f "$BOOTCFG" ] || BOOTCFG=/boot/config.txt
+grep -q '^dtparam=watchdog=on' "$BOOTCFG" || echo 'dtparam=watchdog=on' >> "$BOOTCFG"
 
 echo "== maintenance login =="
 # A real (uid 1000) user also stops Raspberry Pi OS's first-boot user wizard.

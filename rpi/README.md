@@ -70,6 +70,39 @@ A4 page with two QR codes — join the Wi-Fi, open FoodDesk — in Italian and
 English. Print it and tape it up where the waiters gather. It carries the
 Wi-Fi password but never the admin credentials.
 
+## Built for festival conditions
+
+- **Power cuts**: logs live in RAM (volatile journald), there is no
+  swapfile, and background apt/man-db jobs are off — the SD card sees
+  almost no writes beyond the WAL database (torn-write safe by design) and
+  its 15-minute snapshots. Pulling the plug is a non-event in practice;
+  still, buy a decent SD card.
+- **Hangs**: the hardware watchdog reboots a wedged box within seconds;
+  the FoodDesk service itself always restarts on crash.
+
+## USB stick backups
+
+Plug any USB stick (FAT32/exFAT/ext4) into the Pi: it gets a
+`fooddesk-backups/` folder with the existing snapshot history plus a fresh
+snapshot, then mirrors every 15 minutes for as long as it stays in.
+Nothing else on the stick is touched. Mounts are synchronous, so pulling
+the stick out without ceremony is fine — worst case you lose the snapshot
+being written that second, never the ones before. Leave a stick in for the
+whole service and the night's ledger survives even a dead SD card.
+
+## Updating
+
+With an internet uplink plugged in:
+
+```bash
+sudo fooddesk-update            # latest release (or: fooddesk-update v1.2.3)
+```
+
+It snapshots the database, downloads the release tarball, installs, swaps,
+and health-checks — rolling back automatically if the new version does not
+come up. `sudo fooddesk-update --rollback` returns to the previous version
+at any time. The database is never touched by updates.
+
 ## Re-provision / recover
 
 Edit `fooddesk.txt`, then on the Pi:

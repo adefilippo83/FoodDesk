@@ -38,7 +38,7 @@ jobs:
             --exclude node_modules \
             --exclude .git \
             --exclude 'server/data' \
-            README.md package.json package-lock.json deploy server web
+            README.md package.json package-lock.json deploy rpi server web
 
       - name: Publish GitHub release
         env:
