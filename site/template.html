@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="{{lang}}">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{title}}</title>
+  <meta name="description" content="{{metaDescription}}" />
+  <link rel="canonical" href="https://fooddesk.shop{{path}}" />
+  {{alternates}}
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/styles.css" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="{{title}}" />
+  <meta property="og:description" content="{{metaDescription}}" />
+  <meta property="og:url" content="https://fooddesk.shop{{path}}" />
+  <meta property="og:image" content="https://fooddesk.shop/img/kitchen-display.png" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="{{home}}">Food<span>Desk</span></a>
+      <nav class="nav">
+        <a class="hide-sm" href="#features">{{navFeatures}}</a>
+        <a class="hide-sm" href="#how">{{navHow}}</a>
+        <a href="#run">{{navRun}}</a>
+        <a href="https://github.com/adefilippo83/FoodDesk">GitHub</a>
+        {{langLinks}}
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero" style="border-top: 0">
+      <div class="wrap">
+        <div>
+          <h1>{{heroTitle}}</h1>
+          <p class="lede">{{heroLede}}</p>
+          <div class="cta-row">
+            <a class="btn primary" href="https://fooddesk.fly.dev" rel="noreferrer">{{ctaDemo}}</a>
+            <a class="btn" href="#run">{{ctaRun}}</a>
+          </div>
+          <p class="demo-creds">{{demoCreds}}</p>
+        </div>
+        <figure class="hero-shot">
+          <img src="/img/phone-order.png" alt="{{shotPhoneAlt}}" width="1170" height="1992" />
+        </figure>
+      </div>
+    </section>
+
+    <section id="features">
+      <div class="wrap">
+        <h2>{{featuresTitle}}</h2>
+        <p class="section-lede">{{featuresLede}}</p>
+        <div class="cards">
+          <div class="card"><h3>🧾 {{fWaitersT}}</h3><p>{{fWaitersP}}</p></div>
+          <div class="card"><h3>🍳 {{fKitchenT}}</h3><p>{{fKitchenP}}</p></div>
+          <div class="card"><h3>🎩 {{fMaitreT}}</h3><p>{{fMaitreP}}</p></div>
+          <div class="card"><h3>⚙️ {{fAdminT}}</h3><p>{{fAdminP}}</p></div>
+          <div class="card"><h3>📊 {{fReportsT}}</h3><p>{{fReportsP}}</p></div>
+          <div class="card"><h3>🖨 {{fPrintT}}</h3><p>{{fPrintP}}</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <h2>{{shotsTitle}}</h2>
+        <p class="section-lede">{{shotsLede}}</p>
+        <div class="shots">
+          <figure class="shot">
+            <img src="/img/kitchen-display.png" alt="{{shotKitchenAlt}}" loading="lazy" width="1180" height="820" />
+            <figcaption>{{shotKitchenCap}}</figcaption>
+          </figure>
+          <figure class="shot">
+            <img src="/img/reports.png" alt="{{shotReportsAlt}}" loading="lazy" width="1280" height="800" />
+            <figcaption>{{shotReportsCap}}</figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <section id="how">
+      <div class="wrap">
+        <h2>{{howTitle}}</h2>
+        <p class="section-lede">{{howLede}}</p>
+        <div class="flow">
+          <div class="node"><strong>📱 {{flowPhones}}</strong><small>{{flowPhonesSub}}</small></div>
+          <div class="node"><strong>🍳 {{flowTablet}}</strong><small>{{flowTabletSub}}</small></div>
+          <div class="arrow">→</div>
+          <div class="node"><strong>🖥 {{flowBox}}</strong><small>nginx · Fastify · SQLite</small></div>
+          <div class="arrow">→</div>
+          <div class="node"><strong>🖨 {{flowPrinter}}</strong><small>CUPS</small></div>
+        </div>
+        <p class="section-lede" style="margin-bottom: 0">{{howOutro}}</p>
+      </div>
+    </section>
+
+    <section id="run">
+      <div class="wrap">
+        <h2>{{runTitle}}</h2>
+        <p class="section-lede">{{runLede}}</p>
+        <div class="termbox">
+          <button class="copy" data-copy="docker run -d --name fooddesk -p 3000:3000 -v fooddesk-data:/data ghcr.io/adefilippo83/fooddesk:latest">{{copyBtn}}</button>
+          <pre>docker run -d --name fooddesk -p 3000:3000 -v fooddesk-data:/data \
+  ghcr.io/adefilippo83/fooddesk:latest
+docker logs fooddesk   <span class="comment"># {{dockerLogsComment}}</span></pre>
+        </div>
+        <p class="run-alts">{{runAlts}}</p>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <h2>{{principlesTitle}}</h2>
+        <p class="section-lede">{{principlesLede}}</p>
+        <ul class="principles">
+          <li><strong>{{pMoneyT}}</strong> — {{pMoneyP}}</li>
+          <li><strong>{{pHistoryT}}</strong> — {{pHistoryP}}</li>
+          <li><strong>{{pAuthT}}</strong> — {{pAuthP}}</li>
+          <li><strong>{{pHardenedT}}</strong> — {{pHardenedP}}</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span>{{footerLicense}}</span>
+      <a href="https://github.com/adefilippo83/FoodDesk">GitHub</a>
+      <a href="https://github.com/adefilippo83/FoodDesk/releases">{{footerReleases}}</a>
+      <a href="https://fooddesk.fly.dev" rel="noreferrer">{{footerDemo}}</a>
+      <span class="spacer">Food<span style="color: var(--accent)">Desk</span></span>
+    </div>
+  </footer>
+
+  <script>
+    for (const btn of document.querySelectorAll('.copy')) {
+      btn.addEventListener('click', async () => {
+        await navigator.clipboard.writeText(btn.dataset.copy)
+        const old = btn.textContent
+        btn.textContent = '{{copiedBtn}}'
+        setTimeout(() => (btn.textContent = old), 1500)
+      })
+    }
+  </script>
+</body>
+</html>
