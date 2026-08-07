@@ -56,7 +56,18 @@ systemctl enable fooddesk.service fooddesk-backup.timer fooddesk-firstboot.servi
 
 echo "== nginx =="
 cp "$APP/deploy/nginx-fooddesk.conf" /etc/nginx/sites-available/fooddesk
+# Connectivity-check spoofing (offline venues): well-known probe paths must
+# be answered inside the default server too, or the SPA fallback would feed
+# index.html to Android's 204 probe and trigger captive-portal mode.
+mkdir -p /etc/nginx/snippets
+cp "$SRC/rpi/nginx-probes-snippet.conf" /etc/nginx/snippets/fooddesk-probes.conf
+cp "$SRC/rpi/nginx-probes-site.conf" /etc/nginx/sites-available/fooddesk-probes
+sed -i '/server_name _;/a\    include snippets/fooddesk-probes.conf;' \
+  /etc/nginx/sites-available/fooddesk
+grep -q 'fooddesk-probes' /etc/nginx/sites-available/fooddesk \
+  || { echo "probe snippet include not inserted"; exit 1; }
 ln -sf /etc/nginx/sites-available/fooddesk /etc/nginx/sites-enabled/fooddesk
+ln -sf /etc/nginx/sites-available/fooddesk-probes /etc/nginx/sites-enabled/fooddesk-probes
 rm -f /etc/nginx/sites-enabled/default
 nginx -t
 
@@ -68,10 +79,18 @@ grep -q '^127\.0\.1\.1' /etc/hosts || echo -e '127.0.1.1\tfooddesk' >> /etc/host
 echo "== Wi-Fi access point =="
 install -m 600 "$SRC/rpi/fooddesk-ap.nmconnection" \
   /etc/NetworkManager/system-connections/fooddesk-ap.nmconnection
-# Catch-all DNS on the AP: whatever address a phone asks for resolves to the
-# Pi, so "any URL" reaches FoodDesk — handy on a LAN with no internet.
+# Offline-first DNS: every hostname resolves to the Pi (so any URL opens
+# FoodDesk and the nginx probe spoofs keep devices happy), with Windows'
+# NCSI DNS probe answered specifically. The dispatcher hook flips this file
+# to normal forwarding whenever a real uplink appears.
 mkdir -p /etc/NetworkManager/dnsmasq-shared.d
-echo 'address=/#/10.42.0.1' > /etc/NetworkManager/dnsmasq-shared.d/fooddesk.conf
+cat > /etc/NetworkManager/dnsmasq-shared.d/fooddesk.conf <<'EOF'
+# fooddesk (auto): no uplink — captive-style DNS, all names lead to the Pi.
+address=/dns.msftncsi.com/131.107.255.255
+address=/#/10.42.0.1
+EOF
+install -m 755 "$SRC/rpi/90-fooddesk-ap-dns" \
+  /etc/NetworkManager/dispatcher.d/90-fooddesk-ap-dns
 
 echo "== boot partition config template =="
 # Editable from any laptop after flashing — applied on first boot.

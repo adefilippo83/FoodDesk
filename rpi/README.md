@@ -33,6 +33,13 @@ Pi's AP is a convenience, not a requirement).
   `/var/backups/fooddesk` (same units as `deploy/`)
 - A NetworkManager access-point profile (`fooddesk-ap`): WPA2, DHCP + DNS
   via `ipv4.method=shared`, catch-all DNS so any typed URL lands on FoodDesk
+- **Works with no internet**: nginx answers the OS connectivity checks
+  (Android `generate_204`, Apple `hotspot-detect`, Windows NCSI, Firefox) so
+  phones and laptops treat the AP as online — no captive-portal prompts, no
+  "no internet" nagging, no fallback to mobile data. A NetworkManager
+  dispatcher hook flips the AP's DNS back to normal forwarding automatically
+  whenever a real uplink is plugged in (Ethernet or USB tethering), giving
+  clients genuine internet through NAT instead of the spoofed answers
 - First-boot provisioning (`fooddesk-firstboot.service`): applies
   `fooddesk.txt`, seeds the admin account, writes `fooddesk-info.txt`
 - Maintenance login `fooddesk-admin` / `fooddesk` (sudo; password change
@@ -54,8 +61,13 @@ same emergency path as the standard seed).
 
 ## Build it yourself
 
-The image is baked by `.github/workflows/rpi-image.yml` on every release
-(also runnable manually via *workflow dispatch*): the web/server build runs
-natively on the runner, then `rpi/setup.sh` customizes the stock Raspberry
-Pi OS image inside a QEMU chroot (`pguyot/arm-runner-action`) and the result
-is compressed and attached to the release with its SHA256.
+The image is baked by `.github/workflows/rpi-image.yml` on every release:
+the web/server build runs natively on the runner, then `rpi/setup.sh`
+customizes the stock Raspberry Pi OS image inside a QEMU chroot
+(`pguyot/arm-runner-action`) and the result is compressed and attached to
+the release with its SHA256.
+
+**Testing a change**: PRs that touch `rpi/**` (or the workflow) build the
+image automatically — download the `.img.xz` from the run's artifacts. For
+any other branch, run the workflow manually from the Actions tab
+(*workflow dispatch*, pick the branch). A bake takes ~30–60 minutes.
