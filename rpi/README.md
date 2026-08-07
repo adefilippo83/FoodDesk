@@ -70,6 +70,20 @@ A4 page with two QR codes — join the Wi-Fi, open FoodDesk — in Italian and
 English. Print it and tape it up where the waiters gather. It carries the
 Wi-Fi password but never the admin credentials.
 
+## Kiosk mode: the Pi is the kitchen display
+
+Attach an HDMI screen (ideally touch), uncomment `KIOSK=kitchen` in
+`fooddesk.txt`, and the Pi boots straight into the kitchen display —
+Chromium full-screen on a minimal Wayland compositor, no tablet needed.
+
+Under the hood: first boot creates a kitchen-role account with an unusable
+random password and sets `KIOSK_AUTOLOGIN_USER` in `/etc/fooddesk/env`; the
+kiosk browser then logs itself in through `/api/auth/kiosk`, a route that
+only exists when that variable is set, only answers on the loopback
+interface (never through nginx), and only accepts kitchen-role accounts —
+so a phone on the venue Wi-Fi can never use it. To turn the kiosk off:
+`sudo systemctl disable --now fooddesk-kiosk.service`.
+
 ## Built for festival conditions
 
 - **Power cuts**: logs live in RAM (volatile journald), there is no

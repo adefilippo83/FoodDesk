@@ -24,6 +24,7 @@ WIFI_COUNTRY='IT'
 RESTAURANT_NAME=''
 PDF_LANG=''
 ADMIN_PASSWORD=''
+KIOSK=''
 
 if [ -f "$CONF" ]; then
   log "applying $CONF"
@@ -37,6 +38,7 @@ if [ -f "$CONF" ]; then
       RESTAURANT_NAME) RESTAURANT_NAME="$value" ;;
       PDF_LANG) PDF_LANG="$value" ;;
       ADMIN_PASSWORD) ADMIN_PASSWORD="$value" ;;
+      KIOSK) KIOSK="$value" ;;
     esac
   done < "$CONF"
 fi
@@ -80,6 +82,25 @@ sudo -u fooddesk env "DATABASE_FILE=$DATABASE_FILE" \
   ADMIN_USERNAME=admin "ADMIN_PASSWORD=$ADMIN_PASSWORD" \
   node "$APP/server/dist/db/seed.js" || { log "seed failed"; exit 1; }
 systemctl restart fooddesk.service || true
+
+# ---- kiosk mode: the attached screen becomes the kitchen display ----
+if [ "$KIOSK" = "kitchen" ]; then
+  KIOSK_USER="$(sudo -u fooddesk env "DATABASE_FILE=$DATABASE_FILE" \
+    node "$APP/rpi/create-kitchen-user.mjs")" || KIOSK_USER=''
+  if [ -n "$KIOSK_USER" ]; then
+    if grep -q '^#\?KIOSK_AUTOLOGIN_USER=' "$ENV_FILE"; then
+      sed -i "s|^#\?KIOSK_AUTOLOGIN_USER=.*|KIOSK_AUTOLOGIN_USER=$KIOSK_USER|" "$ENV_FILE"
+    else
+      echo "KIOSK_AUTOLOGIN_USER=$KIOSK_USER" >> "$ENV_FILE"
+    fi
+    systemctl restart fooddesk.service || true
+    systemctl enable fooddesk-kiosk.service || true
+    systemctl start --no-block fooddesk-kiosk.service || true
+    log "kiosk mode on — the attached screen shows the kitchen display (user: $KIOSK_USER)"
+  else
+    log "kiosk requested but the kitchen account could not be created"
+  fi
+fi
 
 # ---- hand the credentials to the installer ----
 umask 077

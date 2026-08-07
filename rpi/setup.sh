@@ -21,6 +21,7 @@ apt-get update
 apt-get install -y --no-install-recommends \
   nginx-light sqlite3 avahi-daemon rfkill \
   cups cups-client ipp-usb \
+  cage chromium fonts-liberation \
   ca-certificates curl xz-utils make g++ python3
 
 echo "== node 24 (official arm64 build) =="
@@ -40,7 +41,7 @@ cp -a "$SRC/server/package.json" "$SRC/server/dist" "$SRC/server/public" "$SRC/s
 cp "$SRC/web/package.json" "$APP/web/"
 cp -a "$SRC/deploy" "$APP/deploy"
 cp "$SRC/rpi/firstboot.sh" "$SRC/rpi/printer-hotplug.sh" "$SRC/rpi/usb-backup.sh" \
-  "$SRC/rpi/leaflet.mjs" "$APP/rpi/"
+  "$SRC/rpi/leaflet.mjs" "$SRC/rpi/create-kitchen-user.mjs" "$APP/rpi/"
 chmod +x "$APP/rpi/firstboot.sh" "$APP/rpi/printer-hotplug.sh" "$APP/rpi/usb-backup.sh" \
   "$APP/deploy/fooddesk-backup.sh"
 install -m 755 "$SRC/rpi/fooddesk-update.sh" /usr/local/bin/fooddesk-update
@@ -60,6 +61,7 @@ cp "$SRC/rpi/fooddesk-printer-setup.service" /etc/systemd/system/
 cp "$SRC/rpi/fooddesk-usb-backup@.service" /etc/systemd/system/
 cp "$SRC/rpi/fooddesk-usb-backup.service" /etc/systemd/system/
 cp "$SRC/rpi/fooddesk-usb-backup.timer" /etc/systemd/system/
+cp "$SRC/rpi/fooddesk-kiosk.service" /etc/systemd/system/
 systemctl enable fooddesk.service fooddesk-backup.timer fooddesk-firstboot.service \
   fooddesk-usb-backup.timer cups ssh
 
@@ -135,6 +137,10 @@ WIFI_COUNTRY=IT
 
 # Leave commented to generate a random admin password (recommended).
 #ADMIN_PASSWORD=
+
+# Attach an HDMI touchscreen and uncomment to boot straight into the
+# kitchen display (kiosk mode).
+#KIOSK=kitchen
 TXT
 
 echo "== power-loss hardening =="
@@ -162,6 +168,12 @@ EOF
 BOOTCFG=/boot/firmware/config.txt
 [ -f "$BOOTCFG" ] || BOOTCFG=/boot/config.txt
 grep -q '^dtparam=watchdog=on' "$BOOTCFG" || echo 'dtparam=watchdog=on' >> "$BOOTCFG"
+
+echo "== kiosk user =="
+# Runs the cage/Chromium kitchen display when KIOSK=kitchen is set; the
+# service stays disabled otherwise. No shell, no sudo — display groups only.
+id kiosk >/dev/null 2>&1 \
+  || useradd -m -s /usr/sbin/nologin -G video,render,input kiosk
 
 echo "== maintenance login =="
 # A real (uid 1000) user also stops Raspberry Pi OS's first-boot user wizard.

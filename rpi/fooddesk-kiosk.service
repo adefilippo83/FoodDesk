@@ -1,0 +1,29 @@
+[Unit]
+Description=FoodDesk kitchen display kiosk (Chromium on cage)
+# Disabled by default; rpi/firstboot.sh enables it when fooddesk.txt says
+# KIOSK=kitchen. Takes over tty1 with a minimal Wayland compositor running
+# Chromium full-screen on the kitchen display, logged in via the
+# loopback-only kiosk route.
+After=fooddesk.service systemd-user-sessions.service getty@tty1.service
+Wants=fooddesk.service
+Conflicts=getty@tty1.service
+
+[Service]
+Type=simple
+User=kiosk
+PAMName=login
+TTYPath=/dev/tty1
+StandardInput=tty
+StandardOutput=journal
+StandardError=journal
+UtmpIdentifier=tty1
+UtmpMode=user
+Restart=always
+RestartSec=5
+ExecStart=/usr/bin/cage -- /usr/bin/chromium \
+  --kiosk --noerrdialogs --disable-infobars --no-first-run \
+  --ozone-platform=wayland \
+  http://127.0.0.1:3000/api/auth/kiosk
+
+[Install]
+WantedBy=multi-user.target

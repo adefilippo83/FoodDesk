@@ -67,7 +67,8 @@ jobs:
         id: bake
         with:
           base_image: ${{ env.BASE_IMAGE }}
-          image_additional_mb: 1536
+          # Chromium + cage (kiosk mode) need the extra headroom.
+          image_additional_mb: 3072
           optimize_image: true
           commands: |
             bash rpi/setup.sh
