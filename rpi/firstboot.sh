@@ -108,4 +108,8 @@ Credenziali / credentials: fooddesk-info.txt (SD card, boot partition)
 
 ISSUE
 
+# ---- printable leaflet with the Wi-Fi QR (no admin credentials on it) ----
+node "$APP/rpi/leaflet.mjs" --ssid "$WIFI_SSID" --password "$WIFI_PASSWORD" \
+  --out "$BOOT/fooddesk-leaflet.pdf" || log "leaflet generation failed (non-fatal)"
+
 log "provisioning complete — credentials in $INFO"

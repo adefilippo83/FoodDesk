@@ -113,6 +113,13 @@ and `:X.Y.Z` (amd64 + arm64). For printing from the container, set
 request the image is built **and booted**: the CI smoke test waits for
 `/api/health` and performs a real login before anything may be published.
 
+**Raspberry Pi — flash and go:** every release ships
+`fooddesk-rpi-<version>.img.xz`. Flash it, power the Pi, join the
+**FoodDesk** Wi-Fi it creates, open `http://10.42.0.1/`. Works with no
+internet (connectivity checks are answered locally), auto-configures USB
+printers, and writes the generated credentials plus a printable QR leaflet
+to the SD card's boot partition. Full guide: [rpi/README.md](rpi/README.md).
+
 **Debian venue server — one script:** see [deploy/README.md](deploy/README.md).
 `sudo deploy/install.sh` is idempotent and sets up the system user, the
 hardened systemd service, nginx and 15-minute backups. Updating is

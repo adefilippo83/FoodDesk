@@ -19,7 +19,8 @@ apt-get update
 # make/g++/python3 are the node-gyp fallback in case a native module has no
 # prebuilt arm64 binary; better-sqlite3 normally ships one.
 apt-get install -y --no-install-recommends \
-  nginx-light sqlite3 avahi-daemon cups-client rfkill \
+  nginx-light sqlite3 avahi-daemon rfkill \
+  cups cups-client ipp-usb \
   ca-certificates curl xz-utils make g++ python3
 
 echo "== node 24 (official arm64 build) =="
@@ -38,8 +39,8 @@ cp "$SRC/package.json" "$SRC/package-lock.json" "$APP/"
 cp -a "$SRC/server/package.json" "$SRC/server/dist" "$SRC/server/public" "$SRC/server/drizzle" "$APP/server/"
 cp "$SRC/web/package.json" "$APP/web/"
 cp -a "$SRC/deploy" "$APP/deploy"
-cp "$SRC/rpi/firstboot.sh" "$APP/rpi/firstboot.sh"
-chmod +x "$APP/rpi/firstboot.sh" "$APP/deploy/fooddesk-backup.sh"
+cp "$SRC/rpi/firstboot.sh" "$SRC/rpi/printer-hotplug.sh" "$SRC/rpi/leaflet.mjs" "$APP/rpi/"
+chmod +x "$APP/rpi/firstboot.sh" "$APP/rpi/printer-hotplug.sh" "$APP/deploy/fooddesk-backup.sh"
 chown fooddesk:fooddesk /var/lib/fooddesk
 
 cd "$APP"
@@ -52,7 +53,12 @@ cp "$APP/deploy/fooddesk.service" /etc/systemd/system/
 cp "$APP/deploy/fooddesk-backup.service" /etc/systemd/system/
 cp "$APP/deploy/fooddesk-backup.timer" /etc/systemd/system/
 cp "$SRC/rpi/fooddesk-firstboot.service" /etc/systemd/system/
-systemctl enable fooddesk.service fooddesk-backup.timer fooddesk-firstboot.service ssh
+cp "$SRC/rpi/fooddesk-printer-setup.service" /etc/systemd/system/
+systemctl enable fooddesk.service fooddesk-backup.timer fooddesk-firstboot.service cups ssh
+
+echo "== printing (CUPS + USB hotplug) =="
+cp "$SRC/rpi/cupsd.conf" /etc/cups/cupsd.conf
+cp "$SRC/rpi/99-fooddesk-printer.rules" /etc/udev/rules.d/99-fooddesk-printer.rules
 
 echo "== nginx =="
 cp "$APP/deploy/nginx-fooddesk.conf" /etc/nginx/sites-available/fooddesk
@@ -124,7 +130,8 @@ TXT
 echo "== maintenance login =="
 # A real (uid 1000) user also stops Raspberry Pi OS's first-boot user wizard.
 if ! id fooddesk-admin >/dev/null 2>&1; then
-  useradd -m -s /bin/bash -G sudo fooddesk-admin
+  # lpadmin: the same account authenticates on the CUPS web interface.
+  useradd -m -s /bin/bash -G sudo,lpadmin fooddesk-admin
   echo 'fooddesk-admin:fooddesk' | chpasswd
   chage -d 0 fooddesk-admin   # force a password change on first login
 fi
@@ -137,6 +144,9 @@ test -f "$APP/server/public/index.html"
 test -d "$APP/server/drizzle"
 node -e "import('better-sqlite3').then(() => console.log('better-sqlite3: arm64 module loads'))"
 node -e "import('$APP/server/dist/app.js').then(() => console.log('server bundle: imports cleanly'))"
+node "$APP/rpi/leaflet.mjs" --ssid smoke --password smoketest --out /tmp/leaflet-smoke.pdf
+head -c 5 /tmp/leaflet-smoke.pdf | grep -q '%PDF-' && rm /tmp/leaflet-smoke.pdf
+command -v driverless >/dev/null || { echo "driverless tool missing"; exit 1; }
 
 echo "== cleanup =="
 apt-get clean

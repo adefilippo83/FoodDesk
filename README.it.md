@@ -117,6 +117,14 @@ l'immagine viene compilata **e avviata davvero**: lo smoke test della CI
 aspetta `/api/health` e fa un login reale prima che qualcosa possa essere
 pubblicato.
 
+**Raspberry Pi — scrivi la scheda e via:** ogni release pubblica
+`fooddesk-rpi-<versione>.img.xz`. La scrivi sulla microSD, accendi il
+Raspberry, ti colleghi al Wi-Fi **FoodDesk** che crea da solo e apri
+`http://10.42.0.1/`. Funziona senza internet (i controlli di connettività
+dei telefoni ricevono risposta in locale), configura da solo le stampanti
+USB e scrive le credenziali generate più un volantino QR stampabile sulla
+partizione boot della scheda. Guida completa: [rpi/README.md](rpi/README.md).
+
 **Server Debian della festa — uno script:** vedi
 [deploy/README.md](deploy/README.md). `sudo deploy/install.sh` è
 idempotente e configura utente di sistema, servizio systemd blindato, nginx

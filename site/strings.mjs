@@ -61,6 +61,8 @@ export const en = {
   copyBtn: 'Copy',
   copiedBtn: 'Copied!',
   dockerLogsComment: 'the admin password is printed on first start',
+  runPi:
+    '<strong>Raspberry Pi?</strong> Every <a href="https://github.com/adefilippo83/FoodDesk/releases">release</a> ships a ready-made image: flash it, power on, join the FoodDesk Wi-Fi it creates and start taking orders — no internet needed, USB printers configure themselves. <a href="https://github.com/adefilippo83/FoodDesk/blob/main/rpi/README.md">Guide</a>.',
   runAlts:
     'Prefer a venue server? <a href="https://github.com/adefilippo83/FoodDesk/blob/main/deploy/README.md">One idempotent install script</a> sets up systemd, nginx and backups on Debian. Or open it in <a href="https://codespaces.new/adefilippo83/FoodDesk">GitHub Codespaces</a> for a throwaway instance.',
   principlesTitle: 'Principles the code actually enforces',
@@ -136,6 +138,8 @@ export const it = {
   copyBtn: 'Copia',
   copiedBtn: 'Copiato!',
   dockerLogsComment: 'al primo avvio stampa la password admin generata',
+  runPi:
+    '<strong>Raspberry Pi?</strong> Ogni <a href="https://github.com/adefilippo83/FoodDesk/releases">release</a> include un’immagine pronta: la scrivi sulla microSD, accendi, ti colleghi al Wi-Fi FoodDesk che crea da solo e prendi le comande — senza internet, con stampanti USB che si configurano da sole. <a href="https://github.com/adefilippo83/FoodDesk/blob/main/rpi/README.md">Guida</a>.',
   runAlts:
     'Preferisci un server per la festa? <a href="https://github.com/adefilippo83/FoodDesk/blob/main/deploy/README.md">Uno script idempotente</a> configura systemd, nginx e backup su Debian. Oppure aprilo in <a href="https://codespaces.new/adefilippo83/FoodDesk">GitHub Codespaces</a> per un’istanza usa e getta.',
   principlesTitle: 'Principi che il codice fa rispettare davvero',
@@ -211,6 +215,8 @@ export const es = {
   copyBtn: 'Copiar',
   copiedBtn: '¡Copiado!',
   dockerLogsComment: 'en el primer arranque imprime la contraseña de admin generada',
+  runPi:
+    '<strong>¿Raspberry Pi?</strong> Cada <a href="https://github.com/adefilippo83/FoodDesk/releases">versión</a> incluye una imagen lista: la grabas en la microSD, enciendes, te conectas al Wi-Fi FoodDesk que crea por sí solo y empiezas a tomar pedidos — sin internet, con impresoras USB que se configuran solas. <a href="https://github.com/adefilippo83/FoodDesk/blob/main/rpi/README.md">Guía</a>.',
   runAlts:
     '¿Prefieres un servidor propio? <a href="https://github.com/adefilippo83/FoodDesk/blob/main/deploy/README.md">Un script idempotente</a> configura systemd, nginx y backups en Debian. O ábrelo en <a href="https://codespaces.new/adefilippo83/FoodDesk">GitHub Codespaces</a> para una instancia desechable.',
   principlesTitle: 'Principios que el código hace cumplir de verdad',
@@ -286,6 +292,8 @@ export const fr = {
   copyBtn: 'Copier',
   copiedBtn: 'Copié !',
   dockerLogsComment: 'le mot de passe admin généré s’affiche au premier démarrage',
+  runPi:
+    '<strong>Raspberry Pi ?</strong> Chaque <a href="https://github.com/adefilippo83/FoodDesk/releases">version</a> fournit une image prête à l’emploi : flashez la microSD, allumez, rejoignez le Wi-Fi FoodDesk qu’il crée tout seul et prenez les commandes — sans internet, avec des imprimantes USB qui se configurent seules. <a href="https://github.com/adefilippo83/FoodDesk/blob/main/rpi/README.md">Guide</a>.',
   runAlts:
     'Vous préférez un serveur sur place ? <a href="https://github.com/adefilippo83/FoodDesk/blob/main/deploy/README.md">Un script idempotent</a> configure systemd, nginx et les backups sur Debian. Ou ouvrez-le dans <a href="https://codespaces.new/adefilippo83/FoodDesk">GitHub Codespaces</a> pour une instance jetable.',
   principlesTitle: 'Des principes que le code fait vraiment respecter',
@@ -361,6 +369,8 @@ export const pt = {
   copyBtn: 'Copiar',
   copiedBtn: 'Copiado!',
   dockerLogsComment: 'no primeiro arranque imprime a palavra-passe de admin gerada',
+  runPi:
+    '<strong>Raspberry Pi?</strong> Cada <a href="https://github.com/adefilippo83/FoodDesk/releases">versão</a> traz uma imagem pronta: gravas no microSD, ligas, entras no Wi-Fi FoodDesk que ele próprio cria e começas a registar pedidos — sem internet, com impressoras USB que se configuram sozinhas. <a href="https://github.com/adefilippo83/FoodDesk/blob/main/rpi/README.md">Guia</a>.',
   runAlts:
     'Preferes um servidor no local? <a href="https://github.com/adefilippo83/FoodDesk/blob/main/deploy/README.md">Um script idempotente</a> configura systemd, nginx e backups em Debian. Ou abre-o no <a href="https://codespaces.new/adefilippo83/FoodDesk">GitHub Codespaces</a> para uma instância descartável.',
   principlesTitle: 'Princípios que o código faz mesmo cumprir',

@@ -44,8 +44,31 @@ Pi's AP is a convenience, not a requirement).
   `fooddesk.txt`, seeds the admin account, writes `fooddesk-info.txt`
 - Maintenance login `fooddesk-admin` / `fooddesk` (sudo; password change
   forced at first login), SSH enabled
-- Ethernet stays free: plug in an uplink for internet, or a network printer
-  (set `KITCHEN_PRINTER` + `CUPS_SERVER` in `/etc/fooddesk/env`)
+- Ethernet stays free: plug in an uplink for internet or a network printer
+
+## Printing
+
+FoodDesk sends kitchen tickets as PDFs, so the printer needs a PDF-capable
+CUPS queue:
+
+- **Plug-and-play**: connect a USB printer that speaks IPP (most printers
+  from ~2016 on, via `ipp-usb`) and the appliance auto-creates a driverless
+  queue named `kitchen`, points `KITCHEN_PRINTER` at it and restarts the
+  app. Tickets just print. Works the same for IPP network printers on the
+  Ethernet port.
+- **Everything else** (older thermal printers needing a driver): open the
+  CUPS web interface at **http://10.42.0.1:631/** from any laptop on the
+  FoodDesk Wi-Fi, log in as `fooddesk-admin`, and add the printer with the
+  queue name `kitchen`. The hotplug helper wires up `KITCHEN_PRINTER` as
+  soon as the queue exists.
+- No printer at all: the browser print dialog fallback works as always.
+
+## The venue leaflet
+
+First boot also writes **`fooddesk-leaflet.pdf`** to the boot partition: an
+A4 page with two QR codes — join the Wi-Fi, open FoodDesk — in Italian and
+English. Print it and tape it up where the waiters gather. It carries the
+Wi-Fi password but never the admin credentials.
 
 ## Re-provision / recover
 
