@@ -248,10 +248,14 @@ section h2 {
 
 /* screenshots */
 
+/* Stacked full-width so the dense app UI stays legible — screenshots are
+   captured at 2x for retina crispness. */
 .shots {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  grid-template-columns: 1fr;
+  gap: 24px;
+  max-width: 900px;
+  margin: 0 auto;
 }
 
 .shot {
