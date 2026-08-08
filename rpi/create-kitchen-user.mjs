@@ -1,5 +1,5 @@
 // Ensures an active kitchen-role account exists for kiosk mode and prints
-// its username (and nothing else) on stdout. Run by rpi/firstboot.sh as the
+// its username (and nothing else) on stdout. Run by rpi/provision.sh as the
 // fooddesk user when KIOSK=kitchen. The generated password is random and
 // never shown anywhere: the kiosk logs in via the loopback-only route, and
 // an admin can set a real password from the Staff page if ever needed.

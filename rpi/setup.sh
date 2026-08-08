@@ -40,9 +40,9 @@ cp "$SRC/package.json" "$SRC/package-lock.json" "$APP/"
 cp -a "$SRC/server/package.json" "$SRC/server/dist" "$SRC/server/public" "$SRC/server/drizzle" "$APP/server/"
 cp "$SRC/web/package.json" "$APP/web/"
 cp -a "$SRC/deploy" "$APP/deploy"
-cp "$SRC/rpi/firstboot.sh" "$SRC/rpi/printer-hotplug.sh" "$SRC/rpi/usb-backup.sh" \
+cp "$SRC/rpi/provision.sh" "$SRC/rpi/printer-hotplug.sh" "$SRC/rpi/usb-backup.sh" \
   "$SRC/rpi/leaflet.mjs" "$SRC/rpi/create-kitchen-user.mjs" "$APP/rpi/"
-chmod +x "$APP/rpi/firstboot.sh" "$APP/rpi/printer-hotplug.sh" "$APP/rpi/usb-backup.sh" \
+chmod +x "$APP/rpi/provision.sh" "$APP/rpi/printer-hotplug.sh" "$APP/rpi/usb-backup.sh" \
   "$APP/deploy/fooddesk-backup.sh"
 install -m 755 "$SRC/rpi/fooddesk-update.sh" /usr/local/bin/fooddesk-update
 chown fooddesk:fooddesk /var/lib/fooddesk
@@ -56,13 +56,13 @@ cp "$APP/deploy/env.example" /etc/fooddesk/env
 cp "$APP/deploy/fooddesk.service" /etc/systemd/system/
 cp "$APP/deploy/fooddesk-backup.service" /etc/systemd/system/
 cp "$APP/deploy/fooddesk-backup.timer" /etc/systemd/system/
-cp "$SRC/rpi/fooddesk-firstboot.service" /etc/systemd/system/
+cp "$SRC/rpi/fooddesk-provision.service" /etc/systemd/system/
 cp "$SRC/rpi/fooddesk-printer-setup.service" /etc/systemd/system/
 cp "$SRC/rpi/fooddesk-usb-backup@.service" /etc/systemd/system/
 cp "$SRC/rpi/fooddesk-usb-backup.service" /etc/systemd/system/
 cp "$SRC/rpi/fooddesk-usb-backup.timer" /etc/systemd/system/
 cp "$SRC/rpi/fooddesk-kiosk.service" /etc/systemd/system/
-systemctl enable fooddesk.service fooddesk-backup.timer fooddesk-firstboot.service \
+systemctl enable fooddesk.service fooddesk-backup.timer fooddesk-provision.service \
   fooddesk-usb-backup.timer cups ssh
 
 echo "== printing (CUPS + USB hotplug) =="
@@ -111,16 +111,17 @@ install -m 755 "$SRC/rpi/90-fooddesk-ap-dns" \
   /etc/NetworkManager/dispatcher.d/90-fooddesk-ap-dns
 
 echo "== boot partition config template =="
-# Editable from any laptop after flashing — applied on first boot. On a
-# running Pi the FAT boot partition sits at /boot/firmware; inside the
+# Editable from any laptop, applied by rpi/provision.sh at the next boot.
+# On a running Pi the FAT boot partition sits at /boot/firmware; inside the
 # arm-runner chroot it is mounted at /boot (hiding the rootfs' firmware
 # directory), so fall back accordingly.
 BOOTFS=/boot/firmware
 [ -d "$BOOTFS" ] || BOOTFS=/boot
 cat > "$BOOTFS/fooddesk.txt" <<'TXT'
-# FoodDesk — edit before the first boot, then insert the SD card and power on.
-# Lines starting with # are ignored. After the first boot, the generated
-# credentials appear in fooddesk-info.txt next to this file.
+# FoodDesk configuration. Edit this file any time — from a laptop with the
+# SD card, or over SSH — and reboot: changes are applied automatically.
+# Lines starting with # are ignored. The generated credentials appear in
+# fooddesk-info.txt next to this file after the first boot.
 
 # Wi-Fi network the venue devices will join (password: 8+ characters).
 WIFI_SSID=FoodDesk
@@ -129,17 +130,20 @@ WIFI_PASSWORD=fooddesk-wifi
 # Two-letter Wi-Fi country code (regulatory domain).
 WIFI_COUNTRY=IT
 
-# Shown on receipts; change later in Settings.
+# Shown on receipts; can also be changed later in Settings.
 #RESTAURANT_NAME=Sagra del Borgo
 
 # Language of printed documents: it, en, es, fr, pt.
 #PDF_LANG=it
 
-# Leave commented to generate a random admin password (recommended).
+# Leave commented: a random admin password is generated on the first boot
+# (recommended). Setting a value here (re)sets the admin password at the
+# next boot — that is also the recovery for a lost password; remove the
+# line afterwards.
 #ADMIN_PASSWORD=
 
-# Attach an HDMI touchscreen and uncomment to boot straight into the
-# kitchen display (kiosk mode).
+# Attach an HDMI touchscreen and set "kitchen" to boot straight into the
+# kitchen display; set "off" to turn the kiosk back off.
 #KIOSK=kitchen
 TXT
 

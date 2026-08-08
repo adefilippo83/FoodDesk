@@ -1,0 +1,15 @@
+[Unit]
+Description=FoodDesk provisioning (applies fooddesk.txt)
+# Runs at every boot; rpi/provision.sh exits immediately unless this is the
+# first boot or fooddesk.txt changed since the last apply. Success markers
+# are written by the script itself, so a failed run retries next boot.
+After=NetworkManager.service
+Before=fooddesk.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/opt/fooddesk/rpi/provision.sh
+
+[Install]
+WantedBy=multi-user.target

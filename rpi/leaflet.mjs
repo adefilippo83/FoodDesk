@@ -3,7 +3,7 @@
 // No credentials beyond the Wi-Fi password appear on it — the admin password
 // stays in fooddesk-info.txt.
 //
-// Run on the Pi by rpi/firstboot.sh:
+// Run on the Pi by rpi/provision.sh:
 //   node /opt/fooddesk/rpi/leaflet.mjs --ssid X --password Y --out leaflet.pdf
 // (resolves pdfkit and qrcode from /opt/fooddesk/node_modules)
 import { createWriteStream } from 'node:fs'

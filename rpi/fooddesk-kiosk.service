@@ -1,6 +1,6 @@
 [Unit]
 Description=FoodDesk kitchen display kiosk (Chromium on cage)
-# Disabled by default; rpi/firstboot.sh enables it when fooddesk.txt says
+# Disabled by default; rpi/provision.sh enables it when fooddesk.txt says
 # KIOSK=kitchen. Takes over tty1 with a minimal Wayland compositor running
 # Chromium full-screen on the kitchen display, logged in via the
 # loopback-only kiosk route.

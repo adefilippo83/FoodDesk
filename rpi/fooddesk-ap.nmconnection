@@ -1,7 +1,7 @@
 # FoodDesk venue Wi-Fi access point. NetworkManager keyfile, installed to
 # /etc/NetworkManager/system-connections/ by rpi/setup.sh (must be mode 600).
 # SSID and password are replaced on first boot from fooddesk.txt on the boot
-# partition (see rpi/firstboot.sh); these are the shipped defaults.
+# partition (see rpi/provision.sh); these are the shipped defaults.
 #
 # ipv4.method=shared makes NetworkManager run DHCP + DNS for the clients —
 # no hostapd or dnsmasq configuration needed on Raspberry Pi OS Trixie.
