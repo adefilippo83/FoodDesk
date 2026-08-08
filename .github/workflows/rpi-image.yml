@@ -74,6 +74,13 @@ jobs:
             bash rpi/setup.sh
             cd / && rm -rf /FoodDesk
 
+      # Tier-1 boot test: a COPY of the baked image boots under systemd-nspawn
+      # (arm64 emulation, real systemd). Asserts provisioning, app health,
+      # nginx connectivity probes, login with the generated password, and
+      # config re-apply across a reboot. The shipped artifact stays pristine.
+      - name: Boot test the image (systemd-nspawn)
+        run: sudo -E bash rpi/test-image.sh ${{ steps.bake.outputs.image }}
+
       - name: Compress and checksum
         run: |
           name=fooddesk-rpi-${{ steps.version.outputs.version }}

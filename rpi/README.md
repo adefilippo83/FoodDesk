@@ -188,4 +188,12 @@ the release with its SHA256.
 **Testing a change**: PRs that touch `rpi/**` (or the workflow) build the
 image automatically — download the `.img.xz` from the run's artifacts. For
 any other branch, run the workflow manually from the Actions tab
-(*workflow dispatch*, pick the branch). A bake takes ~30–60 minutes.
+(*workflow dispatch*, pick the branch).
+
+Every bake is also **boot-tested in CI** (`rpi/test-image.sh`): a copy of
+the image boots under systemd-nspawn with arm64 emulation, and the run
+asserts first-boot provisioning, app health, the nginx connectivity
+probes, a real login with the generated admin password, and that editing
+`fooddesk.txt` re-applies across a reboot without touching that password.
+(No Wi-Fi radio exists in CI — the radio, printers and power behavior
+remain the bench test's job.)

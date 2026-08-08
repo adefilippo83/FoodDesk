@@ -203,5 +203,13 @@ allegato alla release con il suo SHA256.
 **Provare una modifica**: le PR che toccano `rpi/**` (o il workflow)
 compilano l'immagine automaticamente — scarica la `.img.xz` dagli artifact
 della run. Per qualunque altro branch, lancia il workflow a mano dalla tab
-Actions (*workflow dispatch*, scegliendo il branch). Una build richiede
-~30–60 minuti.
+Actions (*workflow dispatch*, scegliendo il branch).
+
+Ogni build viene anche **avviata e testata in CI** (`rpi/test-image.sh`):
+una copia dell'immagine parte sotto systemd-nspawn con emulazione arm64, e
+la run verifica il provisioning del primo avvio, la salute dell'app, le
+risposte di nginx ai controlli di connettività, un login vero con la
+password admin generata, e che modificare `fooddesk.txt` venga riapplicato
+al riavvio senza toccare quella password. (In CI non esiste una radio
+Wi-Fi — radio, stampanti e comportamento all'accensione restano compito
+del test su hardware vero.)
