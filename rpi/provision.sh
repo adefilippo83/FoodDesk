@@ -100,9 +100,9 @@ if [ "$FIRST_RUN" = yes ] && [ -z "$ADMIN_PASSWORD" ]; then
   ADMIN_PASSWORD="$(tr -dc 'a-z0-9' < /dev/urandom | head -c 12)"
 fi
 if [ -n "$ADMIN_PASSWORD" ]; then
-  sudo -u fooddesk env "DATABASE_FILE=$DATABASE_FILE" \
+  runuser -u fooddesk -- env "DATABASE_FILE=$DATABASE_FILE" \
     node "$APP/server/dist/db/migrate.js" || { log "migrate failed"; exit 1; }
-  sudo -u fooddesk env "DATABASE_FILE=$DATABASE_FILE" \
+  runuser -u fooddesk -- env "DATABASE_FILE=$DATABASE_FILE" \
     ADMIN_USERNAME=admin "ADMIN_PASSWORD=$ADMIN_PASSWORD" \
     node "$APP/server/dist/db/seed.js" || { log "seed failed"; exit 1; }
   ADMIN_NOTE="$ADMIN_PASSWORD"
@@ -111,7 +111,7 @@ systemctl restart --no-block fooddesk.service || true
 
 # ---- kiosk mode: the attached screen becomes the kitchen display ----
 if [ "$KIOSK" = "kitchen" ]; then
-  KIOSK_USER="$(sudo -u fooddesk env "DATABASE_FILE=$DATABASE_FILE" \
+  KIOSK_USER="$(runuser -u fooddesk -- env "DATABASE_FILE=$DATABASE_FILE" \
     node "$APP/rpi/create-kitchen-user.mjs")" || KIOSK_USER=''
   if [ -n "$KIOSK_USER" ]; then
     if grep -q '^#\?KIOSK_AUTOLOGIN_USER=' "$ENV_FILE"; then

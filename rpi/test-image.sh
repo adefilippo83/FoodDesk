@@ -35,6 +35,10 @@ dump_diagnostics() {
   run_in systemctl list-jobs --no-pager 2>/dev/null || true
   run_in systemctl --no-pager --failed 2>/dev/null | grep -v 'run-u' || true
   run_in journalctl -b --no-pager -n 80 2>/dev/null || true
+  # journald is typically dead in the emulated boot, so the unit's own
+  # output is lost — replay provisioning interactively to capture it.
+  say "provision.sh replay (stdout captured)"
+  run_in bash /opt/fooddesk/rpi/provision.sh || true
   say "console tail"
   tail -n 60 "$WORK/nspawn.log" 2>/dev/null || true
 }
