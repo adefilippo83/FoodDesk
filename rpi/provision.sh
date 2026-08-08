@@ -107,7 +107,7 @@ if [ -n "$ADMIN_PASSWORD" ]; then
     node "$APP/server/dist/db/seed.js" || { log "seed failed"; exit 1; }
   ADMIN_NOTE="$ADMIN_PASSWORD"
 fi
-systemctl restart fooddesk.service || true
+systemctl restart --no-block fooddesk.service || true
 
 # ---- kiosk mode: the attached screen becomes the kitchen display ----
 if [ "$KIOSK" = "kitchen" ]; then
@@ -119,7 +119,7 @@ if [ "$KIOSK" = "kitchen" ]; then
     else
       echo "KIOSK_AUTOLOGIN_USER=$KIOSK_USER" >> "$ENV_FILE"
     fi
-    systemctl restart fooddesk.service || true
+    systemctl restart --no-block fooddesk.service || true
     systemctl enable fooddesk-kiosk.service || true
     systemctl start --no-block fooddesk-kiosk.service || true
     log "kiosk mode on — the attached screen shows the kitchen display (user: $KIOSK_USER)"
@@ -129,7 +129,7 @@ if [ "$KIOSK" = "kitchen" ]; then
 elif systemctl is-enabled fooddesk-kiosk.service >/dev/null 2>&1; then
   systemctl disable --now fooddesk-kiosk.service || true
   sed -i 's|^KIOSK_AUTOLOGIN_USER=.*|#KIOSK_AUTOLOGIN_USER=|' "$ENV_FILE"
-  systemctl restart fooddesk.service || true
+  systemctl restart --no-block fooddesk.service || true
   log "kiosk mode off"
 fi
 

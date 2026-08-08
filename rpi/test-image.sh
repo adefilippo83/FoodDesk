@@ -99,9 +99,44 @@ mkdir -p "$MNT/etc/cloud" && touch "$MNT/etc/cloud/cloud-init.disabled"
 for u in systemd-remount-fs.service swap.target \
          rpi-resize-swap-file.service 'rpi-setup-loop@var-swap.service' \
          'systemd-zram-setup@zram0.service' dev-zram0.swap \
-         rpi-eeprom-update.service; do
+         rpi-eeprom-update.service systemd-firstboot.service userconfig.service; do
   ln -sf /dev/null "$MNT/etc/systemd/system/$u"
 done
+
+# qemu-user cannot emulate the new mount-API syscalls Trixie's systemd uses
+# for service sandboxing, so every namespaced unit (journald, logind, our
+# own hardened fooddesk.service) dies with status=226/NAMESPACE. CI-only:
+# switch the sandboxing knobs off for the emulated boot. The hardening is
+# systemd's contract, not what this test is after.
+mkdir -p "$MNT/etc/systemd/system/service.d"
+cat > "$MNT/etc/systemd/system/service.d/zz-ci-nspawn.conf" <<'EOF'
+[Service]
+PrivateTmp=no
+PrivateDevices=no
+PrivateMounts=no
+ProtectSystem=no
+ProtectHome=no
+ProtectControlGroups=no
+ProtectKernelTunables=no
+ProtectKernelModules=no
+ProtectKernelLogs=no
+ProtectClock=no
+ProtectHostname=no
+ProtectProc=default
+ProcSubset=all
+RestrictNamespaces=no
+RestrictRealtime=no
+LockPersonality=no
+MemoryDenyWriteExecute=no
+ReadWritePaths=
+ReadOnlyPaths=
+InaccessiblePaths=
+NoExecPaths=
+RestrictAddressFamilies=
+SystemCallFilter=
+SystemCallArchitectures=
+CapabilityBoundingSet=
+EOF
 
 say "canary: arm64 emulation works against the image rootfs"
 systemd-nspawn -q -D "$MNT" /usr/local/bin/node --version
