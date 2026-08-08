@@ -139,7 +139,6 @@ NoExecPaths=
 RestrictAddressFamilies=
 SystemCallFilter=
 SystemCallArchitectures=
-CapabilityBoundingSet=
 EOF
 
 say "canary: arm64 emulation works against the image rootfs"

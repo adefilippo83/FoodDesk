@@ -97,7 +97,7 @@ fi
 set -a; . "$ENV_FILE"; set +a
 ADMIN_NOTE='(unchanged)'
 if [ "$FIRST_RUN" = yes ] && [ -z "$ADMIN_PASSWORD" ]; then
-  ADMIN_PASSWORD="$(tr -dc 'a-z0-9' < /dev/urandom | head -c 12)"
+  ADMIN_PASSWORD="$(tr -dc 'a-z0-9' 2>/dev/null < /dev/urandom | head -c 12)"
 fi
 if [ -n "$ADMIN_PASSWORD" ]; then
   runuser -u fooddesk -- env "DATABASE_FILE=$DATABASE_FILE" \
