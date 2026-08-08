@@ -30,11 +30,13 @@ say() { echo; echo "### $*"; }
 run_in() { systemd-run --machine="$M" --wait --pipe --quiet "$@"; }
 
 dump_diagnostics() {
-  say "DIAGNOSTICS (last journal lines from the container)"
-  run_in journalctl --no-pager -n 50 -u fooddesk-provision.service 2>/dev/null || true
-  run_in journalctl --no-pager -n 30 -u fooddesk.service 2>/dev/null || true
-  run_in systemctl --no-pager --failed 2>/dev/null || true
-  tail -n 30 "$WORK/nspawn.log" 2>/dev/null || true
+  say "DIAGNOSTICS"
+  run_in systemctl status --no-pager fooddesk-provision.service fooddesk.service 2>/dev/null || true
+  run_in systemctl list-jobs --no-pager 2>/dev/null || true
+  run_in systemctl --no-pager --failed 2>/dev/null | grep -v 'run-u' || true
+  run_in journalctl -b --no-pager -n 80 2>/dev/null || true
+  say "console tail"
+  tail -n 60 "$WORK/nspawn.log" 2>/dev/null || true
 }
 trap dump_diagnostics ERR
 
@@ -86,6 +88,20 @@ cp "$IMG_SRC" "$IMG"
 LOOP="$(losetup -fP --show "$IMG")"
 mount "${LOOP}p2" "$MNT"
 mount "${LOOP}p1" "$MNT/boot/firmware"
+
+say "neutralize hardware-specific units for the container boot"
+# The disposable copy (never the shipped image) gets the standard
+# foreign-image-under-nspawn treatment: no PARTUUID fstab mounts, no
+# Raspberry zram/swap plumbing, no cloud-init, no EEPROM checks — none of
+# which exist inside a container and all of which otherwise fail loudly.
+: > "$MNT/etc/fstab"
+mkdir -p "$MNT/etc/cloud" && touch "$MNT/etc/cloud/cloud-init.disabled"
+for u in systemd-remount-fs.service swap.target \
+         rpi-resize-swap-file.service 'rpi-setup-loop@var-swap.service' \
+         'systemd-zram-setup@zram0.service' dev-zram0.swap \
+         rpi-eeprom-update.service; do
+  ln -sf /dev/null "$MNT/etc/systemd/system/$u"
+done
 
 say "canary: arm64 emulation works against the image rootfs"
 systemd-nspawn -q -D "$MNT" /usr/local/bin/node --version
