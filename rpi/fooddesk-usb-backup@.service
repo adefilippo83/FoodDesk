@@ -1,0 +1,7 @@
+[Unit]
+Description=FoodDesk USB backup attach (%i)
+# Instantiated by udev (99-fooddesk-usb-backup.rules) per USB partition.
+
+[Service]
+Type=oneshot
+ExecStart=/opt/fooddesk/rpi/usb-backup.sh attach %i

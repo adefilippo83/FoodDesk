@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm'
-import type { FastifyInstance } from 'fastify'
+import type { FastifyInstance, FastifyReply } from 'fastify'
 import type { Db } from '../db/index.js'
 import { users } from '../db/schema.js'
 import { hashPassword, verifyPassword } from '../auth/password.js'
@@ -20,6 +20,15 @@ const DUMMY_HASH = await hashPassword('timing-equalizer')
 
 export function authRoutes(db: Db) {
   return async function register(app: FastifyInstance) {
+    const setSessionCookie = (reply: FastifyReply, sid: string) =>
+      reply.setCookie(SESSION_COOKIE, sid, {
+        path: '/',
+        httpOnly: true,
+        sameSite: 'lax',
+        maxAge: SESSION_TTL_SECONDS,
+        // Venue LAN is plain http; flip on when served over TLS.
+        secure: process.env.COOKIE_SECURE === 'true',
+      })
     // Generous for a venue full of phones (each has its own LAN IP behind
     // nginx), tight enough that one machine cannot hammer scrypt.
     app.post(
@@ -59,15 +68,43 @@ export function authRoutes(db: Db) {
       req.log.info({ event: 'login_ok', userId: row.id, username, ip: req.ip }, 'audit')
 
       const sid = await createSession(db, row.id)
-      reply.setCookie(SESSION_COOKIE, sid, {
-        path: '/',
-        httpOnly: true,
-        sameSite: 'lax',
-        maxAge: SESSION_TTL_SECONDS,
-        // Venue LAN is plain http; flip on when served over TLS.
-        secure: process.env.COOKIE_SECURE === 'true',
-      })
+      setSessionCookie(reply, sid)
       return { id: row.id, username: row.username, displayName: row.displayName, role: row.role }
+    })
+
+    /**
+     * Kiosk auto-login for an appliance's attached kitchen display.
+     * Three independent gates, all server-side:
+     *  - disabled unless KIOSK_AUTOLOGIN_USER is set (never on by default)
+     *  - only for requests arriving directly on loopback: the kiosk browser
+     *    talks to :3000 without nginx, so a legitimate request never carries
+     *    X-Forwarded-For — anything proxied (i.e. any LAN client) does
+     *  - only an active kitchen-role account may be configured; the kiosk
+     *    can reach exactly the kitchen display, nothing more
+     * GET on purpose: it is a browser bootstrap URL, and CSRF is moot on an
+     * endpoint the network can never reach.
+     */
+    app.get('/api/auth/kiosk', async (req, reply) => {
+      const username = process.env.KIOSK_AUTOLOGIN_USER
+      if (!username) return reply.code(404).send({ error: 'not_found' })
+
+      const loopback =
+        req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1'
+      if (!loopback || req.headers['x-forwarded-for'] !== undefined) {
+        req.log.warn({ event: 'kiosk_denied', ip: req.ip }, 'audit')
+        return reply.code(403).send({ error: 'forbidden' })
+      }
+
+      const row = (await db.select().from(users).where(eq(users.username, username)).limit(1))[0]
+      if (!row || !row.active || row.role !== 'kitchen') {
+        req.log.warn({ event: 'kiosk_user_invalid', username }, 'audit')
+        return reply.code(403).send({ error: 'kiosk_user_invalid' })
+      }
+
+      req.log.info({ event: 'kiosk_login', userId: row.id, username }, 'audit')
+      const sid = await createSession(db, row.id)
+      setSessionCookie(reply, sid)
+      return reply.redirect('/kitchen')
     })
 
     app.post('/api/auth/logout', async (req, reply) => {
