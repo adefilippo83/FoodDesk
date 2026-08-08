@@ -31,6 +31,12 @@ NODE_TARBALL=$(curl -fsSL https://nodejs.org/dist/latest-v24.x/ \
 curl -fsSL "https://nodejs.org/dist/latest-v24.x/$NODE_TARBALL" \
   | tar -xJ -C /usr/local --strip-components=1
 node -v
+# systemd ExecStart= paths and sudo's secure_path don't include
+# /usr/local/bin — the service unit and the provisioning sudo calls need
+# node reachable at /usr/bin.
+ln -sf /usr/local/bin/node /usr/bin/node
+ln -sf /usr/local/bin/npm /usr/bin/npm
+ln -sf /usr/local/bin/npx /usr/bin/npx
 
 echo "== app install to $APP =="
 id fooddesk >/dev/null 2>&1 \
@@ -62,6 +68,21 @@ cp "$SRC/rpi/fooddesk-usb-backup@.service" /etc/systemd/system/
 cp "$SRC/rpi/fooddesk-usb-backup.service" /etc/systemd/system/
 cp "$SRC/rpi/fooddesk-usb-backup.timer" /etc/systemd/system/
 cp "$SRC/rpi/fooddesk-kiosk.service" /etc/systemd/system/
+# On a true first boot (empty machine-id) systemd runs preset-all, and the
+# Debian default preset enables everything — which would switch the kiosk
+# on for every device. Declare our policy explicitly.
+mkdir -p /etc/systemd/system-preset
+cat > /etc/systemd/system-preset/50-fooddesk.preset <<'EOF'
+enable fooddesk.service
+enable fooddesk-provision.service
+enable fooddesk-backup.timer
+enable fooddesk-usb-backup.timer
+disable fooddesk-kiosk.service
+disable fooddesk-backup.service
+disable fooddesk-usb-backup.service
+disable fooddesk-usb-backup@.service
+disable fooddesk-printer-setup.service
+EOF
 systemctl enable fooddesk.service fooddesk-backup.timer fooddesk-provision.service \
   fooddesk-usb-backup.timer cups ssh
 
@@ -194,6 +215,7 @@ test -f "$APP/server/dist/db/seed.js"
 test -f "$APP/server/dist/db/migrate.js"
 test -f "$APP/server/public/index.html"
 test -d "$APP/server/drizzle"
+test -x /usr/bin/node
 node -e "import('better-sqlite3').then(() => console.log('better-sqlite3: arm64 module loads'))"
 node -e "import('$APP/server/dist/app.js').then(() => console.log('server bundle: imports cleanly'))"
 node "$APP/rpi/leaflet.mjs" --ssid smoke --password smoketest --out /tmp/leaflet-smoke.pdf

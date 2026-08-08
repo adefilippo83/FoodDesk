@@ -31,7 +31,7 @@ run_in() { systemd-run --machine="$M" --wait --pipe --quiet "$@"; }
 
 dump_diagnostics() {
   say "DIAGNOSTICS"
-  run_in systemctl status --no-pager fooddesk-provision.service fooddesk.service 2>/dev/null || true
+  run_in systemctl status --no-pager fooddesk-provision.service fooddesk.service nginx.service 2>/dev/null || true
   run_in systemctl list-jobs --no-pager 2>/dev/null || true
   run_in systemctl --no-pager --failed 2>/dev/null | grep -v 'run-u' || true
   run_in journalctl -b --no-pager -n 80 2>/dev/null || true
