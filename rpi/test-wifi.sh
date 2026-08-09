@@ -92,7 +92,13 @@ join_and_verify() { # ssid, psk, label
   echo "AP active with DHCP/DNS: ok"
 
   say "host client joins '$ssid' over the air"
-  [ -n "$WPA_PID" ] && kill "$WPA_PID" 2>/dev/null || true
+  # Fully retire any previous supplicant first — starting the new one while
+  # the old deinitializes nl80211 on the same interface wedges association.
+  if [ -n "$WPA_PID" ]; then
+    kill "$WPA_PID" 2>/dev/null || true
+    for i in $(seq 1 10); do kill -0 "$WPA_PID" 2>/dev/null || break; sleep 1; done
+    WPA_PID=''
+  fi
   ip addr flush dev "$CLIENT_IF" 2>/dev/null || true
   local conf="$WORK/wpa-$label.conf"
   # ctrl_interface is what wpa_cli talks to — wpa_passphrase alone omits it.
@@ -161,6 +167,10 @@ echo "AP phy: $AP_PHY — client interface: $CLIENT_IF"
 # Keep any host network daemon's hands off the client radio.
 command -v nmcli >/dev/null && nmcli device set "$CLIENT_IF" managed no 2>/dev/null || true
 rfkill unblock wifi 2>/dev/null || true
+# Match the appliance's regulatory domain: provisioning sets country IT and
+# NM may pick channel 13, which a world-regdom client can scan but must not
+# transmit on (no-IR) — association would silently never start.
+iw reg set IT 2>/dev/null || true
 
 say "prepare and boot the image"
 prepare_image_copy "$IMG_SRC"
