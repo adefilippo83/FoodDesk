@@ -74,6 +74,17 @@ boot_machine() {
   NSPAWN_PID=$!
 }
 
+wait_http() { # url, timeout-iterations (x4s) — a service can be "active"
+  # seconds before node has migrated and bound the port under emulation.
+  local url="$1" tries="${2:-30}"
+  for i in $(seq 1 "$tries"); do
+    if run_in curl -fsS -o /dev/null "$url" 2>/dev/null; then return 0; fi
+    sleep 4
+  done
+  echo "timeout waiting for $url"
+  return 1
+}
+
 wait_active() { # unit, timeout-iterations (x5s)
   local unit="$1" tries="${2:-60}"
   for i in $(seq 1 "$tries"); do
@@ -154,6 +165,7 @@ wait_active fooddesk-provision.service 90
 wait_active fooddesk.service 30
 
 say "app health + services"
+wait_http http://127.0.0.1:3000/api/health
 run_in curl -fsS http://127.0.0.1:3000/api/health | grep -q '"ok":true'
 echo "health: ok"
 run_in systemctl is-active --quiet fooddesk-backup.timer
@@ -174,6 +186,7 @@ echo "leaflet: ok"
 
 say "nginx serves the app and answers connectivity probes"
 wait_active nginx.service 30
+wait_http http://127.0.0.1/generate_204
 CODE="$(run_in curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1/generate_204)"
 [ "$CODE" = 204 ] || { echo "generate_204 returned $CODE"; false; }
 run_in curl -s -H 'Host: captive.apple.com' http://127.0.0.1/hotspot-detect.html | grep -q Success
@@ -191,6 +204,7 @@ say "BOOT 2 — config change is re-applied, admin password survives"
 boot_machine
 wait_active fooddesk-provision.service 90
 wait_active fooddesk.service 30
+wait_http http://127.0.0.1:3000/api/health
 grep -q '^RESTAURANT_NAME=CI Sagra$' "$MNT/etc/fooddesk/env"
 echo "restaurant name applied: ok"
 grep -q 'CISagra' "$INFO" && grep -q 'App password:  *(unchanged)' "$INFO"
