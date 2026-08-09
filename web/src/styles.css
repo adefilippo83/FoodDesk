@@ -292,12 +292,18 @@ label.field span {
 .order-layout {
   display: grid;
   gap: 16px;
-  grid-template-columns: 1fr;
+  /* minmax(0,…): a plain 1fr track refuses to shrink below the category
+     tab row's full width on iOS WebKit, making the whole page pannable. */
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.order-layout > * {
+  min-width: 0;
 }
 
 @media (min-width: 900px) {
   .order-layout {
-    grid-template-columns: 1fr 340px;
+    grid-template-columns: minmax(0, 1fr) 340px;
     align-items: start;
   }
 
@@ -343,6 +349,14 @@ label.field span {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 10px;
+}
+
+/* Phones: one product per row, full width — only the category tabs scroll
+   sideways. Same look on the waiter page and the customer /order page. */
+@media (max-width: 700px) {
+  .product-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .product-btn {
@@ -556,61 +570,17 @@ tr.cancelled td .badge {
   text-decoration: none;
 }
 
+/* An online payment still in flight: on screen for awareness, visually
+   parked — no actions until the money is confirmed. */
+tr.held td {
+  opacity: 0.55;
+}
+
 /* ---------- phones ---------- */
 
-/* New order: fixed summary bar so total and send stay under the thumb while
-   the cart itself lives below the menu. Hidden on desktop (sticky cart). */
-.mobile-orderbar {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
-  background: var(--surface);
-  border-top: 1px solid var(--border);
-  z-index: 40;
-}
-
-.mobile-orderbar-summary {
-  flex: 1;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  min-height: var(--tap);
-  padding: 0 14px;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  background: var(--surface-2);
-  font-weight: 700;
-  font-size: 16px;
-  cursor: pointer;
-  touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.mobile-orderbar-summary .amount {
-  color: var(--accent);
-  font-variant-numeric: tabular-nums;
-}
-
-@media (min-width: 900px) {
-  .mobile-orderbar {
-    display: none;
-  }
-}
-
-@media (max-width: 899.98px) {
-  /* Keep the cart's send button clear of the fixed bar. */
-  .order-layout {
-    padding-bottom: 84px;
-  }
-}
-
 @media (max-width: 700px) {
-  /* Topbar: one compact row, nav on its own swipeable line. */
+  /* Topbar: one compact row; the nav wraps onto extra lines so every
+     entry stays on screen — nothing scrolls off the right edge. */
   .topbar {
     flex-wrap: wrap;
     gap: 8px;
@@ -621,15 +591,7 @@ tr.cancelled td .badge {
   .nav {
     order: 10;
     width: 100%;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    scrollbar-width: none;
-    margin: 0 -12px;
-    padding: 0 12px;
-  }
-
-  .nav::-webkit-scrollbar {
-    display: none;
+    flex-wrap: wrap;
   }
 
   .nav a {

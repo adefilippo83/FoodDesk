@@ -48,11 +48,22 @@ export default function CustomerOrder() {
   const coverTotal = (data?.coverChargeCents ?? 0) * people
   const total = lines.reduce((sum, l) => sum + l.product.priceCents * l.n, 0) + coverTotal
 
-  const add = (id: number, delta: number) =>
+  /** Tracked stock caps the add, with the same message the waiter sees. */
+  const add = (id: number, delta: number) => {
+    if (delta > 0 && data) {
+      const product = data.menu.flatMap((c) => c.products).find((p) => p.id === id)
+      const stock = product?.stockRemaining
+      if (stock !== null && stock !== undefined && (qty[id] ?? 0) >= stock) {
+        setError(t('stockLimit', { n: stock, name: product!.name }))
+        return
+      }
+      setError(null)
+    }
     setQty((q) => {
       const n = Math.max(0, Math.min(99, (q[id] ?? 0) + delta))
       return { ...q, [id]: n }
     })
+  }
 
   async function send() {
     if (!name.trim()) return setError(t('custNameRequired'))
@@ -86,6 +97,11 @@ export default function CustomerOrder() {
             ? t('errOutOfStock')
             : t('errSendOrder'),
       )
+      // The menu changed under the customer's feet: refresh the caps and
+      // drop products that just sold out.
+      if (err instanceof ApiError && (err.code === 'out_of_stock' || err.code === 'products_unavailable')) {
+        api.publicMenu().then(setData).catch(() => {})
+      }
     } finally {
       setSending(false)
     }

@@ -5,8 +5,9 @@ import { LangToggle, useI18n } from '../i18n'
 
 /**
  * The customer's live order page: big pickup number, item ticks, and the
- * one question that matters — is it ready yet? Polls every 5 seconds; the
- * public surface deliberately has no SSE.
+ * one question that matters — is it ready yet? SSE pushes changes the
+ * moment they happen; polling stays as the safety net, fast only while a
+ * payment still needs verifying on each fetch.
  */
 export default function CustomerStatus() {
   const { t } = useI18n()
@@ -14,9 +15,18 @@ export default function CustomerStatus() {
   const [order, setOrder] = useState<PublicOrderStatus | null>(null)
   const [missing, setMissing] = useState(false)
 
+  // Verification of a pending payment happens on each status fetch, so the
+  // page keeps polling fast until the money question is settled; after that
+  // SSE carries the updates and the poll is only a slow safety net.
+  const pendingPayment = order?.paymentState === 'pending'
   useEffect(() => {
     if (!token) return
+    const es = new EventSource(`/api/public/orders/${token}/events`)
     const timer: { id?: ReturnType<typeof setInterval> } = {}
+    const stop = () => {
+      es.close()
+      if (timer.id) clearInterval(timer.id)
+    }
     const load = () =>
       api
         .publicOrderStatus(token)
@@ -24,13 +34,14 @@ export default function CustomerStatus() {
         .catch((err) => {
           if (err instanceof ApiError && err.status === 404) {
             setMissing(true)
-            if (timer.id) clearInterval(timer.id)
+            stop()
           }
         })
     void load()
-    timer.id = setInterval(() => void load(), 5000)
-    return () => clearInterval(timer.id)
-  }, [token])
+    es.addEventListener('orders', () => void load())
+    timer.id = setInterval(() => void load(), pendingPayment ? 5000 : 30000)
+    return stop
+  }, [token, pendingPayment])
 
   if (missing) {
     return (

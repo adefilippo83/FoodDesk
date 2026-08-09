@@ -114,7 +114,9 @@ export function authRoutes(db: Db) {
       return { ok: true }
     })
 
-    app.get('/api/auth/me', { preHandler: requireAuth }, async (req) => {
+    // logLevel warn: every logged-out page load probes this route and gets
+    // a 401 — routine, not worth two log lines per visitor.
+    app.get('/api/auth/me', { preHandler: requireAuth, logLevel: 'warn' }, async (req) => {
       const u = req.user!
       return { id: u.id, username: u.username, displayName: u.displayName, role: u.role }
     })

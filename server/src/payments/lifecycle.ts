@@ -92,6 +92,7 @@ export async function expireHeldOrder(db: Db, order: Order, log?: FastifyBaseLog
     { event: 'held_order_expired', orderId: order.id, dailyNumber: order.dailyNumber },
     'audit',
   )
+  notifyOrdersChanged()
 }
 
 /**

@@ -30,6 +30,7 @@ const URL = 'http://10.42.0.1/'
 
 const wifiQr = await QRCode.toBuffer(wifiPayload, { width: 480, margin: 1 })
 const urlQr = await QRCode.toBuffer(URL, { width: 480, margin: 1 })
+const orderQr = await QRCode.toBuffer(`${URL}order`, { width: 480, margin: 1 })
 
 const A4 = [595.28, 841.89]
 const doc = new PDFDocument({ size: A4, margins: { top: 60, bottom: 60, left: 60, right: 60 } })
@@ -53,12 +54,12 @@ doc
 doc.fillColor('#000')
 
 const section = (n, it, en, qr, caption) => {
-  doc.moveDown(1.2)
-  doc.font('Helvetica-Bold').fontSize(18).text(`${n}. ${it}`, { align: 'center' })
+  doc.moveDown(0.9)
+  doc.font('Helvetica-Bold').fontSize(17).text(`${n}. ${it}`, { align: 'center' })
   doc.font('Helvetica').fontSize(12).fillColor('#444').text(en, { align: 'center' })
   doc.fillColor('#000')
   doc.moveDown(0.5)
-  const size = 170
+  const size = 120
   doc.image(qr, (W - size) / 2, doc.y, { width: size })
   doc.y += size + 8
   doc.font('Helvetica-Bold').fontSize(13).text(caption, 60, doc.y, { width: inner, align: 'center' })
@@ -71,9 +72,11 @@ section(
   wifiQr,
   `${ssid}  ·  password: ${password}`,
 )
-section(2, 'Apri FoodDesk', 'Open FoodDesk', urlQr, URL)
+// Customers first: they only ever need /order. Staff open the app root.
+section(2, 'Ordina dal tuo telefono', 'Order from your phone', orderQr, `${URL}order`)
+section(3, 'Staff: apri FoodDesk', 'Staff: open FoodDesk', urlQr, URL)
 
-doc.moveDown(1.4)
+doc.moveDown(0.8)
 doc
   .font('Helvetica')
   .fontSize(10)

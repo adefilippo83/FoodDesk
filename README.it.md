@@ -10,10 +10,11 @@
 **Il gestionale open source per sagre, feste di paese e ristoranti temporanei.**
 
 Un piccolo computer sul Wi-Fi della festa sostituisce i blocchetti di carta:
-i camerieri prendono le comande dal telefono, la cucina spunta i piatti su
-un tablet, i ticket si stampano da soli e a fine serata i conti sono già
-fatti. Niente cloud, niente abbonamenti, niente commissioni per ordine — i
-dati restano sulla tua macchina.
+i camerieri prendono le comande dal telefono, i clienti inquadrano un QR e
+ordinano e pagano dal proprio, la cucina spunta i piatti su un tablet, i
+ticket si stampano da soli e a fine serata i conti sono già fatti. Niente
+cloud, niente abbonamenti, niente commissioni per ordine — i dati restano
+sulla tua macchina.
 
 *Prefer English? → [README.md](README.md)*
 
@@ -52,6 +53,13 @@ sotto il pollice, gli ordini sono numerati per giornata di servizio
 (`#042`) e un singhiozzo di rete non può mai creare un ordine doppio. Un
 piatto battuto per sbaglio si annulla da solo — totale e cucina si
 aggiornano di conseguenza.
+
+**📲 I clienti** — self-ordering opzionale: i clienti inquadrano un QR al
+tavolo (le Impostazioni stampano poster e cartoncini da tavolo), ordinano
+dal proprio telefono e pagano online — Stripe o PayPal — o alla cassa. La
+cucina vede l'ordine solo quando è pagato, il telefono mostra avanzamento
+in tempo reale e numero di ritiro, e annullare un ordine pagato lo rimborsa
+in automatico. I report dividono l'incasso tra cassa e provider.
 
 **🍳 La cucina** — un display su tablet che non richiede formazione: gli
 ordini nuovi compaiono nell'istante in cui vengono inviati (senza mai

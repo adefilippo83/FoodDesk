@@ -234,14 +234,24 @@ export default function Settings() {
           <span>{t('selfOrderingLabel')}</span>
         </label>
         {settings.customerOrdering && (
-          <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
-            {t('selfOrderingHint')} <code>{window.location.origin}/order</code>
-            <br />
-            {t('onlinePaymentsLabel')}{' '}
-            {(settings.paymentProviders ?? []).length > 0
-              ? (settings.paymentProviders ?? []).join(', ') + ' ✓'
-              : t('onlinePaymentsNone')}
-          </p>
+          <>
+            <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
+              {t('selfOrderingHint')} <code>{window.location.origin}/order</code>
+              <br />
+              {t('onlinePaymentsLabel')}{' '}
+              {(settings.paymentProviders ?? []).length > 0
+                ? (settings.paymentProviders ?? []).join(', ') + ' ✓'
+                : t('onlinePaymentsNone')}
+            </p>
+            <a
+              className="btn"
+              href="/api/settings/customer-qr.pdf"
+              target="_blank"
+              rel="noreferrer"
+            >
+              {t('printCustomerQr')}
+            </a>
+          </>
         )}
       </div>
 

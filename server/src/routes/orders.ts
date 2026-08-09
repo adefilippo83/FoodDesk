@@ -450,22 +450,16 @@ export function orderRoutes(db: Db, providers: ProviderRegistry) {
       const day = q.day && isServiceDay(q.day) ? q.day : serviceDayOf()
 
       const restrictToSelf = !isManager(req.user!) || q.mine === 'true'
-      // Held online-payment orders are not staff business until the money
-      // is confirmed; once expired (cancelled) they surface for the books.
-      const notHeld = or(
-        isNull(orders.paymentRef),
-        isNotNull(orders.paidAt),
-        isNotNull(orders.cancelledAt),
-      )
       // Operators see what they rang up plus customer self-orders (which
-      // have no author and are everyone's business at the counter).
+      // have no author and are everyone's business at the counter). Held
+      // online-payment orders appear too, flagged: staff see the payment
+      // in progress but the money is not counted until it is confirmed.
       const where = restrictToSelf
         ? and(
             eq(orders.serviceDay, day),
-            notHeld,
             or(eq(orders.createdBy, req.user!.id), isNull(orders.createdBy)),
           )
-        : and(eq(orders.serviceDay, day), notHeld)
+        : eq(orders.serviceDay, day)
 
       // Second join on users under an alias: who cancelled ≠ who created.
       const cancellers = alias(users, 'cancellers')
@@ -487,6 +481,7 @@ export function orderRoutes(db: Db, providers: ProviderRegistry) {
           origin: orders.origin,
           paidAt: orders.paidAt,
           paymentMethod: orders.paymentMethod,
+          paymentRef: orders.paymentRef,
           refundedAt: orders.refundedAt,
           createdByName: users.displayName,
         })
@@ -496,7 +491,15 @@ export function orderRoutes(db: Db, providers: ProviderRegistry) {
         .where(where)
         .orderBy(desc(orders.dailyNumber))
 
-      return { serviceDay: day, orders: rows }
+      // The provider reference stays server-side; the client only needs to
+      // know the order is still waiting for its money.
+      return {
+        serviceDay: day,
+        orders: rows.map(({ paymentRef, ...r }) => ({
+          ...r,
+          held: paymentRef !== null && r.paidAt === null && r.cancelledAt === null,
+        })),
+      }
     })
 
     app.get('/api/orders/:id', async (req, reply) => {

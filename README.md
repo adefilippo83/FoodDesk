@@ -10,10 +10,10 @@
 **The open-source ordering system for food festivals, pop-up restaurants and community kitchens.**
 
 One small computer on the venue Wi-Fi replaces the paper pads: waiters take
-orders on their phones, the kitchen ticks off dishes on a tablet, tickets
-print themselves, and at the end of the night the numbers are already added
-up. No cloud, no subscription, no per-order fees — your data stays on your
-own machine.
+orders on their phones, guests scan a QR to order and pay from theirs, the
+kitchen ticks off dishes on a tablet, tickets print themselves, and at the
+end of the night the numbers are already added up. No cloud, no
+subscription, no per-order fees — your data stays on your own machine.
 
 *Preferisci l'italiano? → [README.it.md](README.it.md)*
 
@@ -51,6 +51,13 @@ add kitchen notes, send. The total stays under your thumb, orders are
 numbered per service day (`#042`), and a network hiccup can never create a
 duplicate order. Fix a mis-tap by cancelling a single line — totals and the
 kitchen update themselves.
+
+**📲 The guests** — optional self-ordering: guests scan a QR at the table
+(Settings prints a poster and table cards), order from their own phone and
+pay online — Stripe or PayPal — or at the counter. The kitchen sees the
+order only once it is paid, the phone shows live progress and the pickup
+number, and cancelling a paid order refunds it automatically. Reports split
+the takings by cash drawer vs provider.
 
 **🍳 The kitchen** — a tablet display that needs no training: new orders
 appear the moment they are sent (server-sent events, no refreshing), each

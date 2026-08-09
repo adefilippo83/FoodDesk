@@ -34,6 +34,8 @@ export type OrderSummary = {
   origin: 'staff' | 'customer'
   paidAt: number | null
   paymentMethod: 'cash' | 'stripe' | 'paypal' | null
+  /** Online payment still in progress: listed for awareness, not money yet. */
+  held?: boolean
   /** Set when cancelling this order triggered an automatic refund. */
   refundedAt?: number | null
   /** On a cancel response: the automatic refund could not be executed. */
@@ -48,7 +50,11 @@ export type PublicMenu = {
   coverChargeCents: number
   /** 'counter' always; online providers when the venue configured them. */
   paymentMethods: string[]
-  menu: { id: number; name: string; products: { id: number; name: string; priceCents: number }[] }[]
+  menu: {
+    id: number
+    name: string
+    products: { id: number; name: string; priceCents: number; stockRemaining: number | null }[]
+  }[]
 }
 export type PublicOrderStatus = {
   dailyNumber: number

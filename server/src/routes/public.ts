@@ -3,7 +3,7 @@ import { and, count, eq, isNull } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 import type { Db } from '../db/index.js'
 import { categories, orderItems, orders, products } from '../db/schema.js'
-import { notifyOrdersChanged } from '../lib/events.js'
+import { notifyOrdersChanged, ordersBus } from '../lib/events.js'
 import { parseItems, placeOrder } from '../lib/placeOrder.js'
 import { serviceDayOf } from '../lib/serviceDay.js'
 import { expireHeldOrder, isHeld, verifyHeldOrder } from '../payments/lifecycle.js'
@@ -48,6 +48,7 @@ export function publicRoutes(db: Db, providers: ProviderRegistry) {
             productId: products.id,
             productName: products.name,
             priceCents: products.priceCents,
+            stockRemaining: products.stockRemaining,
             productSort: products.sortOrder,
           })
           .from(products)
@@ -60,7 +61,7 @@ export function publicRoutes(db: Db, providers: ProviderRegistry) {
         const menu: {
           id: number
           name: string
-          products: { id: number; name: string; priceCents: number }[]
+          products: { id: number; name: string; priceCents: number; stockRemaining: number | null }[]
         }[] = []
         for (const r of rows) {
           let cat = menu.find((c) => c.id === r.categoryId)
@@ -68,7 +69,12 @@ export function publicRoutes(db: Db, providers: ProviderRegistry) {
             cat = { id: r.categoryId, name: r.categoryName, products: [] }
             menu.push(cat)
           }
-          cat.products.push({ id: r.productId, name: r.productName, priceCents: r.priceCents })
+          cat.products.push({
+            id: r.productId,
+            name: r.productName,
+            priceCents: r.priceCents,
+            stockRemaining: r.stockRemaining,
+          })
         }
         return {
           restaurantName: s.restaurantName,
@@ -230,6 +236,49 @@ export function publicRoutes(db: Db, providers: ProviderRegistry) {
           publicToken: result.order.publicToken,
           dailyNumber: result.order.dailyNumber,
           totalCents: result.order.totalCents,
+        })
+      },
+    )
+
+    /**
+     * Live nudges for the status page: a bare "orders" ping whenever any
+     * order changes, so the phone refetches at once instead of leaning on
+     * its polling loop. Token-checked like the status route; the stream
+     * itself carries no order data.
+     */
+    app.get(
+      '/api/public/orders/:token/events',
+      { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } },
+      async (req, reply) => {
+        if (!(await enabled())) return reply.code(404).send({ error: 'not_found' })
+        const token = (req.params as { token: string }).token
+        if (!/^[A-Za-z0-9_-]{20,64}$/.test(token)) {
+          return reply.code(404).send({ error: 'not_found' })
+        }
+        const known = (
+          await db
+            .select({ id: orders.id })
+            .from(orders)
+            .where(eq(orders.publicToken, token))
+            .limit(1)
+        )[0]
+        if (!known) return reply.code(404).send({ error: 'not_found' })
+
+        reply.hijack()
+        const raw = reply.raw
+        raw.writeHead(200, {
+          'content-type': 'text/event-stream',
+          'cache-control': 'no-cache',
+          'x-accel-buffering': 'no',
+        })
+        raw.write('retry: 3000\n\n')
+        const onOrders = () => raw.write('event: orders\ndata: {}\n\n')
+        ordersBus.on('orders', onOrders)
+        const heartbeat = setInterval(() => raw.write(': keep-alive\n\n'), 25_000)
+        heartbeat.unref()
+        req.raw.on('close', () => {
+          clearInterval(heartbeat)
+          ordersBus.off('orders', onOrders)
         })
       },
     )

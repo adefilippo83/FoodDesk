@@ -1,9 +1,10 @@
 import type { FastifyInstance } from 'fastify'
-import { requireAdmin, requireAuth } from '../auth/acl.js'
+import { requireAdmin, requireAuth, requireManager } from '../auth/acl.js'
 import type { Db } from '../db/index.js'
 import { kitchenQueue } from '../print/service.js'
 import { kitchenFeatureEnabled } from './kitchen.js'
 import { renderKitchenTicket, renderOrderSheet, renderReceipt } from '../print/pdf.js'
+import { renderCustomerQr } from '../print/customerQr.js'
 import { createHash } from 'node:crypto'
 import { APP_VERSION, imageBuffer, loadSettings, saveSettings } from '../settings.js'
 import type { Order, OrderItem } from '../db/schema.js'
@@ -45,6 +46,23 @@ export function settingsRoutes(db: Db, providers: ProviderRegistry) {
         orderHeaderImageWidthPct: s.orderHeaderImageWidthPct,
         orderFooterImageWidthPct: s.orderFooterImageWidthPct,
       }
+    })
+
+    /**
+     * Printable QR sheet for customer self-ordering: an A4 poster plus four
+     * table cards. The encoded URL is derived from the Host the admin used,
+     * which is exactly the address customers on the same network need.
+     */
+    app.get('/api/settings/customer-qr.pdf', { preHandler: requireManager }, async (req, reply) => {
+      const s = await loadSettings(db)
+      const forwarded = String(req.headers['x-forwarded-proto'] ?? '').split(',')[0]!.trim()
+      const proto = forwarded || req.protocol
+      const orderUrl = `${proto}://${req.headers.host ?? 'localhost'}/order`
+      const pdf = await renderCustomerQr(orderUrl, s)
+      return reply
+        .header('content-type', 'application/pdf')
+        .header('content-disposition', 'inline; filename="fooddesk-customer-qr.pdf"')
+        .send(pdf)
     })
 
     /**

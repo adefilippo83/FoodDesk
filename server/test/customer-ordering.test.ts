@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { after, before, describe, it } from 'node:test'
+import type { AddressInfo } from 'node:net'
 import type { FastifyInstance } from 'fastify'
 import { login, makeTestApp, makeUser } from './helpers.js'
 
@@ -284,5 +285,77 @@ describe('customer self-ordering (phase A)', () => {
       }
     }
     assert.ok(limited, 'never hit the per-IP rate limit')
+  })
+
+  it('exposes the stock counter on the public menu so phones can cap adds', async () => {
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/products/${beerId}`,
+      headers: { cookie: adminCookie },
+      payload: { stockRemaining: 7 },
+    })
+    const res = await app.inject({ method: 'GET', url: '/api/public/menu' })
+    assert.equal(res.statusCode, 200)
+    const beer = res
+      .json()
+      .menu.flatMap((c: { products: { id: number; stockRemaining: number | null }[] }) => c.products)
+      .find((p: { id: number }) => p.id === beerId)
+    assert.equal(beer.stockRemaining, 7)
+    // Back to untracked so later tests keep their assumptions.
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/products/${beerId}`,
+      headers: { cookie: adminCookie },
+      payload: { stockRemaining: null },
+    })
+  })
+
+  it('rejects the status event stream for junk or unknown tokens', async () => {
+    const junk = await app.inject({ method: 'GET', url: '/api/public/orders/short/events' })
+    assert.equal(junk.statusCode, 404)
+    const unknown = await app.inject({
+      method: 'GET',
+      url: '/api/public/orders/AAAAAAAAAAAAAAAAAAAAAAAA/events',
+    })
+    assert.equal(unknown.statusCode, 404)
+  })
+
+  it('streams an orders ping to the status page when anything changes', async () => {
+    const created = await createOrder({
+      customerName: 'Streamer',
+      covers: 1,
+      items: [{ productId: beerId, qty: 1 }],
+    })
+    assert.equal(created.statusCode, 201)
+    const token = created.json().publicToken
+
+    await app.listen({ port: 0, host: '127.0.0.1' })
+    const port = (app.server.address() as AddressInfo).port
+    const controller = new AbortController()
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/api/public/orders/${token}/events`, {
+        signal: controller.signal,
+      })
+      assert.equal(res.status, 200)
+      assert.match(res.headers.get('content-type') ?? '', /text\/event-stream/)
+
+      const reader = res.body!.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      const trigger = createOrder({
+        customerName: 'Second',
+        covers: 1,
+        items: [{ productId: beerId, qty: 1 }],
+      })
+      while (!buffer.includes('event: orders')) {
+        const { value, done } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value)
+      }
+      await trigger
+      assert.ok(buffer.includes('event: orders'), `no orders event in: ${buffer}`)
+    } finally {
+      controller.abort()
+    }
   })
 })

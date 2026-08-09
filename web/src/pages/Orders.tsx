@@ -134,7 +134,9 @@ export default function Orders() {
 
   useOrdersEvents(() => void load())
 
-  const dayTotal = orders.reduce((sum, o) => sum + o.totalCents, 0)
+  // Held payments are provisional: on screen, but not in the day's money.
+  const settled = orders.filter((o) => !o.held)
+  const dayTotal = settled.reduce((sum, o) => sum + o.totalCents, 0)
 
   if (loading) return <div className="empty">{t('loading')}</div>
 
@@ -143,8 +145,8 @@ export default function Orders() {
       <div className="row" style={{ marginBottom: 16, alignItems: 'baseline' }}>
         <h1 style={{ margin: 0 }}>{t('ordersTitle')}</h1>
         <span className="muted" style={{ marginLeft: 'auto' }}>
-          {serviceDay} · {orders.length}{' '}
-          {orders.length === 1 ? t('orderSingular') : t('orderPlural')} · €{formatMoney(dayTotal)}
+          {serviceDay} · {settled.length}{' '}
+          {settled.length === 1 ? t('orderSingular') : t('orderPlural')} · €{formatMoney(dayTotal)}
         </span>
       </div>
 
@@ -174,7 +176,7 @@ export default function Orders() {
             </thead>
             <tbody>
               {orders.map((o) => (
-                <tr key={o.id} className={o.cancelledAt ? 'cancelled' : ''}>
+                <tr key={o.id} className={o.cancelledAt ? 'cancelled' : o.held ? 'held' : ''}>
                   <td data-label="#">
                     <strong>{String(o.dailyNumber).padStart(3, '0')}</strong>
                   </td>
@@ -212,17 +214,25 @@ export default function Orders() {
                         {t('readyBadge')}
                       </span>
                     )}
-                    {o.origin === 'customer' && o.paidAt === null && o.cancelledAt === null && (
-                      <span className="badge fail" style={{ marginLeft: 4 }}>
-                        {t('unpaidBadge')}
+                    {o.held ? (
+                      <span className="badge" style={{ marginLeft: 4 }}>
+                        {t('paymentInProgress')} · {o.paymentMethod === 'paypal' ? 'PayPal' : 'Stripe'}
                       </span>
+                    ) : (
+                      o.origin === 'customer' &&
+                      o.paidAt === null &&
+                      o.cancelledAt === null && (
+                        <span className="badge fail" style={{ marginLeft: 4 }}>
+                          {t('unpaidBadge')}
+                        </span>
+                      )
                     )}
                     {o.paymentMethod !== null &&
                       o.paymentMethod !== 'cash' &&
                       o.paidAt !== null &&
                       o.cancelledAt === null && (
                         <span className="badge ok" style={{ marginLeft: 4 }}>
-                          {t('prepaidBadge')}
+                          {o.paymentMethod === 'paypal' ? 'PayPal' : 'Stripe'} ✓
                         </span>
                       )}
                     {o.refundedAt != null && (
@@ -232,6 +242,8 @@ export default function Orders() {
                     )}
                   </td>
                   <td className="num">
+                    {o.held ? null : (
+                    <>
                     <button className="btn small" onClick={() => void api.order(o.id).then(setOpen)}>
                       {t('view')}
                     </button>{' '}
@@ -284,6 +296,8 @@ export default function Orders() {
                           {t('cancelOrder')}
                         </button>
                       )
+                    )}
+                    </>
                     )}
                   </td>
                 </tr>

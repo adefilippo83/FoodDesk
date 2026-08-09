@@ -140,13 +140,19 @@ describe('online payments (phase B, fake provider)', () => {
     assert.ok(paymentUrl.startsWith('https://pay.example/'))
     assert.equal(await stockOf(), before! - 1) // stock reserved while held
 
-    // Invisible to staff and kitchen while pending.
+    // Staff see the payment in progress, flagged held; the kitchen never
+    // sees it until the money is confirmed.
     const listed = await app.inject({
       method: 'GET',
       url: '/api/orders',
       headers: { cookie: adminCookie },
     })
-    assert.ok(!listed.json().orders.some((o: { customerName: string }) => o.customerName === 'Pia'))
+    const heldRow = listed
+      .json()
+      .orders.find((o: { customerName: string }) => o.customerName === 'Pia')
+    assert.ok(heldRow, 'held order should be listed for awareness')
+    assert.equal(heldRow.held, true)
+    assert.equal(heldRow.paymentRef, undefined, 'provider ref must stay server-side')
     const kds = await app.inject({
       method: 'GET',
       url: '/api/kitchen/orders',
@@ -176,6 +182,7 @@ describe('online payments (phase B, fake provider)', () => {
       .orders.find((o: { customerName: string }) => o.customerName === 'Pia')
     assert.ok(visible, 'paid order should be staff-visible')
     assert.equal(visible.paymentMethod, 'stripe')
+    assert.equal(visible.held, false)
     const kdsAfter = await app.inject({
       method: 'GET',
       url: '/api/kitchen/orders',
