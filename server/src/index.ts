@@ -1,8 +1,7 @@
-import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { buildApp } from './app.js'
-import { createDb } from './db/index.js'
+import { createDb, runMigrations } from './db/index.js'
 import { purgeExpiredSessions } from './auth/session.js'
 import { retryFailedPrints } from './print/service.js'
 import { sweepHeldOrders } from './payments/lifecycle.js'
@@ -17,9 +16,7 @@ const { db, sqlite } = createDb(DATABASE_FILE)
 
 // Migrations run at every boot: idempotent, and an update on the venue server
 // becomes a plain restart with no separate migrate step to forget.
-migrate(db, {
-  migrationsFolder: resolve(dirname(fileURLToPath(import.meta.url)), '../drizzle'),
-})
+runMigrations({ db, sqlite }, resolve(dirname(fileURLToPath(import.meta.url)), '../drizzle'))
 
 const app = await buildApp(db)
 
