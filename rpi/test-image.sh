@@ -39,6 +39,10 @@ dump_diagnostics() {
   # output is lost — replay provisioning interactively to capture it.
   say "provision.sh replay (stdout captured)"
   run_in bash /opt/fooddesk/rpi/provision.sh || true
+  say "nginx -t inside the container"
+  run_in /usr/sbin/nginx -t || true
+  run_in ls -la /etc/nginx/sites-enabled /var/log/nginx || true
+  run_in cat /proc/sys/net/ipv6/conf/all/disable_ipv6 || true
   say "console tail"
   tail -n 60 "$WORK/nspawn.log" 2>/dev/null || true
 }
@@ -148,7 +152,6 @@ say "BOOT 1 — pristine image, first provisioning"
 boot_machine
 wait_active fooddesk-provision.service 90
 wait_active fooddesk.service 30
-wait_active nginx.service 30
 
 say "app health + services"
 run_in curl -fsS http://127.0.0.1:3000/api/health | grep -q '"ok":true'
@@ -156,15 +159,6 @@ echo "health: ok"
 run_in systemctl is-active --quiet fooddesk-backup.timer
 run_in systemctl is-active --quiet fooddesk-usb-backup.timer
 echo "backup timers: active"
-
-say "nginx serves the app and answers connectivity probes"
-CODE="$(run_in curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1/generate_204)"
-[ "$CODE" = 204 ] || { echo "generate_204 returned $CODE"; false; }
-run_in curl -s -H 'Host: captive.apple.com' http://127.0.0.1/hotspot-detect.html | grep -q Success
-run_in curl -s -H 'Host: www.msftconnecttest.com' http://127.0.0.1/connecttest.txt \
-  | grep -q 'Microsoft Connect Test'
-run_in curl -fsS http://127.0.0.1/ | grep -qi '<!doctype html'
-echo "probes + SPA: ok"
 
 say "generated credentials work"
 INFO="$MNT/boot/firmware/fooddesk-info.txt"
@@ -177,6 +171,16 @@ run_in curl -fsS -X POST http://127.0.0.1:3000/api/auth/login \
 echo "login with generated password: ok"
 head -c 5 "$MNT/boot/firmware/fooddesk-leaflet.pdf" | grep -q '%PDF-'
 echo "leaflet: ok"
+
+say "nginx serves the app and answers connectivity probes"
+wait_active nginx.service 30
+CODE="$(run_in curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1/generate_204)"
+[ "$CODE" = 204 ] || { echo "generate_204 returned $CODE"; false; }
+run_in curl -s -H 'Host: captive.apple.com' http://127.0.0.1/hotspot-detect.html | grep -q Success
+run_in curl -s -H 'Host: www.msftconnecttest.com' http://127.0.0.1/connecttest.txt \
+  | grep -q 'Microsoft Connect Test'
+run_in curl -fsS http://127.0.0.1/ | grep -qi '<!doctype html'
+echo "probes + SPA: ok"
 
 say "power off and edit fooddesk.txt"
 stop_machine
