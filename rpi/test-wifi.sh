@@ -12,6 +12,10 @@
 #   over the air. Then reboot with a changed SSID+password and prove the
 #   phone must (and can) join the new network.
 #
+# Runs on the arm64 runner (ubuntu-24.04-arm): the image executes natively
+# — no qemu-user, under which NetworkManager aborts — and the x86 Azure
+# kernels ship no Wi-Fi stack at all (actions/runner-images#1480).
+#
 #   usage: sudo rpi/test-wifi.sh <image-file>
 set -Eeuo pipefail
 
@@ -118,11 +122,23 @@ join_and_verify() { # ssid, psk, label
   echo "app reachable through nginx over the air: ok"
 }
 
-say "install host dependencies (incl. wifi tooling and hwsim module)"
-install_host_deps "linux-modules-extra-$(uname -r)" iw wpasupplicant dnsutils isc-dhcp-client
+say "install host dependencies (wifi tooling)"
+install_host_deps iw wpasupplicant dnsutils isc-dhcp-client
 
 say "create two virtual radios"
-modprobe mac80211_hwsim radios=2
+echo "runner kernel: $(uname -r)"
+if ! modprobe mac80211_hwsim radios=2 2>/dev/null; then
+  # The module often lives in the kernel's modules-extra package.
+  apt-get install -y -qq "linux-modules-extra-$(uname -r)" >/dev/null 2>&1 || true
+  if ! modprobe mac80211_hwsim radios=2; then
+    echo "FATAL: kernel $(uname -r) does not provide mac80211_hwsim"
+    echo "-- wireless modules present:"
+    find "/lib/modules/$(uname -r)" \( -name '*80211*' -o -name '*hwsim*' \) 2>/dev/null | head
+    echo "-- kernel config:"
+    grep -iE 'HWSIM|^CONFIG_MAC80211=|^CONFIG_CFG80211=' "/boot/config-$(uname -r)" 2>/dev/null || true
+    exit 1
+  fi
+fi
 sleep 2
 iw dev
 # The AP phy must carry the interface named wlan0 (the profile pins it);
