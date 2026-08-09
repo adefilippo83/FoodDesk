@@ -223,6 +223,21 @@ export default function Settings() {
             }}
           />
         </label>
+
+        <label className="field" style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <input
+            type="checkbox"
+            checked={settings.customerOrdering}
+            onChange={(e) => void save({ customerOrdering: e.target.checked })}
+            style={{ width: 20, height: 20 }}
+          />
+          <span>{t('selfOrderingLabel')}</span>
+        </label>
+        {settings.customerOrdering && (
+          <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
+            {t('selfOrderingHint')} <code>{window.location.origin}/order</code>
+          </p>
+        )}
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>

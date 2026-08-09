@@ -66,7 +66,7 @@ function OrderCard({
             {age} min
             {order.covers > 0 ? ` · ${order.covers} ${t('covers').toLowerCase()}` : ''}
             {' · '}
-            {order.createdByName}
+            {order.createdByName ?? t('customerBadge')}
           </span>
         </div>
       </div>

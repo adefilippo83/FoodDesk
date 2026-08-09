@@ -33,6 +33,8 @@ export type CategoryStyle = (typeof CATEGORY_STYLES)[number]
 export type AppSettings = {
   restaurantName: string
   coverChargeCents: number
+  /** Customer self-ordering (phase A): the public /order flow. Default off. */
+  customerOrdering: boolean
   /** Receipt paper. The legacy shared key — order/kitchen fall back to it. */
   paperSize: PaperSize
   /** Order sheet (foglio ordine) paper — issue #34. */
@@ -64,6 +66,7 @@ export type AppSettings = {
 const DEFAULTS: AppSettings = {
   restaurantName: process.env.RESTAURANT_NAME ?? 'FoodDesk',
   coverChargeCents: 0,
+  customerOrdering: false,
   paperSize: 'roll80',
   orderPaperSize: 'roll80',
   kitchenPaperSize: 'roll80',
@@ -109,6 +112,8 @@ export async function loadSettings(db: Db): Promise<AppSettings> {
   if (name) s.restaurantName = name
   const cover = Number(map.get('coverChargeCents'))
   if (Number.isInteger(cover) && cover >= 0) s.coverChargeCents = cover
+  const selfOrder = map.get('customerOrdering')
+  if (selfOrder !== undefined) s.customerOrdering = selfOrder === 'on'
   const paper = map.get('paperSize')
   if (paper && (PAPER_SIZES as readonly string[]).includes(paper)) s.paperSize = paper as PaperSize
   // Installs that predate per-document sizes shared one paperSize for every
@@ -167,6 +172,12 @@ export async function saveSettings(
       return { field: 'coverChargeCents', error: 'invalid_amount' }
     }
     writes.push(['coverChargeCents', String(v)])
+  }
+  if (patch.customerOrdering !== undefined) {
+    if (typeof patch.customerOrdering !== 'boolean') {
+      return { field: 'customerOrdering', error: 'invalid_flag' }
+    }
+    writes.push(['customerOrdering', patch.customerOrdering ? 'on' : 'off'])
   }
   for (const key of ['paperSize', 'orderPaperSize', 'kitchenPaperSize'] as const) {
     if (patch[key] === undefined) continue

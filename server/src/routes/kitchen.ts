@@ -58,7 +58,7 @@ export function kitchenRoutes(db: Db) {
           createdByName: users.displayName,
         })
         .from(orders)
-        .innerJoin(users, eq(users.id, orders.createdBy))
+        .leftJoin(users, eq(users.id, orders.createdBy))
         .where(
           and(
             eq(orders.serviceDay, day),

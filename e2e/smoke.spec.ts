@@ -66,4 +66,34 @@ test('login → menu → order → kitchen display', async ({ page }) => {
   // ---- and the waiters' list now flags it ready ----
   await page.getByRole('link', { name: 'Orders' }).click()
   await expect(page.getByText('ready')).toBeVisible()
+
+  // ---- customer self-ordering: switch it on ----
+  await page.getByRole('link', { name: 'Settings' }).click()
+  // Controlled checkbox: the checked state lands only after the save
+  // round-trip, so click (not check) and wait for the hint to confirm.
+  const toggle = page.getByLabel(/Customer self-ordering/)
+  await expect(toggle).toBeVisible()
+  await toggle.click()
+  await expect(page.getByText(/Customers order at:/)).toBeVisible()
+  await expect(toggle).toBeChecked()
+
+  // ---- a customer (no login) orders from their phone ----
+  const customer = await page.context().newPage()
+  await customer.goto('/order')
+  await customer.getByRole('button', { name: /Beer/ }).click()
+  await customer.getByLabel(/Your name/).fill('Table 9')
+  await customer.getByRole('button', { name: /\+/ }).first().click() // 2 people
+  await customer.getByRole('button', { name: 'Send order' }).click()
+
+  // ---- the status page shows the pickup number, in preparation ----
+  await expect(customer.getByText('Your order number')).toBeVisible()
+  await expect(customer.getByText('002')).toBeVisible()
+  await expect(customer.getByText('In preparation')).toBeVisible()
+
+  // ---- staff sees it flagged as a customer order to pay, marks it paid ----
+  await page.getByRole('link', { name: 'Orders' }).click()
+  await expect(page.getByRole('cell', { name: /Table 9/ })).toBeVisible()
+  await expect(page.getByText('to pay')).toBeVisible()
+  await page.getByRole('button', { name: 'Mark paid' }).click()
+  await expect(page.getByText('to pay')).toHaveCount(0)
 })
