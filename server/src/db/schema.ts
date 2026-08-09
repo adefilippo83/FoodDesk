@@ -92,10 +92,15 @@ export const orders = sqliteTable(
     origin: text('origin', { enum: ['staff', 'customer'] }).notNull().default('staff'),
     // Customers track their order by this unguessable token, never by id.
     publicToken: text('public_token'),
-    // Payment: null = not (yet) paid. Phase A only knows cash-at-pickup;
-    // the method column already reserves room for the gateways of phase B.
+    // Payment: paidAt null = not (yet) paid. Online payments (phase B) set
+    // the method and provider reference at creation and hold the order out
+    // of the kitchen until the provider confirms; cash is set when marked
+    // paid at the counter. refundedAt records the automatic refund when a
+    // manager cancels an online-paid order.
     paidAt: integer('paid_at'),
     paymentMethod: text('payment_method', { enum: ['cash', 'stripe', 'paypal'] }),
+    paymentRef: text('payment_ref'),
+    refundedAt: integer('refunded_at'),
     createdBy: integer('created_by').references(() => users.id),
     createdAt: integer('created_at').notNull().default(sql`(unixepoch())`),
     // Print state: an order is never lost because a printer jammed.

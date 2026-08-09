@@ -1,4 +1,4 @@
-import { desc, eq, isNull, sql } from 'drizzle-orm'
+import { and, desc, eq, isNotNull, isNull, or, sql } from 'drizzle-orm'
 import PDFDocument from 'pdfkit'
 import type { FastifyInstance } from 'fastify'
 import { requireManager } from '../auth/acl.js'
@@ -50,7 +50,13 @@ async function loadDay(db: Db, day: string): Promise<{ orders: OrderRow[]; items
     })
     .from(orders)
     .innerJoin(users, eq(users.id, orders.createdBy))
-    .where(eq(orders.serviceDay, day))
+    .where(
+      and(
+        eq(orders.serviceDay, day),
+        // Held online-payment orders are not money (yet): out of the books.
+        or(isNull(orders.paymentRef), isNotNull(orders.paidAt), isNotNull(orders.cancelledAt)),
+      ),
+    )
     .orderBy(orders.dailyNumber)
 
   const itemRows = orderRows.length
@@ -65,7 +71,13 @@ async function loadDay(db: Db, day: string): Promise<{ orders: OrderRow[]; items
         })
         .from(orderItems)
         .innerJoin(orders, eq(orders.id, orderItems.orderId))
-        .where(eq(orders.serviceDay, day))
+        .where(
+      and(
+        eq(orders.serviceDay, day),
+        // Held online-payment orders are not money (yet): out of the books.
+        or(isNull(orders.paymentRef), isNotNull(orders.paidAt), isNotNull(orders.cancelledAt)),
+      ),
+    )
     : []
 
   return { orders: orderRows, items: itemRows }
@@ -251,7 +263,12 @@ export function reportRoutes(db: Db) {
           revenueCents: sql<number>`coalesce(sum(${orders.totalCents}), 0)`,
         })
         .from(orders)
-        .where(isNull(orders.cancelledAt))
+        .where(
+          and(
+            isNull(orders.cancelledAt),
+            or(isNull(orders.paymentRef), isNotNull(orders.paidAt)),
+          ),
+        )
         .groupBy(orders.serviceDay)
         .orderBy(desc(orders.serviceDay))
     })

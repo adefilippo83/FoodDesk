@@ -236,6 +236,11 @@ export default function Settings() {
         {settings.customerOrdering && (
           <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
             {t('selfOrderingHint')} <code>{window.location.origin}/order</code>
+            <br />
+            {t('onlinePaymentsLabel')}{' '}
+            {(settings.paymentProviders ?? []).length > 0
+              ? (settings.paymentProviders ?? []).join(', ') + ' ✓'
+              : t('onlinePaymentsNone')}
           </p>
         )}
       </div>

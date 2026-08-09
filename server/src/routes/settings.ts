@@ -8,7 +8,9 @@ import { createHash } from 'node:crypto'
 import { APP_VERSION, imageBuffer, loadSettings, saveSettings } from '../settings.js'
 import type { Order, OrderItem } from '../db/schema.js'
 
-export function settingsRoutes(db: Db) {
+import type { ProviderRegistry } from '../payments/provider.js'
+
+export function settingsRoutes(db: Db, providers: ProviderRegistry) {
   return async function register(app: FastifyInstance) {
     /** Cheap feature flags — the UI decides which doors to draw. */
     app.get('/api/features', { preHandler: requireAuth }, async () => ({
@@ -70,6 +72,8 @@ export function settingsRoutes(db: Db) {
     app.get('/api/settings', { preHandler: requireAdmin }, async () => ({
       ...(await loadSettings(db)),
       version: APP_VERSION,
+      // Read-only: which online payment providers the env configures.
+      paymentProviders: [...providers.keys()],
     }))
 
     // The one route allowed a large body: base64 logo/background uploads.
@@ -87,7 +91,7 @@ export function settingsRoutes(db: Db) {
           { event: 'settings_changed', by: req.user!.id, fields: Object.keys(body) },
           'audit',
         )
-        return { ...(await loadSettings(db)), version: APP_VERSION }
+        return { ...(await loadSettings(db)), version: APP_VERSION, paymentProviders: [...providers.keys()] }
       },
     )
 
@@ -116,6 +120,8 @@ export function settingsRoutes(db: Db) {
         publicToken: null,
         paidAt: null,
         paymentMethod: null,
+        paymentRef: null,
+        refundedAt: null,
         note: null,
         totalCents: 2 * 650 + 3 * 500 + 3 * s.coverChargeCents,
         createdBy: 0,

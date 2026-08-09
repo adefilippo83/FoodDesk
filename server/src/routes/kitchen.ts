@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, isNull, or } from 'drizzle-orm'
+import { and, asc, eq, gt, inArray, isNotNull, isNull, or } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 import { requireRole } from '../auth/acl.js'
 import type { Db } from '../db/index.js'
@@ -63,6 +63,10 @@ export function kitchenRoutes(db: Db) {
           and(
             eq(orders.serviceDay, day),
             or(isNull(orders.cancelledAt), gt(orders.cancelledAt, now - CANCELLED_VISIBLE_S)),
+            // Online-payment orders reach the kitchen only once paid — and an
+            // expired one (cancelled, never paid) must not flash ANNULLATO
+            // for a ticket the kitchen never saw.
+            or(isNull(orders.paymentRef), isNotNull(orders.paidAt)),
           ),
         )
         .orderBy(asc(orders.dailyNumber))

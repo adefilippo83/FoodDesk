@@ -153,6 +153,7 @@ npm test          # 105 test server; `npm run test:e2e` per lo smoke test browse
 | `PDF_LANG` | `it` | Lingua predefinita dei documenti (it/en/es/fr/pt) — Impostazioni sovrascrive |
 | `CURRENCY_SYMBOL` | `€` | Simbolo di valuta su scontrini e totali |
 | `SERVICE_DAY_CUTOFF_HOUR` | `5` | Gli ordini prima di quest'ora contano per la giornata precedente |
+| `STRIPE_SECRET_KEY` | non impostata | Abilita i pagamenti online con carta per gli ordini dei clienti (checkout Stripe). Resta nell'env, mai nel database o nei suoi backup |
 | `CUSTOMER_ORDER_CAP` | `30` | Massimo di ordini clienti aperti (non pagati) prima che i nuovi ricevano "locale al completo" |
 | `KIOSK_AUTOLOGIN_USER` | non impostata | Account cucina auto-connesso via `/api/auth/kiosk` — solo loopback, per un display kiosk collegato ([rpi/README.md](rpi/README.md)) |
 

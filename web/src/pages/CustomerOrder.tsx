@@ -16,6 +16,7 @@ export default function CustomerOrder() {
   const [activeCat, setActiveCat] = useState<number | null>(null)
   const [qty, setQty] = useState<Record<number, number>>({})
   const [people, setPeople] = useState(1)
+  const [payment, setPayment] = useState('counter')
   const [name, setName] = useState('')
   const [note, setNote] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -65,9 +66,16 @@ export default function CustomerOrder() {
         covers: people,
         note: note.trim() || undefined,
         clientKey: orderKeyRef.current,
+        payment,
         items: lines.map((l) => ({ productId: l.product.id, qty: l.n })),
       })
       rememberMyOrder(res.publicToken, res.dailyNumber)
+      if (res.paymentUrl) {
+        // Off to the provider's hosted checkout; it sends the customer back
+        // to the status page, which verifies and releases the order.
+        window.location.assign(res.paymentUrl)
+        return
+      }
       navigate(`/o/${res.publicToken}`)
     } catch (err) {
       orderKeyRef.current = crypto.randomUUID() // fresh key for a changed retry
@@ -212,6 +220,32 @@ export default function CustomerOrder() {
             />
           </label>
 
+          {(data.paymentMethods ?? []).includes('stripe') && (
+            <div className="field">
+              <span style={{ display: 'block', marginBottom: 6 }}>{t('custPayHow')}</span>
+              <div className="row" style={{ gap: 16 }}>
+                <label className="row" style={{ gap: 6, alignItems: 'center' }}>
+                  <input
+                    type="radio"
+                    name="payment"
+                    checked={payment === 'counter'}
+                    onChange={() => setPayment('counter')}
+                  />
+                  <span>{t('custPayCounter')}</span>
+                </label>
+                <label className="row" style={{ gap: 6, alignItems: 'center' }}>
+                  <input
+                    type="radio"
+                    name="payment"
+                    checked={payment === 'stripe'}
+                    onChange={() => setPayment('stripe')}
+                  />
+                  <span>{t('custPayCard')}</span>
+                </label>
+              </div>
+            </div>
+          )}
+
           <div className="row" style={{ alignItems: 'center', marginTop: 8 }}>
             <strong style={{ fontSize: 18 }}>{t('total')}</strong>
             <strong style={{ marginLeft: 'auto', fontSize: 20 }}>€{formatMoney(total)}</strong>
@@ -226,7 +260,7 @@ export default function CustomerOrder() {
             {sending ? t('sending') : t('custSend')}
           </button>
           <p className="muted" style={{ fontSize: 13, marginTop: 8, textAlign: 'center' }}>
-            {t('custPayAtPickup')}
+            {payment === 'counter' ? t('custPayAtPickup') : t('custPayRedirectHint')}
           </p>
         </section>
       </main>

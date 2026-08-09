@@ -49,16 +49,23 @@ export default function CustomerStatus() {
   if (!order) return <div className="empty">{t('loading')}</div>
 
   const activeItems = order.items.filter((i) => i.cancelledAt === null)
-  const state = order.cancelledAt
-    ? 'cancelled'
-    : order.paidAt
-      ? 'collected'
-      : order.completedAt
-        ? 'ready'
-        : 'preparing'
+  // A payment that never completed reads as its own story, not a generic
+  // cancellation; otherwise the cooking progress drives the banner.
+  const paymentFailed = order.paymentState === 'failed'
+  const paymentPending = order.paymentState === 'pending'
+  const state = paymentFailed
+    ? 'failed'
+    : order.cancelledAt
+      ? 'cancelled'
+      : paymentPending
+        ? 'pending'
+        : order.completedAt
+          ? 'ready'
+          : 'preparing'
   const stateLabel = {
+    failed: t('custPaymentFailed'),
     cancelled: t('custStateCancelled'),
-    collected: t('custStateCollected'),
+    pending: t('custPaymentPending'),
     ready: t('custStateReady'),
     preparing: t('custStatePreparing'),
   }[state]
@@ -80,14 +87,32 @@ export default function CustomerStatus() {
             {String(order.dailyNumber).padStart(3, '0')}
           </div>
           <span
-            className={`badge ${state === 'cancelled' ? 'fail' : state === 'preparing' ? '' : 'ok'}`}
+            className={`badge ${
+              state === 'cancelled' || state === 'failed'
+                ? 'fail'
+                : state === 'ready'
+                  ? 'ok'
+                  : ''
+            }`}
             style={{ fontSize: 15, padding: '6px 14px' }}
           >
             {stateLabel}
           </span>
+          {order.paidAt !== null && !order.cancelledAt && (
+            <span className="badge ok" style={{ marginLeft: 6 }}>
+              {t('custPaidBadge')}
+            </span>
+          )}
           {state === 'ready' && (
             <p className="muted" style={{ marginBottom: 0 }}>
               {t('custComeCollect')}
+            </p>
+          )}
+          {state === 'pending' && order.paymentUrl && (
+            <p style={{ marginBottom: 0 }}>
+              <a className="btn primary" href={order.paymentUrl}>
+                {t('custPayNow')}
+              </a>
             </p>
           )}
         </div>
@@ -123,7 +148,7 @@ export default function CustomerStatus() {
             <strong style={{ flex: 1, fontSize: 18 }}>{t('total')}</strong>
             <strong style={{ fontSize: 18 }}>€{formatMoney(order.totalCents)}</strong>
           </div>
-          {!order.paidAt && !order.cancelledAt && (
+          {!order.paidAt && !order.cancelledAt && order.paymentState === 'none' && (
             <p className="muted" style={{ fontSize: 13, marginBottom: 0 }}>
               {t('custPayAtPickup')}
             </p>

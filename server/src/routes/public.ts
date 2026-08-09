@@ -6,15 +6,17 @@ import { categories, orderItems, orders, products } from '../db/schema.js'
 import { notifyOrdersChanged } from '../lib/events.js'
 import { parseItems, placeOrder } from '../lib/placeOrder.js'
 import { serviceDayOf } from '../lib/serviceDay.js'
+import { expireHeldOrder, isHeld, verifyHeldOrder } from '../payments/lifecycle.js'
+import type { OnlineMethod, ProviderRegistry } from '../payments/provider.js'
 import { printKitchenTicket } from '../print/service.js'
 import { loadSettings } from '../settings.js'
 
 /**
- * Customer self-ordering (phase A): the only unauthenticated surface of the
- * app, deliberately narrow — read the menu, place an order, follow your own
- * order by unguessable token. Everything is gated on the admin-controlled
- * customerOrdering setting (default off) and rate-limited per IP, since it
- * listens on an open venue Wi-Fi.
+ * Customer self-ordering (phase A) + online payments (phase B): the only
+ * unauthenticated surface of the app, deliberately narrow — read the menu,
+ * place an order, follow your own order by unguessable token. Everything is
+ * gated on the admin-controlled customerOrdering setting (default off) and
+ * rate-limited per IP, since it listens on an open venue Wi-Fi.
  */
 
 // How many customer orders may be open (not cancelled, unpaid) at once —
@@ -25,7 +27,7 @@ function orderCap(): number {
   return Number.isInteger(n) && n > 0 ? n : 30
 }
 
-export function publicRoutes(db: Db) {
+export function publicRoutes(db: Db, providers: ProviderRegistry) {
   return async function register(app: FastifyInstance) {
     /** 404 when the feature is off: the surface simply does not exist. */
     async function enabled(): Promise<boolean> {
@@ -72,6 +74,8 @@ export function publicRoutes(db: Db) {
         return {
           restaurantName: s.restaurantName,
           coverChargeCents: s.coverChargeCents,
+          // "counter" is always available; online methods when configured.
+          paymentMethods: ['counter', ...providers.keys()],
           menu,
         }
       },
@@ -97,6 +101,13 @@ export function publicRoutes(db: Db) {
         const covers = Number(body?.covers)
         if (!Number.isInteger(covers) || covers < 1 || covers > 99) {
           return reply.code(400).send({ error: 'invalid_covers' })
+        }
+
+        // counter (default) or a configured online provider.
+        const payment = typeof body?.payment === 'string' ? body.payment : 'counter'
+        const provider = payment === 'counter' ? null : providers.get(payment as OnlineMethod)
+        if (payment !== 'counter' && !provider) {
+          return reply.code(400).send({ error: 'payment_unavailable' })
         }
 
         const note =
@@ -139,6 +150,7 @@ export function publicRoutes(db: Db) {
           createdBy: null,
           origin: 'customer',
           publicToken: randomBytes(24).toString('base64url'),
+          paymentMethod: provider ? provider.method : null,
         })
         if (!result.ok) {
           if (result.code === 'unknown_products') {
@@ -150,25 +162,73 @@ export function publicRoutes(db: Db) {
           return reply.code(409).send({ error: 'out_of_stock', unavailable: result.ids })
         }
 
-        if (!result.replayed) {
-          req.log.info(
-            {
-              event: 'customer_order',
-              orderId: result.order.id,
-              dailyNumber: result.order.dailyNumber,
-              totalCents: result.order.totalCents,
-              ip: req.ip,
-            },
-            'audit',
-          )
-          printKitchenTicket(db, result.order).catch((err) =>
-            req.log.error(err, 'kitchen print crashed'),
-          )
-          notifyOrdersChanged()
+        // Replays: a held order replays with its resume URL; a released one
+        // replays like phase A.
+        if (result.replayed) {
+          let paymentUrl: string | null = null
+          if (isHeld(result.order) && provider) {
+            paymentUrl = await provider.resumeUrl(result.order.paymentRef!).catch(() => null)
+          }
+          return reply.code(200).send({
+            publicToken: result.order.publicToken,
+            dailyNumber: result.order.dailyNumber,
+            totalCents: result.order.totalCents,
+            ...(paymentUrl ? { paymentUrl } : {}),
+          })
         }
 
+        // Online payment: create the hosted checkout BEFORE the order is
+        // released. Held orders never print and never notify; if the
+        // provider cannot take the payment, roll the order back (restock)
+        // and let the customer fall back to paying at the counter.
+        if (provider) {
+          const returnUrl = `${req.protocol}://${req.headers.host}/o/${result.order.publicToken}`
+          try {
+            const payment = await provider.createPayment(result.order, returnUrl)
+            await db
+              .update(orders)
+              .set({ paymentRef: payment.ref })
+              .where(eq(orders.id, result.order.id))
+            req.log.info(
+              {
+                event: 'online_payment_started',
+                orderId: result.order.id,
+                method: provider.method,
+                ref: payment.ref,
+                totalCents: result.order.totalCents,
+              },
+              'audit',
+            )
+            return reply.code(201).send({
+              publicToken: result.order.publicToken,
+              dailyNumber: result.order.dailyNumber,
+              totalCents: result.order.totalCents,
+              paymentUrl: payment.redirectUrl,
+            })
+          } catch (err) {
+            req.log.warn({ err, orderId: result.order.id }, 'online payment unavailable')
+            await expireHeldOrder(db, result.order, req.log)
+            return reply.code(503).send({ error: 'payment_unavailable' })
+          }
+        }
+
+        req.log.info(
+          {
+            event: 'customer_order',
+            orderId: result.order.id,
+            dailyNumber: result.order.dailyNumber,
+            totalCents: result.order.totalCents,
+            ip: req.ip,
+          },
+          'audit',
+        )
+        printKitchenTicket(db, result.order).catch((err) =>
+          req.log.error(err, 'kitchen print crashed'),
+        )
+        notifyOrdersChanged()
+
         // Only what the customer needs — no internal ids.
-        return reply.code(result.replayed ? 200 : 201).send({
+        return reply.code(201).send({
           publicToken: result.order.publicToken,
           dailyNumber: result.order.dailyNumber,
           totalCents: result.order.totalCents,
@@ -187,10 +247,30 @@ export function publicRoutes(db: Db) {
         if (!/^[A-Za-z0-9_-]{20,64}$/.test(token)) {
           return reply.code(404).send({ error: 'not_found' })
         }
-        const order = (
+        let order = (
           await db.select().from(orders).where(eq(orders.publicToken, token)).limit(1)
         )[0]
         if (!order) return reply.code(404).send({ error: 'not_found' })
+
+        // The customer's own polling doubles as payment verification: their
+        // return from the hosted checkout lands here.
+        let paymentUrl: string | null = null
+        if (isHeld(order)) {
+          try {
+            const outcome = await verifyHeldOrder(db, providers, order, req.log)
+            order = (
+              await db.select().from(orders).where(eq(orders.id, order.id)).limit(1)
+            )[0]!
+            if (outcome === 'pending') {
+              const provider = providers.get(order.paymentMethod as OnlineMethod)
+              paymentUrl = provider
+                ? await provider.resumeUrl(order.paymentRef!).catch(() => null)
+                : null
+            }
+          } catch (err) {
+            req.log.warn({ err, orderId: order.id }, 'payment verify failed; still pending')
+          }
+        }
 
         const items = await db
           .select({
@@ -203,6 +283,14 @@ export function publicRoutes(db: Db) {
           .from(orderItems)
           .where(eq(orderItems.orderId, order.id))
 
+        const paymentState = order.paymentRef
+          ? order.paidAt
+            ? 'paid'
+            : order.cancelledAt
+              ? 'failed'
+              : 'pending'
+          : 'none'
+
         return {
           dailyNumber: order.dailyNumber,
           customerName: order.customerName,
@@ -213,6 +301,8 @@ export function publicRoutes(db: Db) {
           completedAt: order.completedAt,
           cancelledAt: order.cancelledAt,
           paidAt: order.paidAt,
+          paymentState,
+          ...(paymentUrl ? { paymentUrl } : {}),
           items,
         }
       },

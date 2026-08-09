@@ -86,8 +86,10 @@ export default function Orders() {
   async function cancelOrder(id: number) {
     setCancelling(true)
     try {
-      await api.cancelOrder(id)
-      setError(null)
+      const res = await api.cancelOrder(id)
+      // A cancelled online-paid order refunds automatically; if the refund
+      // call failed, the money needs a human — say so loudly.
+      setError(res.refundFailed ? t('errRefundFailed') : null)
     } catch {
       setError(t('errCancelOrder'))
     } finally {

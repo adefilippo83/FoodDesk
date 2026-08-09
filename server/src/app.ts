@@ -14,6 +14,7 @@ import { kitchenRoutes } from './routes/kitchen.js'
 import { menuRoutes } from './routes/menu.js'
 import { orderRoutes } from './routes/orders.js'
 import { publicRoutes } from './routes/public.js'
+import { providersFromEnv, type ProviderRegistry } from './payments/provider.js'
 import { reportRoutes } from './routes/reports.js'
 import { settingsRoutes } from './routes/settings.js'
 import { userRoutes } from './routes/users.js'
@@ -22,8 +23,14 @@ const PUBLIC_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../public')
 
 export async function buildApp(
   db: Db,
-  opts: { logger?: boolean; serveStatic?: boolean } = {},
+  opts: {
+    logger?: boolean
+    serveStatic?: boolean
+    /** Override for tests; defaults to what the env configures. */
+    paymentProviders?: ProviderRegistry
+  } = {},
 ): Promise<FastifyInstance> {
+  const providers = opts.paymentProviders ?? providersFromEnv()
   const app = Fastify({
     logger: opts.logger ?? true,
     // Orders and menu edits are tiny; the one route that legitimately carries
@@ -125,11 +132,11 @@ export async function buildApp(
   await app.register(authRoutes(db))
   await app.register(userRoutes(db))
   await app.register(menuRoutes(db))
-  await app.register(orderRoutes(db))
-  await app.register(publicRoutes(db))
+  await app.register(orderRoutes(db, providers))
+  await app.register(publicRoutes(db, providers))
   await app.register(kitchenRoutes(db))
   await app.register(reportRoutes(db))
-  await app.register(settingsRoutes(db))
+  await app.register(settingsRoutes(db, providers))
 
   // In production the built React app is served from the same origin as the
   // API, so waiters only ever need one address on the venue Wi-Fi.
