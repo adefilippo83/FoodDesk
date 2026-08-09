@@ -164,29 +164,23 @@ describe('customer self-ordering (phase A)', () => {
     assert.equal(status.json().paidAt, null)
     assert.equal(status.json().items.length, 1)
 
-    // The kitchen works the order — visible on the customer's phone.
-    const kds = await app.inject({
+    // Not paid yet → the kitchen must NOT see it: the register releases it.
+    let kds = await app.inject({
       method: 'GET',
       url: '/api/kitchen/orders',
       headers: { cookie: kitchenCookie },
     })
-    const kdsOrder = kds
-      .json()
-      .orders.find((o: { dailyNumber: number }) => o.dailyNumber === created.json().dailyNumber)
-    assert.ok(kdsOrder, 'customer order missing on the kitchen display')
-    assert.equal(kdsOrder.createdByName, null)
-    await app.inject({
-      method: 'PUT',
-      url: `/api/kitchen/items/${kdsOrder.items[0].id}`,
-      headers: { cookie: kitchenCookie },
-      payload: { done: true },
-    })
+    assert.ok(
+      !kds
+        .json()
+        .orders.some(
+          (o: { dailyNumber: number }) => o.dailyNumber === created.json().dailyNumber,
+        ),
+      'unpaid counter order must be invisible to the kitchen',
+    )
 
-    status = await app.inject({ method: 'GET', url: `/api/public/orders/${token}` })
-    assert.ok(status.json().items[0].doneAt !== null)
-    assert.ok(status.json().completedAt !== null)
-
-    // Any floor staff (not the creator — there is none) marks it paid.
+    // Any floor staff (not the creator — there is none) sees it and marks it
+    // paid at the counter — which is what sends it to the kitchen.
     const listed = await app.inject({
       method: 'GET',
       url: '/api/orders',
@@ -209,6 +203,27 @@ describe('customer self-ordering (phase A)', () => {
 
     status = await app.inject({ method: 'GET', url: `/api/public/orders/${token}` })
     assert.ok(status.json().paidAt !== null)
+
+    // Paid → on the kitchen display; the cook works it, the phone sees it.
+    kds = await app.inject({
+      method: 'GET',
+      url: '/api/kitchen/orders',
+      headers: { cookie: kitchenCookie },
+    })
+    const kdsOrder = kds
+      .json()
+      .orders.find((o: { dailyNumber: number }) => o.dailyNumber === created.json().dailyNumber)
+    assert.ok(kdsOrder, 'paid customer order missing on the kitchen display')
+    assert.equal(kdsOrder.createdByName, null)
+    await app.inject({
+      method: 'PUT',
+      url: `/api/kitchen/items/${kdsOrder.items[0].id}`,
+      headers: { cookie: kitchenCookie },
+      payload: { done: true },
+    })
+    status = await app.inject({ method: 'GET', url: `/api/public/orders/${token}` })
+    assert.ok(status.json().items[0].doneAt !== null)
+    assert.ok(status.json().completedAt !== null)
 
     // Idempotent second tap.
     const again = await app.inject({

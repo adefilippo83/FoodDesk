@@ -8,7 +8,6 @@ import { parseItems, placeOrder } from '../lib/placeOrder.js'
 import { serviceDayOf } from '../lib/serviceDay.js'
 import { expireHeldOrder, isHeld, verifyHeldOrder } from '../payments/lifecycle.js'
 import type { OnlineMethod, ProviderRegistry } from '../payments/provider.js'
-import { printKitchenTicket } from '../print/service.js'
 import { loadSettings } from '../settings.js'
 
 /**
@@ -222,9 +221,8 @@ export function publicRoutes(db: Db, providers: ProviderRegistry) {
           },
           'audit',
         )
-        printKitchenTicket(db, result.order).catch((err) =>
-          req.log.error(err, 'kitchen print crashed'),
-        )
+        // No kitchen ticket yet: a counter order starts cooking only when
+        // it is paid at the register (the mark-paid action prints it).
         notifyOrdersChanged()
 
         // Only what the customer needs — no internal ids.

@@ -53,19 +53,26 @@ export default function CustomerStatus() {
   // cancellation; otherwise the cooking progress drives the banner.
   const paymentFailed = order.paymentState === 'failed'
   const paymentPending = order.paymentState === 'pending'
+  // A counter order waits at the register: the kitchen starts only once
+  // it is paid, and the page must say so instead of "in preparation".
+  const awaitingCounter =
+    order.paymentState === 'none' && order.paidAt === null && order.cancelledAt === null
   const state = paymentFailed
     ? 'failed'
     : order.cancelledAt
       ? 'cancelled'
       : paymentPending
         ? 'pending'
-        : order.completedAt
-          ? 'ready'
-          : 'preparing'
+        : awaitingCounter
+          ? 'gopay'
+          : order.completedAt
+            ? 'ready'
+            : 'preparing'
   const stateLabel = {
     failed: t('custPaymentFailed'),
     cancelled: t('custStateCancelled'),
     pending: t('custPaymentPending'),
+    gopay: t('custGoPay'),
     ready: t('custStateReady'),
     preparing: t('custStatePreparing'),
   }[state]
@@ -108,6 +115,11 @@ export default function CustomerStatus() {
               {t('custComeCollect')}
             </p>
           )}
+          {state === 'gopay' && (
+            <p className="muted" style={{ marginBottom: 0 }}>
+              {t('custGoPayHint')}
+            </p>
+          )}
           {state === 'pending' && order.paymentUrl && (
             <p style={{ marginBottom: 0 }}>
               <a className="btn primary" href={order.paymentUrl}>
@@ -148,11 +160,7 @@ export default function CustomerStatus() {
             <strong style={{ flex: 1, fontSize: 18 }}>{t('total')}</strong>
             <strong style={{ fontSize: 18 }}>€{formatMoney(order.totalCents)}</strong>
           </div>
-          {!order.paidAt && !order.cancelledAt && order.paymentState === 'none' && (
-            <p className="muted" style={{ fontSize: 13, marginBottom: 0 }}>
-              {t('custPayAtPickup')}
-            </p>
-          )}
+
         </div>
 
         <div style={{ textAlign: 'center', marginTop: 16 }}>

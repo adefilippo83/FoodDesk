@@ -63,10 +63,11 @@ export function kitchenRoutes(db: Db) {
           and(
             eq(orders.serviceDay, day),
             or(isNull(orders.cancelledAt), gt(orders.cancelledAt, now - CANCELLED_VISIBLE_S)),
-            // Online-payment orders reach the kitchen only once paid — and an
-            // expired one (cancelled, never paid) must not flash ANNULLATO
-            // for a ticket the kitchen never saw.
-            or(isNull(orders.paymentRef), isNotNull(orders.paidAt)),
+            // Customer self-orders reach the kitchen only once PAID — card
+            // or counter alike; the kitchen cooks committed money, and an
+            // expired/never-paid one must not flash ANNULLATO for a ticket
+            // the kitchen never saw. Staff-taken orders are immediate.
+            or(eq(orders.origin, 'staff'), isNotNull(orders.paidAt)),
           ),
         )
         .orderBy(asc(orders.dailyNumber))

@@ -435,6 +435,11 @@ export function orderRoutes(db: Db, providers: ProviderRegistry) {
         { event: 'order_paid', by: req.user!.id, orderId: id, method: 'cash' },
         'audit',
       )
+      // Paying at the counter is what releases a customer order to the
+      // kitchen — the ticket prints now, not at creation.
+      if (updated.origin === 'customer') {
+        printKitchenTicket(db, updated).catch((err) => req.log.error(err, 'kitchen print crashed'))
+      }
       notifyOrdersChanged()
       return updated
     })

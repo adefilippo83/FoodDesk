@@ -85,15 +85,20 @@ test('login → menu → order → kitchen display', async ({ page }) => {
   await customer.getByRole('button', { name: /\+/ }).first().click() // 2 people
   await customer.getByRole('button', { name: 'Send order' }).click()
 
-  // ---- the status page shows the pickup number, in preparation ----
+  // ---- the status page: pickup number, waiting for counter payment ----
   await expect(customer.getByText('Your order number')).toBeVisible()
   await expect(customer.getByText('002')).toBeVisible()
-  await expect(customer.getByText('In preparation')).toBeVisible()
+  await expect(customer.getByText('Go to the counter and pay')).toBeVisible()
 
-  // ---- staff sees it flagged as a customer order to pay, marks it paid ----
+  // ---- staff sees it flagged to pay; paying releases it to the kitchen ----
   await page.getByRole('link', { name: 'Orders' }).click()
   await expect(page.getByRole('cell', { name: /Table 9/ })).toBeVisible()
   await expect(page.getByText('to pay')).toBeVisible()
   await page.getByRole('button', { name: 'Mark paid' }).click()
   await expect(page.getByText('to pay')).toHaveCount(0)
+
+  // ---- now (and only now) the kitchen has it, and the phone catches up ----
+  await page.getByRole('link', { name: 'Kitchen' }).click()
+  await expect(page.getByText('#002')).toBeVisible()
+  await expect(customer.getByText('In preparation')).toBeVisible({ timeout: 10_000 })
 })
