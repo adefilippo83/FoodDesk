@@ -53,6 +53,11 @@ dump_diagnostics() {
   iw dev 2>/dev/null || true
   [ -n "$CLIENT_IF" ] && wpa_cli -i "$CLIENT_IF" status 2>/dev/null || true
   [ -n "$CLIENT_IF" ] && ip -4 addr show "$CLIENT_IF" 2>/dev/null || true
+  say "what the client can see (scan)"
+  [ -n "$CLIENT_IF" ] && timeout 20 iw dev "$CLIENT_IF" scan 2>/dev/null \
+    | grep -E 'BSS|SSID|freq|signal' | head -20 || true
+  say "wpa_supplicant log"
+  tail -n 40 "$WORK"/wpa-*.log 2>/dev/null || true
   dmesg 2>/dev/null | grep -i hwsim | tail -10 || true
 }
 trap dump_diagnostics ERR
@@ -86,9 +91,11 @@ join_and_verify() { # ssid, psk, label
   dhclient -r "$CLIENT_IF" 2>/dev/null || true
   ip addr flush dev "$CLIENT_IF" 2>/dev/null || true
   local conf="$WORK/wpa-$label.conf"
-  wpa_passphrase "$ssid" "$psk" > "$conf"
+  # ctrl_interface is what wpa_cli talks to — wpa_passphrase alone omits it.
+  { echo "ctrl_interface=/var/run/wpa_supplicant"; wpa_passphrase "$ssid" "$psk"; } > "$conf"
   ip link set "$CLIENT_IF" up
-  wpa_supplicant -B -i "$CLIENT_IF" -c "$conf" -D nl80211 -P "$WORK/wpa.pid"
+  wpa_supplicant -B -i "$CLIENT_IF" -c "$conf" -D nl80211 -P "$WORK/wpa.pid" \
+    -t -f "$WORK/wpa-$label.log"
   WPA_PID="$(cat "$WORK/wpa.pid")"
   local joined=''
   for i in $(seq 1 30); do
