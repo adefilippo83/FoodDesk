@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { after, before, describe, it } from 'node:test'
+import type { AddressInfo } from 'node:net'
 import type { FastifyInstance } from 'fastify'
 import { login, makeTestApp, makeUser } from './helpers.js'
 
@@ -164,29 +165,23 @@ describe('customer self-ordering (phase A)', () => {
     assert.equal(status.json().paidAt, null)
     assert.equal(status.json().items.length, 1)
 
-    // The kitchen works the order — visible on the customer's phone.
-    const kds = await app.inject({
+    // Not paid yet → the kitchen must NOT see it: the register releases it.
+    let kds = await app.inject({
       method: 'GET',
       url: '/api/kitchen/orders',
       headers: { cookie: kitchenCookie },
     })
-    const kdsOrder = kds
-      .json()
-      .orders.find((o: { dailyNumber: number }) => o.dailyNumber === created.json().dailyNumber)
-    assert.ok(kdsOrder, 'customer order missing on the kitchen display')
-    assert.equal(kdsOrder.createdByName, null)
-    await app.inject({
-      method: 'PUT',
-      url: `/api/kitchen/items/${kdsOrder.items[0].id}`,
-      headers: { cookie: kitchenCookie },
-      payload: { done: true },
-    })
+    assert.ok(
+      !kds
+        .json()
+        .orders.some(
+          (o: { dailyNumber: number }) => o.dailyNumber === created.json().dailyNumber,
+        ),
+      'unpaid counter order must be invisible to the kitchen',
+    )
 
-    status = await app.inject({ method: 'GET', url: `/api/public/orders/${token}` })
-    assert.ok(status.json().items[0].doneAt !== null)
-    assert.ok(status.json().completedAt !== null)
-
-    // Any floor staff (not the creator — there is none) marks it paid.
+    // Any floor staff (not the creator — there is none) sees it and marks it
+    // paid at the counter — which is what sends it to the kitchen.
     const listed = await app.inject({
       method: 'GET',
       url: '/api/orders',
@@ -209,6 +204,27 @@ describe('customer self-ordering (phase A)', () => {
 
     status = await app.inject({ method: 'GET', url: `/api/public/orders/${token}` })
     assert.ok(status.json().paidAt !== null)
+
+    // Paid → on the kitchen display; the cook works it, the phone sees it.
+    kds = await app.inject({
+      method: 'GET',
+      url: '/api/kitchen/orders',
+      headers: { cookie: kitchenCookie },
+    })
+    const kdsOrder = kds
+      .json()
+      .orders.find((o: { dailyNumber: number }) => o.dailyNumber === created.json().dailyNumber)
+    assert.ok(kdsOrder, 'paid customer order missing on the kitchen display')
+    assert.equal(kdsOrder.createdByName, null)
+    await app.inject({
+      method: 'PUT',
+      url: `/api/kitchen/items/${kdsOrder.items[0].id}`,
+      headers: { cookie: kitchenCookie },
+      payload: { done: true },
+    })
+    status = await app.inject({ method: 'GET', url: `/api/public/orders/${token}` })
+    assert.ok(status.json().items[0].doneAt !== null)
+    assert.ok(status.json().completedAt !== null)
 
     // Idempotent second tap.
     const again = await app.inject({
@@ -269,5 +285,77 @@ describe('customer self-ordering (phase A)', () => {
       }
     }
     assert.ok(limited, 'never hit the per-IP rate limit')
+  })
+
+  it('exposes the stock counter on the public menu so phones can cap adds', async () => {
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/products/${beerId}`,
+      headers: { cookie: adminCookie },
+      payload: { stockRemaining: 7 },
+    })
+    const res = await app.inject({ method: 'GET', url: '/api/public/menu' })
+    assert.equal(res.statusCode, 200)
+    const beer = res
+      .json()
+      .menu.flatMap((c: { products: { id: number; stockRemaining: number | null }[] }) => c.products)
+      .find((p: { id: number }) => p.id === beerId)
+    assert.equal(beer.stockRemaining, 7)
+    // Back to untracked so later tests keep their assumptions.
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/products/${beerId}`,
+      headers: { cookie: adminCookie },
+      payload: { stockRemaining: null },
+    })
+  })
+
+  it('rejects the status event stream for junk or unknown tokens', async () => {
+    const junk = await app.inject({ method: 'GET', url: '/api/public/orders/short/events' })
+    assert.equal(junk.statusCode, 404)
+    const unknown = await app.inject({
+      method: 'GET',
+      url: '/api/public/orders/AAAAAAAAAAAAAAAAAAAAAAAA/events',
+    })
+    assert.equal(unknown.statusCode, 404)
+  })
+
+  it('streams an orders ping to the status page when anything changes', async () => {
+    const created = await createOrder({
+      customerName: 'Streamer',
+      covers: 1,
+      items: [{ productId: beerId, qty: 1 }],
+    })
+    assert.equal(created.statusCode, 201)
+    const token = created.json().publicToken
+
+    await app.listen({ port: 0, host: '127.0.0.1' })
+    const port = (app.server.address() as AddressInfo).port
+    const controller = new AbortController()
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/api/public/orders/${token}/events`, {
+        signal: controller.signal,
+      })
+      assert.equal(res.status, 200)
+      assert.match(res.headers.get('content-type') ?? '', /text\/event-stream/)
+
+      const reader = res.body!.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      const trigger = createOrder({
+        customerName: 'Second',
+        covers: 1,
+        items: [{ productId: beerId, qty: 1 }],
+      })
+      while (!buffer.includes('event: orders')) {
+        const { value, done } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value)
+      }
+      await trigger
+      assert.ok(buffer.includes('event: orders'), `no orders event in: ${buffer}`)
+    } finally {
+      controller.abort()
+    }
   })
 })

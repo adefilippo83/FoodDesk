@@ -7,22 +7,25 @@ export const en = {
   langName: 'English',
   title: 'FoodDesk — open-source ordering for food festivals',
   metaDescription:
-    'The open-source ordering system for food festivals, pop-up restaurants and community kitchens. Waiters order from their phones, the kitchen ticks off dishes on a tablet, tickets print themselves. No cloud, no fees.',
+    'The open-source ordering system for food festivals, pop-up restaurants and community kitchens. Waiters order from their phones, the kitchen ticks off dishes on a tablet, tickets print themselves. Guests can order and pay from their own phones. No cloud, no fees.',
   navFeatures: 'Features',
   navHow: 'How it works',
   navRun: 'Run it',
   heroTitle: 'The paper pads are gone. <em>The line moves faster.</em>',
   heroLede:
-    'FoodDesk is the open-source ordering system for food festivals, pop-up restaurants and community kitchens. Waiters take orders on their phones, the kitchen ticks off dishes on a tablet, tickets print themselves — and at the end of the night the numbers are already added up. No cloud, no subscription, no per-order fees.',
+    'FoodDesk is the open-source ordering system for food festivals, pop-up restaurants and community kitchens. Waiters take orders on their phones, guests scan a QR to order and pay from theirs, the kitchen ticks off dishes on a tablet, tickets print themselves — and at the end of the night the numbers are already added up. No cloud, no subscription, no per-order fees.',
   ctaDemo: 'Try the live demo',
   ctaRun: 'Run it yourself',
   demoCreds:
-    'Demo accounts: <code>mario</code> (waiter), <code>cucina</code> (kitchen), <code>admin</code> — password <code>fooddesk-demo</code>. Open it on two devices — send an order from one and watch it appear on the other instantly.',
+    'Demo accounts: <code>mario</code> (waiter), <code>cucina</code> (kitchen), <code>admin</code> — password <code>fooddesk-demo</code>. Open it on two devices — send an order from one and watch it appear on the other instantly. Or skip the login and <a href="https://fooddesk.fly.dev/order" rel="noreferrer">order as a guest</a>.',
   featuresTitle: 'Built for the whole crew',
   featuresLede: 'Every role gets exactly the screen it needs — and nothing it does not.',
   fWaitersT: 'Waiters',
   fWaitersP:
     'A phone-first PWA: tap products, count covers, add kitchen notes, send. Orders are numbered per service day, and a network hiccup can never create a duplicate order.',
+  fCustomersT: 'The guests',
+  fCustomersP:
+    'Guests scan a QR at the table, order from their own phone and pay online — Stripe or PayPal — or at the counter. The kitchen sees the order the moment it is paid, and the phone shows live progress and the pickup number.',
   fKitchenT: 'The kitchen',
   fKitchenP:
     'New orders appear the moment they are sent — no refreshing. Each dish is one big tap to mark done, and a cancelled order shouts CANCELLED instead of silently vanishing.',
@@ -84,22 +87,25 @@ export const it = {
   langName: 'Italiano',
   title: 'FoodDesk — il gestionale open source per sagre',
   metaDescription:
-    'Il gestionale open source per sagre, feste di paese e ristoranti temporanei. I camerieri ordinano dal telefono, la cucina spunta i piatti sul tablet, i ticket si stampano da soli. Niente cloud, niente commissioni.',
+    'Il gestionale open source per sagre, feste di paese e ristoranti temporanei. I camerieri ordinano dal telefono, la cucina spunta i piatti sul tablet, i ticket si stampano da soli. I clienti possono ordinare e pagare dal proprio telefono. Niente cloud, niente commissioni.',
   navFeatures: 'Funzioni',
   navHow: 'Come funziona',
   navRun: 'Installalo',
   heroTitle: 'Via i blocchetti di carta. <em>La fila scorre più veloce.</em>',
   heroLede:
-    'FoodDesk è il gestionale open source per sagre, feste di paese e ristoranti temporanei. I camerieri prendono le comande dal telefono, la cucina spunta i piatti su un tablet, i ticket si stampano da soli — e a fine serata i conti sono già fatti. Niente cloud, niente abbonamenti, niente commissioni per ordine.',
+    'FoodDesk è il gestionale open source per sagre, feste di paese e ristoranti temporanei. I camerieri prendono le comande dal telefono, i clienti inquadrano un QR e ordinano e pagano dal proprio, la cucina spunta i piatti su un tablet, i ticket si stampano da soli — e a fine serata i conti sono già fatti. Niente cloud, niente abbonamenti, niente commissioni per ordine.',
   ctaDemo: 'Prova la demo live',
   ctaRun: 'Installalo subito',
   demoCreds:
-    'Account demo: <code>mario</code> (cameriere), <code>cucina</code> (display cucina), <code>admin</code> — password <code>fooddesk-demo</code>. Aprila su due dispositivi: invia un ordine da uno e guardalo comparire all’istante sull’altro.',
+    'Account demo: <code>mario</code> (cameriere), <code>cucina</code> (display cucina), <code>admin</code> — password <code>fooddesk-demo</code>. Aprila su due dispositivi: invia un ordine da uno e guardalo comparire all’istante sull’altro. Oppure salta il login e <a href="https://fooddesk.fly.dev/order" rel="noreferrer">ordina come cliente</a>.',
   featuresTitle: 'Pensato per tutta la squadra',
   featuresLede: 'Ogni ruolo ha esattamente lo schermo che gli serve — e niente di più.',
   fWaitersT: 'I camerieri',
   fWaitersP:
     'Una PWA nata per il telefono: tocchi i prodotti, conti i coperti, aggiungi la nota per la cucina, invii. Gli ordini sono numerati per giornata di servizio e un singhiozzo di rete non può mai creare un doppione.',
+  fCustomersT: 'I clienti',
+  fCustomersP:
+    'I clienti inquadrano un QR al tavolo, ordinano dal proprio telefono e pagano online — Stripe o PayPal — o alla cassa. La cucina vede l’ordine appena è pagato, e il telefono mostra avanzamento in tempo reale e numero di ritiro.',
   fKitchenT: 'La cucina',
   fKitchenP:
     'Gli ordini nuovi compaiono nell’istante in cui vengono inviati, senza ricaricare. Ogni piatto si segna pronto con un solo tap, e un ordine annullato grida ANNULLATO invece di sparire in silenzio.',
@@ -161,22 +167,25 @@ export const es = {
   langName: 'Español',
   title: 'FoodDesk — comandas open source para fiestas gastronómicas',
   metaDescription:
-    'El sistema de comandas open source para fiestas gastronómicas, restaurantes pop-up y cocinas comunitarias. Los camareros piden desde el móvil, la cocina marca los platos en una tablet, los tickets se imprimen solos. Sin nube, sin comisiones.',
+    'El sistema de comandas open source para fiestas gastronómicas, restaurantes pop-up y cocinas comunitarias. Los camareros piden desde el móvil, la cocina marca los platos en una tablet, los tickets se imprimen solos. Los clientes pueden pedir y pagar desde su móvil. Sin nube, sin comisiones.',
   navFeatures: 'Funciones',
   navHow: 'Cómo funciona',
   navRun: 'Instálalo',
   heroTitle: 'Adiós a las libretas de papel. <em>La cola avanza más rápido.</em>',
   heroLede:
-    'FoodDesk es el sistema de comandas open source para fiestas gastronómicas, restaurantes pop-up y cocinas comunitarias. Los camareros toman los pedidos desde el móvil, la cocina marca los platos en una tablet, los tickets se imprimen solos — y al final de la noche las cuentas ya están hechas. Sin nube, sin suscripciones, sin comisiones por pedido.',
+    'FoodDesk es el sistema de comandas open source para fiestas gastronómicas, restaurantes pop-up y cocinas comunitarias. Los camareros toman los pedidos desde el móvil, los clientes escanean un QR para pedir y pagar desde el suyo, la cocina marca los platos en una tablet, los tickets se imprimen solos — y al final de la noche las cuentas ya están hechas. Sin nube, sin suscripciones, sin comisiones por pedido.',
   ctaDemo: 'Prueba la demo en vivo',
   ctaRun: 'Instálalo por tu cuenta',
   demoCreds:
-    'Cuentas de demo: <code>mario</code> (camarero), <code>cucina</code> (cocina), <code>admin</code> — contraseña <code>fooddesk-demo</code>. Ábrela en dos dispositivos: envía un pedido desde uno y míralo aparecer al instante en el otro.',
+    'Cuentas de demo: <code>mario</code> (camarero), <code>cucina</code> (cocina), <code>admin</code> — contraseña <code>fooddesk-demo</code>. Ábrela en dos dispositivos: envía un pedido desde uno y míralo aparecer al instante en el otro. O sáltate el login y <a href="https://fooddesk.fly.dev/order" rel="noreferrer">pide como cliente</a>.',
   featuresTitle: 'Pensado para todo el equipo',
   featuresLede: 'Cada rol tiene exactamente la pantalla que necesita — y nada más.',
   fWaitersT: 'Los camareros',
   fWaitersP:
     'Una PWA nacida para el móvil: tocas los productos, cuentas los cubiertos, añades la nota para cocina, envías. Los pedidos se numeran por jornada y un fallo de red nunca puede crear un duplicado.',
+  fCustomersT: 'Los clientes',
+  fCustomersP:
+    'Los clientes escanean un QR en la mesa, piden desde su propio móvil y pagan online — Stripe o PayPal — o en caja. La cocina ve el pedido en cuanto está pagado, y el móvil muestra el progreso en vivo y el número de recogida.',
   fKitchenT: 'La cocina',
   fKitchenP:
     'Los pedidos nuevos aparecen en el instante en que se envían, sin recargar. Cada plato se marca como listo con un solo toque, y un pedido anulado grita ANULADO en vez de desaparecer en silencio.',
@@ -238,22 +247,25 @@ export const fr = {
   langName: 'Français',
   title: 'FoodDesk — commandes open source pour fêtes et festivals',
   metaDescription:
-    'Le système de commandes open source pour fêtes de village, restaurants éphémères et cuisines associatives. Les serveurs commandent depuis leur téléphone, la cuisine coche les plats sur tablette, les tickets s’impriment tout seuls. Sans cloud, sans commission.',
+    'Le système de commandes open source pour fêtes de village, restaurants éphémères et cuisines associatives. Les serveurs commandent depuis leur téléphone, la cuisine coche les plats sur tablette, les tickets s’impriment tout seuls. Les clients peuvent commander et payer depuis leur téléphone. Sans cloud, sans commission.',
   navFeatures: 'Fonctions',
   navHow: 'Comment ça marche',
   navRun: 'Installer',
   heroTitle: 'Fini les carnets papier. <em>La file avance plus vite.</em>',
   heroLede:
-    'FoodDesk est le système de commandes open source pour fêtes de village, restaurants éphémères et cuisines associatives. Les serveurs prennent les commandes sur leur téléphone, la cuisine coche les plats sur une tablette, les tickets s’impriment tout seuls — et en fin de soirée les comptes sont déjà faits. Sans cloud, sans abonnement, sans commission par commande.',
+    'FoodDesk est le système de commandes open source pour fêtes de village, restaurants éphémères et cuisines associatives. Les serveurs prennent les commandes sur leur téléphone, les clients scannent un QR pour commander et payer depuis le leur, la cuisine coche les plats sur une tablette, les tickets s’impriment tout seuls — et en fin de soirée les comptes sont déjà faits. Sans cloud, sans abonnement, sans commission par commande.',
   ctaDemo: 'Essayer la démo en ligne',
   ctaRun: 'Installez-le vous-même',
   demoCreds:
-    'Comptes de démo : <code>mario</code> (serveur), <code>cucina</code> (cuisine), <code>admin</code> — mot de passe <code>fooddesk-demo</code>. Ouvrez-la sur deux appareils : envoyez une commande depuis l’un et regardez-la apparaître instantanément sur l’autre.',
+    'Comptes de démo : <code>mario</code> (serveur), <code>cucina</code> (cuisine), <code>admin</code> — mot de passe <code>fooddesk-demo</code>. Ouvrez-la sur deux appareils : envoyez une commande depuis l’un et regardez-la apparaître instantanément sur l’autre. Ou sautez le login et <a href="https://fooddesk.fly.dev/order" rel="noreferrer">commandez comme client</a>.',
   featuresTitle: 'Pensé pour toute l’équipe',
   featuresLede: 'Chaque rôle a exactement l’écran qu’il lui faut — et rien de plus.',
   fWaitersT: 'Les serveurs',
   fWaitersP:
     'Une PWA née pour le téléphone : on touche les produits, on compte les couverts, on ajoute la note cuisine, on envoie. Les commandes sont numérotées par journée de service et une coupure réseau ne peut jamais créer de doublon.',
+  fCustomersT: 'Les clients',
+  fCustomersP:
+    'Les clients scannent un QR à table, commandent depuis leur propre téléphone et paient en ligne — Stripe ou PayPal — ou au comptoir. La cuisine voit la commande dès qu’elle est payée, et le téléphone affiche la progression en direct et le numéro de retrait.',
   fKitchenT: 'La cuisine',
   fKitchenP:
     'Les nouvelles commandes apparaissent à l’instant où elles partent, sans recharger. Chaque plat se marque prêt d’un seul geste, et une commande annulée crie ANNULÉE au lieu de disparaître en silence.',
@@ -315,22 +327,25 @@ export const pt = {
   langName: 'Português',
   title: 'FoodDesk — pedidos open source para festas gastronómicas',
   metaDescription:
-    'O sistema de pedidos open source para festas gastronómicas, restaurantes pop-up e cozinhas comunitárias. Os empregados pedem pelo telemóvel, a cozinha marca os pratos num tablet, os talões imprimem-se sozinhos. Sem nuvem, sem comissões.',
+    'O sistema de pedidos open source para festas gastronómicas, restaurantes pop-up e cozinhas comunitárias. Os empregados pedem pelo telemóvel, a cozinha marca os pratos num tablet, os talões imprimem-se sozinhos. Os clientes podem pedir e pagar pelo telemóvel. Sem nuvem, sem comissões.',
   navFeatures: 'Funções',
   navHow: 'Como funciona',
   navRun: 'Instalar',
   heroTitle: 'Adeus aos blocos de papel. <em>A fila anda mais depressa.</em>',
   heroLede:
-    'O FoodDesk é o sistema de pedidos open source para festas gastronómicas, restaurantes pop-up e cozinhas comunitárias. Os empregados registam os pedidos no telemóvel, a cozinha marca os pratos num tablet, os talões imprimem-se sozinhos — e no fim da noite as contas já estão feitas. Sem nuvem, sem subscrições, sem comissões por pedido.',
+    'O FoodDesk é o sistema de pedidos open source para festas gastronómicas, restaurantes pop-up e cozinhas comunitárias. Os empregados registam os pedidos no telemóvel, os clientes fazem scan de um QR para pedir e pagar do deles, a cozinha marca os pratos num tablet, os talões imprimem-se sozinhos — e no fim da noite as contas já estão feitas. Sem nuvem, sem subscrições, sem comissões por pedido.',
   ctaDemo: 'Experimenta a demo ao vivo',
   ctaRun: 'Instala tu mesmo',
   demoCreds:
-    'Contas de demonstração: <code>mario</code> (empregado), <code>cucina</code> (cozinha), <code>admin</code> — palavra-passe <code>fooddesk-demo</code>. Abre em dois dispositivos: envia um pedido num deles e vê-o aparecer no outro no mesmo instante.',
+    'Contas de demonstração: <code>mario</code> (empregado), <code>cucina</code> (cozinha), <code>admin</code> — palavra-passe <code>fooddesk-demo</code>. Abre em dois dispositivos: envia um pedido num deles e vê-o aparecer no outro no mesmo instante. Ou salta o login e <a href="https://fooddesk.fly.dev/order" rel="noreferrer">pede como cliente</a>.',
   featuresTitle: 'Pensado para toda a equipa',
   featuresLede: 'Cada função tem exatamente o ecrã de que precisa — e nada mais.',
   fWaitersT: 'Os empregados',
   fWaitersP:
     'Uma PWA nascida para o telemóvel: tocas nos produtos, contas os couverts, acrescentas a nota para a cozinha, envias. Os pedidos são numerados por jornada e uma falha de rede nunca cria um duplicado.',
+  fCustomersT: 'Os clientes',
+  fCustomersP:
+    'Os clientes fazem scan de um QR na mesa, pedem do próprio telemóvel e pagam online — Stripe ou PayPal — ou ao balcão. A cozinha vê o pedido assim que está pago, e o telemóvel mostra o progresso ao vivo e o número de levantamento.',
   fKitchenT: 'A cozinha',
   fKitchenP:
     'Os pedidos novos aparecem no instante em que são enviados, sem recarregar. Cada prato marca-se como pronto com um só toque, e um pedido anulado grita ANULADO em vez de desaparecer em silêncio.',

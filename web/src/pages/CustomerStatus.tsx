@@ -5,8 +5,9 @@ import { LangToggle, useI18n } from '../i18n'
 
 /**
  * The customer's live order page: big pickup number, item ticks, and the
- * one question that matters — is it ready yet? Polls every 5 seconds; the
- * public surface deliberately has no SSE.
+ * one question that matters — is it ready yet? SSE pushes changes the
+ * moment they happen; polling stays as the safety net, fast only while a
+ * payment still needs verifying on each fetch.
  */
 export default function CustomerStatus() {
   const { t } = useI18n()
@@ -14,9 +15,18 @@ export default function CustomerStatus() {
   const [order, setOrder] = useState<PublicOrderStatus | null>(null)
   const [missing, setMissing] = useState(false)
 
+  // Verification of a pending payment happens on each status fetch, so the
+  // page keeps polling fast until the money question is settled; after that
+  // SSE carries the updates and the poll is only a slow safety net.
+  const pendingPayment = order?.paymentState === 'pending'
   useEffect(() => {
     if (!token) return
+    const es = new EventSource(`/api/public/orders/${token}/events`)
     const timer: { id?: ReturnType<typeof setInterval> } = {}
+    const stop = () => {
+      es.close()
+      if (timer.id) clearInterval(timer.id)
+    }
     const load = () =>
       api
         .publicOrderStatus(token)
@@ -24,13 +34,14 @@ export default function CustomerStatus() {
         .catch((err) => {
           if (err instanceof ApiError && err.status === 404) {
             setMissing(true)
-            if (timer.id) clearInterval(timer.id)
+            stop()
           }
         })
     void load()
-    timer.id = setInterval(() => void load(), 5000)
-    return () => clearInterval(timer.id)
-  }, [token])
+    es.addEventListener('orders', () => void load())
+    timer.id = setInterval(() => void load(), pendingPayment ? 5000 : 30000)
+    return stop
+  }, [token, pendingPayment])
 
   if (missing) {
     return (
@@ -49,16 +60,30 @@ export default function CustomerStatus() {
   if (!order) return <div className="empty">{t('loading')}</div>
 
   const activeItems = order.items.filter((i) => i.cancelledAt === null)
-  const state = order.cancelledAt
-    ? 'cancelled'
-    : order.paidAt
-      ? 'collected'
-      : order.completedAt
-        ? 'ready'
-        : 'preparing'
+  // A payment that never completed reads as its own story, not a generic
+  // cancellation; otherwise the cooking progress drives the banner.
+  const paymentFailed = order.paymentState === 'failed'
+  const paymentPending = order.paymentState === 'pending'
+  // A counter order waits at the register: the kitchen starts only once
+  // it is paid, and the page must say so instead of "in preparation".
+  const awaitingCounter =
+    order.paymentState === 'none' && order.paidAt === null && order.cancelledAt === null
+  const state = paymentFailed
+    ? 'failed'
+    : order.cancelledAt
+      ? 'cancelled'
+      : paymentPending
+        ? 'pending'
+        : awaitingCounter
+          ? 'gopay'
+          : order.completedAt
+            ? 'ready'
+            : 'preparing'
   const stateLabel = {
+    failed: t('custPaymentFailed'),
     cancelled: t('custStateCancelled'),
-    collected: t('custStateCollected'),
+    pending: t('custPaymentPending'),
+    gopay: t('custGoPay'),
     ready: t('custStateReady'),
     preparing: t('custStatePreparing'),
   }[state]
@@ -80,14 +105,37 @@ export default function CustomerStatus() {
             {String(order.dailyNumber).padStart(3, '0')}
           </div>
           <span
-            className={`badge ${state === 'cancelled' ? 'fail' : state === 'preparing' ? '' : 'ok'}`}
+            className={`badge ${
+              state === 'cancelled' || state === 'failed'
+                ? 'fail'
+                : state === 'ready'
+                  ? 'ok'
+                  : ''
+            }`}
             style={{ fontSize: 15, padding: '6px 14px' }}
           >
             {stateLabel}
           </span>
+          {order.paidAt !== null && !order.cancelledAt && (
+            <span className="badge ok" style={{ marginLeft: 6 }}>
+              {t('custPaidBadge')}
+            </span>
+          )}
           {state === 'ready' && (
             <p className="muted" style={{ marginBottom: 0 }}>
               {t('custComeCollect')}
+            </p>
+          )}
+          {state === 'gopay' && (
+            <p className="muted" style={{ marginBottom: 0 }}>
+              {t('custGoPayHint')}
+            </p>
+          )}
+          {state === 'pending' && order.paymentUrl && (
+            <p style={{ marginBottom: 0 }}>
+              <a className="btn primary" href={order.paymentUrl}>
+                {t('custPayNow')}
+              </a>
             </p>
           )}
         </div>
@@ -123,11 +171,7 @@ export default function CustomerStatus() {
             <strong style={{ flex: 1, fontSize: 18 }}>{t('total')}</strong>
             <strong style={{ fontSize: 18 }}>€{formatMoney(order.totalCents)}</strong>
           </div>
-          {!order.paidAt && !order.cancelledAt && (
-            <p className="muted" style={{ fontSize: 13, marginBottom: 0 }}>
-              {t('custPayAtPickup')}
-            </p>
-          )}
+
         </div>
 
         <div style={{ textAlign: 'center', marginTop: 16 }}>

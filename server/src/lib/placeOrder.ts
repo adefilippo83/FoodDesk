@@ -47,6 +47,8 @@ export type PlaceOrderInput = {
   createdBy: number | null
   origin: 'staff' | 'customer'
   publicToken: string | null
+  /** Online payments (phase B): stamped at creation, order held until paid. */
+  paymentMethod?: 'stripe' | 'paypal' | null
 }
 
 export type PlaceOrderResult =
@@ -135,6 +137,7 @@ export async function placeOrder(db: Db, input: PlaceOrderInput): Promise<PlaceO
           createdBy: input.createdBy,
           origin: input.origin,
           publicToken: input.publicToken,
+          paymentMethod: input.paymentMethod ?? null,
           clientKey: input.clientKey,
         })
         .returning()

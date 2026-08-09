@@ -34,6 +34,12 @@ export type OrderSummary = {
   origin: 'staff' | 'customer'
   paidAt: number | null
   paymentMethod: 'cash' | 'stripe' | 'paypal' | null
+  /** Online payment still in progress: listed for awareness, not money yet. */
+  held?: boolean
+  /** Set when cancelling this order triggered an automatic refund. */
+  refundedAt?: number | null
+  /** On a cancel response: the automatic refund could not be executed. */
+  refundFailed?: boolean
   printedAt: number | null
   printError: string | null
 }
@@ -42,7 +48,13 @@ export type OrderSummary = {
 export type PublicMenu = {
   restaurantName: string
   coverChargeCents: number
-  menu: { id: number; name: string; products: { id: number; name: string; priceCents: number }[] }[]
+  /** 'counter' always; online providers when the venue configured them. */
+  paymentMethods: string[]
+  menu: {
+    id: number
+    name: string
+    products: { id: number; name: string; priceCents: number; stockRemaining: number | null }[]
+  }[]
 }
 export type PublicOrderStatus = {
   dailyNumber: number
@@ -54,6 +66,9 @@ export type PublicOrderStatus = {
   completedAt: number | null
   cancelledAt: number | null
   paidAt: number | null
+  paymentState: 'none' | 'pending' | 'paid' | 'failed'
+  /** Present while an online payment is still completable. */
+  paymentUrl?: string
   items: {
     nameSnapshot: string
     priceCentsSnapshot: number
@@ -92,6 +107,7 @@ export type KitchenOrder = {
   cancelledAt: number | null
   completedAt: number | null
   createdByName: string | null
+  paymentMethod: 'cash' | 'stripe' | 'paypal' | null
   items: KitchenItem[]
 }
 
@@ -124,6 +140,8 @@ export type AppSettings = OrderSheetLayout & {
   restaurantName: string
   coverChargeCents: number
   customerOrdering: boolean
+  /** Read-only: online providers configured via env (e.g. ['stripe']). */
+  paymentProviders: string[]
   /** Receipt paper size. */
   paperSize: PaperSize
   /** Order sheet and kitchen ticket paper sizes — independent since #34/#35. */
@@ -158,6 +176,9 @@ export type DailyReport = {
   avgPerCoverCents: number | null
   byProduct: { name: string; qty: number; revenueCents: number }[]
   byCategory: { name: string; qty: number; revenueCents: number }[]
+  byPayment: { method: 'counter' | 'stripe' | 'paypal'; ordersCount: number; revenueCents: number }[]
+  refundedCount: number
+  refundedCents: number
 }
 
 export class ApiError extends Error {
@@ -241,9 +262,10 @@ export const api = {
     covers: number
     note?: string
     clientKey?: string
+    payment?: string
     items: { productId: number; qty: number }[]
   }) =>
-    request<{ publicToken: string; dailyNumber: number; totalCents: number }>(
+    request<{ publicToken: string; dailyNumber: number; totalCents: number; paymentUrl?: string }>(
       'POST',
       '/api/public/orders',
       input,

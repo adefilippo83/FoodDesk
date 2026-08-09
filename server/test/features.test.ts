@@ -354,7 +354,7 @@ describe('coperto, cancellation, settings, passwords, reorder', () => {
       headers: { cookie: adminCookie },
     })
     const row = csv.body.split('\r\n').find((l: string) => l.includes('Da annullare'))!
-    assert.ok(row.endsWith(';yes'), `cancelled flag missing: ${row}`)
+    assert.ok(row.endsWith(';yes;'), `cancelled flag missing: ${row}`)
   })
 
   // ---- password change ----

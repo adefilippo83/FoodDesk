@@ -86,8 +86,10 @@ export default function Orders() {
   async function cancelOrder(id: number) {
     setCancelling(true)
     try {
-      await api.cancelOrder(id)
-      setError(null)
+      const res = await api.cancelOrder(id)
+      // A cancelled online-paid order refunds automatically; if the refund
+      // call failed, the money needs a human — say so loudly.
+      setError(res.refundFailed ? t('errRefundFailed') : null)
     } catch {
       setError(t('errCancelOrder'))
     } finally {
@@ -132,7 +134,9 @@ export default function Orders() {
 
   useOrdersEvents(() => void load())
 
-  const dayTotal = orders.reduce((sum, o) => sum + o.totalCents, 0)
+  // Held payments are provisional: on screen, but not in the day's money.
+  const settled = orders.filter((o) => !o.held)
+  const dayTotal = settled.reduce((sum, o) => sum + o.totalCents, 0)
 
   if (loading) return <div className="empty">{t('loading')}</div>
 
@@ -141,8 +145,8 @@ export default function Orders() {
       <div className="row" style={{ marginBottom: 16, alignItems: 'baseline' }}>
         <h1 style={{ margin: 0 }}>{t('ordersTitle')}</h1>
         <span className="muted" style={{ marginLeft: 'auto' }}>
-          {serviceDay} · {orders.length}{' '}
-          {orders.length === 1 ? t('orderSingular') : t('orderPlural')} · €{formatMoney(dayTotal)}
+          {serviceDay} · {settled.length}{' '}
+          {settled.length === 1 ? t('orderSingular') : t('orderPlural')} · €{formatMoney(dayTotal)}
         </span>
       </div>
 
@@ -172,7 +176,7 @@ export default function Orders() {
             </thead>
             <tbody>
               {orders.map((o) => (
-                <tr key={o.id} className={o.cancelledAt ? 'cancelled' : ''}>
+                <tr key={o.id} className={o.cancelledAt ? 'cancelled' : o.held ? 'held' : ''}>
                   <td data-label="#">
                     <strong>{String(o.dailyNumber).padStart(3, '0')}</strong>
                   </td>
@@ -203,20 +207,43 @@ export default function Orders() {
                   <td data-label={t('total')} className="num">
                     €{formatMoney(o.totalCents)}
                   </td>
-                  <td data-label={t('colKitchen')} style={{ whiteSpace: 'nowrap' }}>
+                  <td data-label={t('colKitchen')}>
                     <PrintStatus order={o} />
                     {o.completedAt !== null && o.cancelledAt === null && (
                       <span className="badge ok" style={{ marginLeft: 4 }}>
                         {t('readyBadge')}
                       </span>
                     )}
-                    {o.origin === 'customer' && o.paidAt === null && o.cancelledAt === null && (
-                      <span className="badge fail" style={{ marginLeft: 4 }}>
-                        {t('unpaidBadge')}
+                    {o.held ? (
+                      <span className="badge" style={{ marginLeft: 4 }}>
+                        {t('paymentInProgress')} · {o.paymentMethod === 'paypal' ? 'PayPal' : 'Stripe'}
+                      </span>
+                    ) : (
+                      o.origin === 'customer' &&
+                      o.paidAt === null &&
+                      o.cancelledAt === null && (
+                        <span className="badge fail" style={{ marginLeft: 4 }}>
+                          {t('unpaidBadge')}
+                        </span>
+                      )
+                    )}
+                    {o.paymentMethod !== null &&
+                      o.paymentMethod !== 'cash' &&
+                      o.paidAt !== null &&
+                      o.cancelledAt === null && (
+                        <span className="badge ok" style={{ marginLeft: 4 }}>
+                          {o.paymentMethod === 'paypal' ? 'PayPal' : 'Stripe'} ✓
+                        </span>
+                      )}
+                    {o.refundedAt != null && (
+                      <span className="badge" style={{ marginLeft: 4 }}>
+                        {t('refundedBadge')}
                       </span>
                     )}
                   </td>
-                  <td className="num" style={{ whiteSpace: 'nowrap' }}>
+                  <td className="num">
+                    {o.held ? null : (
+                    <>
                     <button className="btn small" onClick={() => void api.order(o.id).then(setOpen)}>
                       {t('view')}
                     </button>{' '}
@@ -269,6 +296,8 @@ export default function Orders() {
                           {t('cancelOrder')}
                         </button>
                       )
+                    )}
+                    </>
                     )}
                   </td>
                 </tr>
@@ -330,7 +359,7 @@ export default function Orders() {
                         )}
                       </td>
                       <td className="num">€{formatMoney(i.priceCentsSnapshot * i.qty)}</td>
-                      <td className="num" style={{ whiteSpace: 'nowrap' }}>
+                      <td className="num">
                         {open.cancelledAt === null && i.cancelledAt === null && (
                           <>
                             {i.qty > 1 && (

@@ -8,6 +8,7 @@ describe('settings: per-document paper sizes and version', () => {
   let app: FastifyInstance
   let close: () => void
   let adminCookie: string
+  let operatorCookie: string
 
   async function getSettings() {
     const res = await app.inject({
@@ -33,7 +34,9 @@ describe('settings: per-document paper sizes and version', () => {
     app = t.app
     close = t.close
     await makeUser(t.db, 'admin', 'admin')
+    await makeUser(t.db, 'marco', 'operator')
     adminCookie = await login(app, 'admin')
+    operatorCookie = await login(app, 'marco')
   })
 
   after(() => {
@@ -107,4 +110,25 @@ describe('settings: per-document paper sizes and version', () => {
       assert.ok(res.rawPayload.subarray(0, 5).toString() === '%PDF-', 'missing PDF magic bytes')
     })
   }
+
+  it('serves the customer QR sheet as a PDF, deriving the URL from the Host', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/settings/customer-qr.pdf',
+      headers: { cookie: adminCookie, host: '10.42.0.1' },
+    })
+    assert.equal(res.statusCode, 200)
+    assert.equal(res.headers['content-type'], 'application/pdf')
+    assert.match(String(res.headers['content-disposition']), /fooddesk-customer-qr\.pdf/)
+    assert.equal(res.rawPayload.subarray(0, 5).toString(), '%PDF-')
+  })
+
+  it('keeps the customer QR sheet away from operators', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/settings/customer-qr.pdf',
+      headers: { cookie: operatorCookie },
+    })
+    assert.equal(res.statusCode, 403)
+  })
 })

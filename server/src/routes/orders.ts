@@ -7,11 +7,13 @@ import { orderItems, orders, products, users, type Order } from '../db/schema.js
 import { notifyOrdersChanged } from '../lib/events.js'
 import { isServiceDay, serviceDayOf } from '../lib/serviceDay.js'
 import { parseItems, placeOrder } from '../lib/placeOrder.js'
+import { isHeld } from '../payments/lifecycle.js'
+import type { OnlineMethod, ProviderRegistry } from '../payments/provider.js'
 import { renderKitchenTicket, renderOrderSheet, renderReceipt } from '../print/pdf.js'
 import { kitchenQueue, printKitchenTicket } from '../print/service.js'
 import { loadSettings } from '../settings.js'
 
-export function orderRoutes(db: Db) {
+export function orderRoutes(db: Db, providers: ProviderRegistry) {
   return async function register(app: FastifyInstance) {
     // Floor staff only: a kitchen account has no business creating or
     // browsing orders outside its display.
@@ -88,6 +90,8 @@ export function orderRoutes(db: Db) {
     ): Promise<Order | 'not_found' | 'forbidden'> {
       const order = (await db.select().from(orders).where(eq(orders.id, id)).limit(1))[0]
       if (!order) return 'not_found'
+      // A held online-payment order is not staff business (yet): invisible.
+      if (isHeld(order)) return 'not_found'
       // Customer orders have no author — the whole floor handles them.
       if (!isManager(user) && order.createdBy !== null && order.createdBy !== user.id) {
         return 'forbidden'
@@ -148,8 +152,30 @@ export function orderRoutes(db: Db) {
         },
         'audit',
       )
+
+      // Online-paid order cancelled by a manager: the customer gets their
+      // money back, automatically and in full.
+      let refundFailed = false
+      if (updated.paidAt && updated.paymentRef && updated.paymentMethod !== 'cash') {
+        const provider = providers.get(updated.paymentMethod as OnlineMethod)
+        try {
+          if (!provider) throw new Error(`no provider for ${updated.paymentMethod}`)
+          await provider.refund(updated.paymentRef)
+          await db
+            .update(orders)
+            .set({ refundedAt: Math.floor(Date.now() / 1000) })
+            .where(eq(orders.id, id))
+          req.log.info(
+            { event: 'order_refunded', orderId: id, totalCents: updated.totalCents },
+            'audit',
+          )
+        } catch (err) {
+          refundFailed = true
+          req.log.error({ err, orderId: id }, 'automatic refund FAILED — handle manually')
+        }
+      }
       notifyOrdersChanged()
-      return updated
+      return { ...updated, ...(refundFailed ? { refundFailed: true } : {}) }
     })
 
     /**
@@ -164,6 +190,11 @@ export function orderRoutes(db: Db) {
       if (order === 'not_found') return reply.code(404).send({ error: 'not_found' })
       if (order === 'forbidden') return reply.code(403).send({ error: 'forbidden' })
       if (order.cancelledAt) return reply.code(409).send({ error: 'order_cancelled' })
+      // No partial refunds in phase B: an online-paid order's lines and
+      // amounts are frozen; only a full cancel (with full refund) changes it.
+      if (order.paidAt && order.paymentMethod !== null && order.paymentMethod !== 'cash') {
+        return reply.code(409).send({ error: 'online_paid_locked' })
+      }
 
       const item = (
         await db.select().from(orderItems).where(eq(orderItems.id, itemId)).limit(1)
@@ -253,6 +284,11 @@ export function orderRoutes(db: Db) {
       if (order === 'not_found') return reply.code(404).send({ error: 'not_found' })
       if (order === 'forbidden') return reply.code(403).send({ error: 'forbidden' })
       if (order.cancelledAt) return reply.code(409).send({ error: 'order_cancelled' })
+      // No partial refunds in phase B: an online-paid order's lines and
+      // amounts are frozen; only a full cancel (with full refund) changes it.
+      if (order.paidAt && order.paymentMethod !== null && order.paymentMethod !== 'cash') {
+        return reply.code(409).send({ error: 'online_paid_locked' })
+      }
 
       const item = (
         await db.select().from(orderItems).where(eq(orderItems.id, itemId)).limit(1)
@@ -382,6 +418,11 @@ export function orderRoutes(db: Db) {
       if (order === 'forbidden') return reply.code(403).send({ error: 'forbidden' })
       if (order.cancelledAt) return reply.code(409).send({ error: 'order_cancelled' })
       if (order.paidAt) return { ...order } // idempotent
+      // An order routed through an online provider is paid online or not at
+      // all — the counter must not be able to bypass the payment flow.
+      if (order.paymentMethod !== null) {
+        return reply.code(409).send({ error: 'online_payment_pending' })
+      }
 
       const updated = (
         await db
@@ -394,6 +435,11 @@ export function orderRoutes(db: Db) {
         { event: 'order_paid', by: req.user!.id, orderId: id, method: 'cash' },
         'audit',
       )
+      // Paying at the counter is what releases a customer order to the
+      // kitchen — the ticket prints now, not at creation.
+      if (updated.origin === 'customer') {
+        printKitchenTicket(db, updated).catch((err) => req.log.error(err, 'kitchen print crashed'))
+      }
       notifyOrdersChanged()
       return updated
     })
@@ -405,7 +451,9 @@ export function orderRoutes(db: Db) {
 
       const restrictToSelf = !isManager(req.user!) || q.mine === 'true'
       // Operators see what they rang up plus customer self-orders (which
-      // have no author and are everyone's business at the counter).
+      // have no author and are everyone's business at the counter). Held
+      // online-payment orders appear too, flagged: staff see the payment
+      // in progress but the money is not counted until it is confirmed.
       const where = restrictToSelf
         ? and(
             eq(orders.serviceDay, day),
@@ -433,6 +481,8 @@ export function orderRoutes(db: Db) {
           origin: orders.origin,
           paidAt: orders.paidAt,
           paymentMethod: orders.paymentMethod,
+          paymentRef: orders.paymentRef,
+          refundedAt: orders.refundedAt,
           createdByName: users.displayName,
         })
         .from(orders)
@@ -441,7 +491,15 @@ export function orderRoutes(db: Db) {
         .where(where)
         .orderBy(desc(orders.dailyNumber))
 
-      return { serviceDay: day, orders: rows }
+      // The provider reference stays server-side; the client only needs to
+      // know the order is still waiting for its money.
+      return {
+        serviceDay: day,
+        orders: rows.map(({ paymentRef, ...r }) => ({
+          ...r,
+          held: paymentRef !== null && r.paidAt === null && r.cancelledAt === null,
+        })),
+      }
     })
 
     app.get('/api/orders/:id', async (req, reply) => {

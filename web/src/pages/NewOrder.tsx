@@ -155,7 +155,6 @@ export default function NewOrder() {
   const [toast, setToast] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const customerRef = useRef<HTMLInputElement>(null)
-  const cartRef = useRef<HTMLElement>(null)
   // One key per intended order, stable across retries of the same submit: if
   // the first attempt landed despite a network error, the retry replays it
   // server-side instead of creating a duplicate.
@@ -187,6 +186,11 @@ export default function NewOrder() {
   const total = useMemo(
     () => lines.reduce((sum, l) => sum + l.priceCents * l.qty, 0) + covers * coverChargeCents,
     [lines, covers, coverChargeCents],
+  )
+
+  const qtyById = useMemo(
+    () => new Map(lines.map((l) => [l.productId, l.qty] as const)),
+    [lines],
   )
 
   const stockById = useMemo(
@@ -338,6 +342,11 @@ export default function NewOrder() {
                         · ×{p.stockRemaining}
                       </span>
                     )}
+                    {(qtyById.get(p.id) ?? 0) > 0 && (
+                      <span className="badge ok" style={{ marginLeft: 6 }}>
+                        ×{qtyById.get(p.id)}
+                      </span>
+                    )}
                   </span>
                 </button>
               ))}
@@ -345,7 +354,7 @@ export default function NewOrder() {
           )}
         </div>
 
-        <aside className="card cart" ref={cartRef}>
+        <aside className="card cart">
           <h2>{t('cartTitle')}</h2>
 
           <label className="field">
@@ -362,17 +371,9 @@ export default function NewOrder() {
 
           {coverChargeCents > 0 && (
             <div className="field">
-              <span
-                style={{
-                  display: 'block',
-                  fontSize: 13,
-                  color: 'var(--text-dim)',
-                  marginBottom: 6,
-                  fontWeight: 600,
-                }}
-              >
+              <span style={{ display: 'block', marginBottom: 6 }}>
                 {t('covers')}
-                <span style={{ fontWeight: 400 }}>
+                <span className="muted">
                   {' '}
                   · €{formatMoney(coverChargeCents)} {t('each')}
                 </span>
@@ -409,37 +410,36 @@ export default function NewOrder() {
           ) : (
             <div>
               {lines.map((l) => (
-                <div className="cart-line" key={l.productId}>
-                  <div>
-                    <div style={{ fontWeight: 600 }}>{l.name}</div>
-                    <div className="muted" style={{ fontSize: 13 }}>
-                      €{formatMoney(l.priceCents)} {t('each')}
+                <div key={l.productId} className="field">
+                  <div className="row" style={{ alignItems: 'center' }}>
+                    <span style={{ flex: 1, fontWeight: 600 }}>{l.name}</span>
+                    <div className="qty-controls">
+                      <button
+                        className="qty-btn"
+                        onClick={() => changeQty(l.productId, -1)}
+                        aria-label={t('oneLess', { name: l.name })}
+                      >
+                        −
+                      </button>
+                      <span className="qty" style={{ minWidth: 28 }}>{l.qty}</span>
+                      <button
+                        className="qty-btn"
+                        onClick={() => changeQty(l.productId, 1)}
+                        aria-label={t('oneMore', { name: l.name })}
+                      >
+                        +
+                      </button>
                     </div>
-                  </div>
-                  <div className="line-total">€{formatMoney(l.priceCents * l.qty)}</div>
-                  <div className="qty-controls">
-                    <button
-                      className="qty-btn"
-                      onClick={() => changeQty(l.productId, -1)}
-                      aria-label={t('oneLess', { name: l.name })}
-                    >
-                      −
-                    </button>
-                    <span className="qty">{l.qty}</span>
-                    <button
-                      className="qty-btn"
-                      onClick={() => changeQty(l.productId, 1)}
-                      aria-label={t('oneMore', { name: l.name })}
-                    >
-                      +
-                    </button>
+                    <span className="line-total" style={{ minWidth: 70, textAlign: 'right' }}>
+                      €{formatMoney(l.priceCents * l.qty)}
+                    </span>
                   </div>
                 </div>
               ))}
             </div>
           )}
 
-          <label className="field" style={{ marginTop: 14 }}>
+          <label className="field">
             <span>{t('kitchenNote')}</span>
             <input
               className="input"
@@ -449,51 +449,38 @@ export default function NewOrder() {
             />
           </label>
 
-          <div className="cart-total">
-            <span>{t('total')}</span>
-            <span className="amount">€{formatMoney(total)}</span>
+          <div className="row" style={{ alignItems: 'center', marginTop: 8 }}>
+            <strong style={{ fontSize: 18 }}>{t('total')}</strong>
+            <strong style={{ marginLeft: 'auto', fontSize: 20 }}>€{formatMoney(total)}</strong>
           </div>
 
-          <div className="row">
-            <button
-              className="btn primary"
-              style={{ flex: 1 }}
-              disabled={lines.length === 0 || submitting}
-              onClick={() => void submit()}
-            >
-              {submitting ? t('sending') : t('sendOrder')}
-            </button>
-            {lines.length > 0 && (
-              <button className="btn danger" onClick={() => setLines([])} disabled={submitting}>
-                {t('clear')}
-              </button>
-            )}
-          </div>
-        </aside>
-      </div>
-
-      {/* Phone-only (hidden ≥900px): the cart lives below the fold, but the
-          running total and the send button must always be under the thumb. */}
-      {lines.length > 0 && (
-        <div className="mobile-orderbar">
-          <button
-            className="mobile-orderbar-summary"
-            onClick={() => cartRef.current?.scrollIntoView({ behavior: 'smooth' })}
-          >
-            <span className="count">
-              🛒 {lines.reduce((n, l) => n + l.qty, 0)}
-            </span>
-            <span className="amount">€{formatMoney(total)}</span>
-          </button>
           <button
             className="btn primary"
-            disabled={submitting}
+            style={{ width: '100%', marginTop: 12, minHeight: 52 }}
+            disabled={lines.length === 0 || submitting}
             onClick={() => void submit()}
           >
             {submitting ? t('sending') : t('sendOrder')}
           </button>
-        </div>
-      )}
+          {lines.length > 0 && (
+            <button
+              onClick={() => setLines([])}
+              disabled={submitting}
+              style={{
+                width: '100%',
+                marginTop: 8,
+                background: 'none',
+                border: 'none',
+                color: 'var(--text-dim)',
+                fontSize: 13,
+                cursor: 'pointer',
+              }}
+            >
+              {t('clear')}
+            </button>
+          )}
+        </aside>
+      </div>
 
       {toast && <div className="toast">{toast}</div>}
     </>

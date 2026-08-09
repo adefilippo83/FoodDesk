@@ -16,6 +16,7 @@ export default function CustomerOrder() {
   const [activeCat, setActiveCat] = useState<number | null>(null)
   const [qty, setQty] = useState<Record<number, number>>({})
   const [people, setPeople] = useState(1)
+  const [payment, setPayment] = useState('counter')
   const [name, setName] = useState('')
   const [note, setNote] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -47,11 +48,22 @@ export default function CustomerOrder() {
   const coverTotal = (data?.coverChargeCents ?? 0) * people
   const total = lines.reduce((sum, l) => sum + l.product.priceCents * l.n, 0) + coverTotal
 
-  const add = (id: number, delta: number) =>
+  /** Tracked stock caps the add, with the same message the waiter sees. */
+  const add = (id: number, delta: number) => {
+    if (delta > 0 && data) {
+      const product = data.menu.flatMap((c) => c.products).find((p) => p.id === id)
+      const stock = product?.stockRemaining
+      if (stock !== null && stock !== undefined && (qty[id] ?? 0) >= stock) {
+        setError(t('stockLimit', { n: stock, name: product!.name }))
+        return
+      }
+      setError(null)
+    }
     setQty((q) => {
       const n = Math.max(0, Math.min(99, (q[id] ?? 0) + delta))
       return { ...q, [id]: n }
     })
+  }
 
   async function send() {
     if (!name.trim()) return setError(t('custNameRequired'))
@@ -65,9 +77,16 @@ export default function CustomerOrder() {
         covers: people,
         note: note.trim() || undefined,
         clientKey: orderKeyRef.current,
+        payment,
         items: lines.map((l) => ({ productId: l.product.id, qty: l.n })),
       })
       rememberMyOrder(res.publicToken, res.dailyNumber)
+      if (res.paymentUrl) {
+        // Off to the provider's hosted checkout; it sends the customer back
+        // to the status page, which verifies and releases the order.
+        window.location.assign(res.paymentUrl)
+        return
+      }
       navigate(`/o/${res.publicToken}`)
     } catch (err) {
       orderKeyRef.current = crypto.randomUUID() // fresh key for a changed retry
@@ -78,6 +97,11 @@ export default function CustomerOrder() {
             ? t('errOutOfStock')
             : t('errSendOrder'),
       )
+      // The menu changed under the customer's feet: refresh the caps and
+      // drop products that just sold out.
+      if (err instanceof ApiError && (err.code === 'out_of_stock' || err.code === 'products_unavailable')) {
+        api.publicMenu().then(setData).catch(() => {})
+      }
     } finally {
       setSending(false)
     }
@@ -212,6 +236,31 @@ export default function CustomerOrder() {
             />
           </label>
 
+          {(data.paymentMethods ?? []).some((m) => m !== 'counter') && (
+            <div className="field">
+              <span style={{ display: 'block', marginBottom: 6 }}>{t('custPayHow')}</span>
+              <div className="row" style={{ gap: 16, flexWrap: 'wrap' }}>
+                {(data.paymentMethods ?? []).map((m) => (
+                  <label key={m} className="row" style={{ gap: 6, alignItems: 'center' }}>
+                    <input
+                      type="radio"
+                      name="payment"
+                      checked={payment === m}
+                      onChange={() => setPayment(m)}
+                    />
+                    <span>
+                      {m === 'counter'
+                        ? t('custPayCounter')
+                        : m === 'stripe'
+                          ? t('custPayCard')
+                          : 'PayPal'}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="row" style={{ alignItems: 'center', marginTop: 8 }}>
             <strong style={{ fontSize: 18 }}>{t('total')}</strong>
             <strong style={{ marginLeft: 'auto', fontSize: 20 }}>€{formatMoney(total)}</strong>
@@ -226,7 +275,7 @@ export default function CustomerOrder() {
             {sending ? t('sending') : t('custSend')}
           </button>
           <p className="muted" style={{ fontSize: 13, marginTop: 8, textAlign: 'center' }}>
-            {t('custPayAtPickup')}
+            {payment === 'counter' ? t('custPayAtPickup') : t('custPayRedirectHint')}
           </p>
         </section>
       </main>

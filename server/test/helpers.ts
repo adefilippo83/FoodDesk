@@ -8,10 +8,12 @@ import { users, type Role } from '../src/db/schema.js'
 
 const migrationsFolder = resolve(dirname(fileURLToPath(import.meta.url)), '../drizzle')
 
-export async function makeTestApp(): Promise<{ app: FastifyInstance; db: Db; close: () => void }> {
+export async function makeTestApp(
+  opts: Parameters<typeof buildApp>[1] = {},
+): Promise<{ app: FastifyInstance; db: Db; close: () => void }> {
   const { db, sqlite } = createDb(':memory:')
   runMigrations({ db, sqlite }, migrationsFolder)
-  const app = await buildApp(db, { logger: false, serveStatic: false })
+  const app = await buildApp(db, { logger: false, serveStatic: false, ...opts })
   await app.ready()
   return { app, db, close: () => sqlite.close() }
 }

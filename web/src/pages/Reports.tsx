@@ -132,9 +132,29 @@ export default function Reports() {
                 <strong>{report.cancelledCount}</strong>
               </div>
             )}
+            {report.refundedCount > 0 && (
+              <div className="card stat">
+                <span className="muted">{t('refundedStat')}</span>
+                <strong>€{formatMoney(report.refundedCents)}</strong>
+              </div>
+            )}
           </div>
 
           <div className="report-grid">
+            <Breakdown
+              title={t('byPayment')}
+              rows={(report.byPayment ?? []).map((p) => ({
+                name:
+                  p.method === 'counter'
+                    ? t('payMethodCounter')
+                    : p.method === 'stripe'
+                      ? 'Stripe'
+                      : 'PayPal',
+                ordersCount: p.ordersCount,
+                revenueCents: p.revenueCents,
+              }))}
+              unitLabel={t('navOrders')}
+            />
             <Breakdown title={t('byProduct')} rows={report.byProduct} unitLabel={t('qty')} />
             <Breakdown title={t('byCategory')} rows={report.byCategory} unitLabel={t('qty')} />
           </div>
