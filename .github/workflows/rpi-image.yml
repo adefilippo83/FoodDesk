@@ -110,12 +110,9 @@ jobs:
   # catch-all DNS and logs into FoodDesk over the air. Runs NATIVELY on the
   # arm64 runner: no qemu-user (NetworkManager aborts under emulation), and
   # the x86 Azure kernel ships no Wi-Fi stack at all (runner-images#1480).
-  # continue-on-error until the arm64 runner kernel is proven to carry
-  # mac80211_hwsim — flip to blocking once green.
   wifi-test:
     runs-on: ubuntu-24.04-arm
     needs: build
-    continue-on-error: true
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
