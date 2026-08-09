@@ -1,0 +1,6 @@
+[Unit]
+Description=FoodDesk USB backup periodic mirror
+
+[Service]
+Type=oneshot
+ExecStart=/opt/fooddesk/rpi/usb-backup.sh periodic

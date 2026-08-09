@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# NetworkManager dispatcher hook: pick the DNS behavior of the FoodDesk
+# access point based on whether the Pi actually has an upstream connection.
+#
+# - no uplink (typical sagra): catch-all DNS — every hostname resolves to
+#   the Pi, so any typed URL opens FoodDesk and nginx satisfies the OS
+#   connectivity checks (see rpi/nginx-probes-*.conf). Windows' NCSI DNS
+#   probe needs its one magic IP answered specifically.
+# - uplink present (Ethernet/tethering): normal DNS forwarding, so shared
+#   mode NAT gives clients real internet and real probe answers.
+#
+# The AP connection is only bounced when the mode actually changes, so the
+# dispatcher events triggered by the bounce itself terminate immediately.
+set -u
+
+IFACE="${1:-}"
+ACTION="${2:-}"
+CONF=/etc/NetworkManager/dnsmasq-shared.d/fooddesk.conf
+
+case "$ACTION" in
+  up | down | connectivity-change) ;;
+  *) exit 0 ;;
+esac
+
+# An upstream default route through anything but the AP interface = online.
+if ip route show default 2>/dev/null | grep -v 'dev wlan0' | grep -q .; then
+  MODE=online
+else
+  MODE=offline
+fi
+
+WANTED=$(mktemp)
+if [ "$MODE" = online ]; then
+  cat > "$WANTED" <<'EOF'
+# fooddesk (auto): uplink present — normal DNS forwarding for AP clients.
+EOF
+else
+  cat > "$WANTED" <<'EOF'
+# fooddesk (auto): no uplink — captive-style DNS, all names lead to the Pi.
+address=/dns.msftncsi.com/131.107.255.255
+address=/#/10.42.0.1
+EOF
+fi
+
+if cmp -s "$WANTED" "$CONF"; then
+  rm -f "$WANTED"
+  exit 0
+fi
+
+mv "$WANTED" "$CONF"
+chmod 644 "$CONF"
+logger -t fooddesk-ap-dns "switching AP DNS to $MODE mode (event: $IFACE $ACTION)"
+
+# Reactivate the AP so its dnsmasq instance rereads the config. Only when it
+# is currently active — otherwise autoconnect will pick the file up anyway.
+if nmcli -t -f NAME connection show --active | grep -qx 'fooddesk-ap'; then
+  nmcli connection up fooddesk-ap >/dev/null 2>&1 || true
+fi
+
+exit 0

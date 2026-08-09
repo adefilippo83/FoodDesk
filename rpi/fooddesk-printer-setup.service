@@ -1,0 +1,9 @@
+[Unit]
+Description=FoodDesk USB printer auto-setup
+# Pulled in by udev (99-fooddesk-printer.rules) when a USB printer appears.
+After=cups.service
+Wants=cups.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/fooddesk/rpi/printer-hotplug.sh

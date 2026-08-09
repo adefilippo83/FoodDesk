@@ -113,6 +113,13 @@ and `:X.Y.Z` (amd64 + arm64). For printing from the container, set
 request the image is built **and booted**: the CI smoke test waits for
 `/api/health` and performs a real login before anything may be published.
 
+**Raspberry Pi — flash and go:** every release ships
+`fooddesk-rpi-<version>.img.xz`. Flash it, power the Pi, join the
+**FoodDesk** Wi-Fi it creates, open `http://10.42.0.1/`. Works with no
+internet (connectivity checks are answered locally), auto-configures USB
+printers, and writes the generated credentials plus a printable QR leaflet
+to the SD card's boot partition. Full guide: [rpi/README.md](rpi/README.md).
+
 **Debian venue server — one script:** see [deploy/README.md](deploy/README.md).
 `sudo deploy/install.sh` is idempotent and sets up the system user, the
 hardened systemd service, nginx and 15-minute backups. Updating is
@@ -141,6 +148,7 @@ npm test          # 105 server tests; `npm run test:e2e` for the browser smoke t
 | `PDF_LANG` | `it` | Default document language (it/en/es/fr/pt) — Settings overrides |
 | `CURRENCY_SYMBOL` | `€` | Currency symbol on receipts and totals |
 | `SERVICE_DAY_CUTOFF_HOUR` | `5` | Orders before this hour count as the previous service day |
+| `KIOSK_AUTOLOGIN_USER` | unset | Kitchen-role account auto-logged-in via `/api/auth/kiosk` — loopback-only, for an attached kiosk display ([rpi/README.md](rpi/README.md)) |
 
 ## Under the hood
 
