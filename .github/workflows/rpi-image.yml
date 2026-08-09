@@ -5,8 +5,12 @@
 name: Raspberry Pi image
 
 on:
-  release:
-    types: [published]
+  # Trigger on the tag push itself, like docker.yml — NOT on release:published:
+  # the release is created by release.yml with the default GITHUB_TOKEN, whose
+  # derived events are suppressed by GitHub's anti-recursion rule and would
+  # never fire this workflow.
+  push:
+    tags: ['v*']
   # PRs touching the image pipeline get a test bake; the .img.xz is attached
   # to the run as an artifact. Other branches: use workflow_dispatch.
   pull_request:
@@ -49,8 +53,8 @@ jobs:
       - name: Version
         id: version
         run: |
-          if [ "${{ github.event_name }}" = "release" ]; then
-            v="${{ github.event.release.tag_name }}"
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            v="${{ github.ref_name }}"
           elif [ "${{ github.event_name }}" = "pull_request" ]; then
             v="pr${{ github.event.pull_request.number }}-$(git rev-parse --short HEAD)"
           else
@@ -98,11 +102,19 @@ jobs:
           retention-days: 7
 
       - name: Attach to release
-        if: github.event_name == 'release'
+        if: github.ref_type == 'tag'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload "${{ github.event.release.tag_name }}" \
+          # release.yml creates the release from the same tag push; it is
+          # normally done long before the ~20-minute bake, but never race it.
+          for i in $(seq 1 30); do
+            gh release view "${{ github.ref_name }}" >/dev/null 2>&1 && break
+            echo "release ${{ github.ref_name }} not created yet — waiting"
+            sleep 30
+          done
+          gh release view "${{ github.ref_name }}" >/dev/null
+          gh release upload "${{ github.ref_name }}" --clobber \
             fooddesk-rpi-*.img.xz SHA256SUMS.txt
 
   # Tier-2: the access point over a virtual radio (mac80211_hwsim) — a
