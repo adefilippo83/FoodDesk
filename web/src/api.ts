@@ -101,6 +101,7 @@ export type KitchenOrder = {
   cancelledAt: number | null
   completedAt: number | null
   createdByName: string | null
+  paymentMethod: 'cash' | 'stripe' | 'paypal' | null
   items: KitchenItem[]
 }
 
@@ -169,6 +170,9 @@ export type DailyReport = {
   avgPerCoverCents: number | null
   byProduct: { name: string; qty: number; revenueCents: number }[]
   byCategory: { name: string; qty: number; revenueCents: number }[]
+  byPayment: { method: 'counter' | 'stripe' | 'paypal'; ordersCount: number; revenueCents: number }[]
+  refundedCount: number
+  refundedCents: number
 }
 
 export class ApiError extends Error {

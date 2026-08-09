@@ -84,6 +84,10 @@ describe('reports', () => {
     // Both orders defaulted to covers=1 → 2 covers total.
     assert.equal(r.totalCovers, 2)
     assert.equal(r.avgPerCoverCents, 1625)
+    // No online payments configured: everything is counter money.
+    assert.deepEqual(r.byPayment, [{ method: 'counter', ordersCount: 2, revenueCents: 3250 }])
+    assert.equal(r.refundedCount, 0)
+    assert.equal(r.refundedCents, 0)
   })
 
   it('aggregates products across orders', async () => {
@@ -152,7 +156,7 @@ describe('reports', () => {
     assert.equal(lines.length, 4)
     assert.equal(
       lines[0],
-      'order;time;customer;waiter;category;item;qty;unit_price;line_total;cancelled',
+      'order;time;customer;waiter;payment;category;item;qty;unit_price;line_total;cancelled;refunded',
     )
     // Fields containing ; or " must be quoted and doubled.
     const wineLine = lines.find((l) => l.includes('Riserva'))!
@@ -160,7 +164,9 @@ describe('reports', () => {
     assert.ok(wineLine.includes('"Bar; outside"'), `customer not quoted: ${wineLine}`)
     // 3 beers at 5,00 = 15,00
     const luciaLine = lines.find((l) => l.includes('lucia'))!
-    assert.ok(luciaLine.endsWith(';3;5,00;15,00;'), `bad money format: ${luciaLine}`)
+    assert.ok(luciaLine.endsWith(';3;5,00;15,00;;'), `bad money format: ${luciaLine}`)
+    // Staff orders are counter money.
+    assert.ok(luciaLine.includes(';counter;'), `missing payment column: ${luciaLine}`)
   })
 
   it('lists service days with counts', async () => {

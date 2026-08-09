@@ -20,6 +20,7 @@ const LABELS = {
     coverCharge: 'Coperto',
     total: 'TOTALE',
     thanks: 'Grazie!',
+    prepaid: 'PREPAGATO',
     cancelled: 'ANNULLATO',
     note: 'Nota',
   },
@@ -30,6 +31,7 @@ const LABELS = {
     coverCharge: 'Cover charge',
     total: 'TOTAL',
     thanks: 'Thank you!',
+    prepaid: 'PREPAID',
     cancelled: 'CANCELLED',
     note: 'Note',
   },
@@ -40,6 +42,7 @@ const LABELS = {
     coverCharge: 'Cubierto',
     total: 'TOTAL',
     thanks: '¡Gracias!',
+    prepaid: 'PREPAGADO',
     cancelled: 'ANULADO',
     note: 'Nota',
   },
@@ -50,6 +53,7 @@ const LABELS = {
     coverCharge: 'Couvert',
     total: 'TOTAL',
     thanks: 'Merci !',
+    prepaid: 'PRÉPAYÉ',
     cancelled: 'ANNULÉE',
     note: 'Note',
   },
@@ -60,6 +64,7 @@ const LABELS = {
     coverCharge: 'Couvert',
     total: 'TOTAL',
     thanks: 'Obrigado!',
+    prepaid: 'PRÉ-PAGO',
     cancelled: 'ANULADO',
     note: 'Nota',
   },
@@ -309,6 +314,10 @@ export function renderKitchenTicket(
       })
     if (order.covers > 0) {
       doc.fontSize(11).text(`${L.covers}: ${order.covers}`, { align: 'center' })
+    }
+    // Paid online before reaching the kitchen: pickup hands it straight over.
+    if (order.paidAt && order.paymentMethod !== null && order.paymentMethod !== 'cash') {
+      doc.font('Helvetica-Bold').fontSize(13).text(`· ${L.prepaid} ·`, { align: 'center' })
     }
 
     dashes(doc, d)

@@ -23,7 +23,9 @@ type OrderRow = {
   coverChargeCents: number
   totalCents: number
   cancelledAt: number | null
-  waiter: string
+  paymentMethod: 'cash' | 'stripe' | 'paypal' | null
+  refundedAt: number | null
+  waiter: string | null
 }
 
 type ItemRow = {
@@ -46,10 +48,13 @@ async function loadDay(db: Db, day: string): Promise<{ orders: OrderRow[]; items
       coverChargeCents: orders.coverChargeCents,
       totalCents: orders.totalCents,
       cancelledAt: orders.cancelledAt,
+      paymentMethod: orders.paymentMethod,
+      refundedAt: orders.refundedAt,
       waiter: users.displayName,
     })
     .from(orders)
-    .innerJoin(users, eq(users.id, orders.createdBy))
+    // LEFT join: customer self-orders have no author and must still count.
+    .leftJoin(users, eq(users.id, orders.createdBy))
     .where(
       and(
         eq(orders.serviceDay, day),
@@ -117,6 +122,26 @@ function buildReport(day: string, data: { orders: OrderRow[]; items: ItemRow[] }
     byCategory.sort((a, b) => b.revenueCents - a.revenueCents)
   }
 
+  // Where the money physically is: the cash drawer vs the two provider
+  // dashboards. Staff orders and counter-paid self-orders are both drawer.
+  const payKey = (o: OrderRow) =>
+    o.paymentMethod === 'stripe' || o.paymentMethod === 'paypal' ? o.paymentMethod : 'counter'
+  const payMap = new Map<string, { ordersCount: number; revenueCents: number }>()
+  for (const o of active) {
+    const e = payMap.get(payKey(o)) ?? { ordersCount: 0, revenueCents: 0 }
+    e.ordersCount += 1
+    e.revenueCents += o.totalCents
+    payMap.set(payKey(o), e)
+  }
+  const byPayment = [...payMap.entries()]
+    .map(([method, v]) => ({ method, ...v }))
+    .sort((a, b) => b.revenueCents - a.revenueCents)
+
+  // Refunds live on cancelled orders; they are outside revenue but the
+  // person doing the books must see money that went back out.
+  const refunded = data.orders.filter((o) => o.cancelledAt && o.refundedAt)
+  const refundedCents = refunded.reduce((s, o) => s + o.totalCents, 0)
+
   return {
     serviceDay: day,
     ordersCount: active.length,
@@ -128,6 +153,9 @@ function buildReport(day: string, data: { orders: OrderRow[]; items: ItemRow[] }
     avgPerCoverCents: totalCovers > 0 ? Math.round(revenueCents / totalCovers) : null,
     byProduct: tally((r) => `${r.item} (${r.category})`),
     byCategory,
+    byPayment,
+    refundedCount: refunded.length,
+    refundedCents,
   }
 }
 
@@ -150,23 +178,34 @@ function toCsv(data: { orders: OrderRow[]; items: ItemRow[] }): string {
     byOrder.set(i.orderId, list)
   }
 
-  const lines = ['order;time;customer;waiter;category;item;qty;unit_price;line_total;cancelled']
+  const lines = [
+    'order;time;customer;waiter;payment;category;item;qty;unit_price;line_total;cancelled;refunded',
+  ]
   for (const o of data.orders) {
     const time = new Date(o.createdAt * 1000).toLocaleTimeString('it-IT', {
       hour: '2-digit',
       minute: '2-digit',
     })
     const cancelled = o.cancelledAt ? 'yes' : ''
-    const base = [String(o.dailyNumber).padStart(3, '0'), time, esc(o.customerName), esc(o.waiter)]
+    const refunded = o.refundedAt ? 'yes' : ''
+    const payment =
+      o.paymentMethod === 'stripe' || o.paymentMethod === 'paypal' ? o.paymentMethod : 'counter'
+    const base = [
+      String(o.dailyNumber).padStart(3, '0'),
+      time,
+      esc(o.customerName),
+      esc(o.waiter),
+      payment,
+    ]
     for (const i of byOrder.get(o.id) ?? []) {
       const lineCancelled = o.cancelledAt || i.cancelledAt ? 'yes' : ''
       lines.push(
-        [...base, esc(i.category), esc(i.item), i.qty, money(i.unitCents), money(i.qty * i.unitCents), lineCancelled].join(';'),
+        [...base, esc(i.category), esc(i.item), i.qty, money(i.unitCents), money(i.qty * i.unitCents), lineCancelled, refunded].join(';'),
       )
     }
     if (o.covers > 0 && o.coverChargeCents > 0) {
       lines.push(
-        [...base, 'Coperto', 'Coperto', o.covers, money(o.coverChargeCents), money(o.covers * o.coverChargeCents), cancelled].join(';'),
+        [...base, 'Coperto', 'Coperto', o.covers, money(o.coverChargeCents), money(o.covers * o.coverChargeCents), cancelled, refunded].join(';'),
       )
     }
   }
@@ -204,6 +243,7 @@ async function renderReportPdf(
     stats.push(['Medio a coperto', money(report.avgPerCoverCents)])
   }
   if (report.cancelledCount > 0) stats.push(['Annullati', String(report.cancelledCount)])
+  if (report.refundedCount > 0) stats.push(['Rimborsati', money(report.refundedCents)])
 
   const statW = innerW / stats.length
   const statY = doc.y
@@ -242,6 +282,15 @@ async function renderReportPdf(
     }
   }
 
+  const PAY_LABELS: Record<string, string> = { counter: 'Cassa', stripe: 'Stripe', paypal: 'PayPal' }
+  table(
+    'Per pagamento',
+    report.byPayment.map((p) => ({
+      name: PAY_LABELS[p.method] ?? p.method,
+      qty: p.ordersCount,
+      revenueCents: p.revenueCents,
+    })),
+  )
   table('Per prodotto', report.byProduct)
   table('Per categoria', report.byCategory)
 

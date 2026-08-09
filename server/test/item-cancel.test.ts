@@ -219,7 +219,7 @@ describe('order item cancellation', () => {
     const beerLines = csv.body.split('\r\n').filter((l: string) => l.includes(';Beer;'))
     assert.ok(beerLines.length >= 2)
     assert.ok(
-      beerLines.every((l: string) => l.endsWith(';yes')),
+      beerLines.every((l: string) => l.endsWith(';yes;')),
       `every cancelled beer line must be flagged: ${beerLines.join(' | ')}`,
     )
   })

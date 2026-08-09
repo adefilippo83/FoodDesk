@@ -55,6 +55,7 @@ export function kitchenRoutes(db: Db) {
           createdAt: orders.createdAt,
           cancelledAt: orders.cancelledAt,
           completedAt: orders.completedAt,
+          paymentMethod: orders.paymentMethod,
           createdByName: users.displayName,
         })
         .from(orders)

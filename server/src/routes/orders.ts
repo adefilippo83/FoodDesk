@@ -487,6 +487,7 @@ export function orderRoutes(db: Db, providers: ProviderRegistry) {
           origin: orders.origin,
           paidAt: orders.paidAt,
           paymentMethod: orders.paymentMethod,
+          refundedAt: orders.refundedAt,
           createdByName: users.displayName,
         })
         .from(orders)

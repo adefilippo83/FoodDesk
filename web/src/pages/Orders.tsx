@@ -217,6 +217,19 @@ export default function Orders() {
                         {t('unpaidBadge')}
                       </span>
                     )}
+                    {o.paymentMethod !== null &&
+                      o.paymentMethod !== 'cash' &&
+                      o.paidAt !== null &&
+                      o.cancelledAt === null && (
+                        <span className="badge ok" style={{ marginLeft: 4 }}>
+                          {t('prepaidBadge')}
+                        </span>
+                      )}
+                    {o.refundedAt != null && (
+                      <span className="badge" style={{ marginLeft: 4 }}>
+                        {t('refundedBadge')}
+                      </span>
+                    )}
                   </td>
                   <td className="num" style={{ whiteSpace: 'nowrap' }}>
                     <button className="btn small" onClick={() => void api.order(o.id).then(setOpen)}>

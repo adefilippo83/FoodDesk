@@ -56,7 +56,14 @@ function OrderCard({
       <div className="kds-head">
         <span className="kds-num">#{String(order.dailyNumber).padStart(3, '0')}</span>
         <div className="kds-meta">
-          <strong>{order.customerName}</strong>
+          <strong>
+            {order.customerName}
+            {(order.paymentMethod === 'stripe' || order.paymentMethod === 'paypal') && (
+              <span className="badge ok" style={{ marginLeft: 6 }}>
+                {t('prepaidBadge')}
+              </span>
+            )}
+          </strong>
           <span>
             {new Date(order.createdAt * 1000).toLocaleTimeString([], {
               hour: '2-digit',
