@@ -64,6 +64,8 @@ await db.insert(settings).values([
   { key: 'orderFooterText', value: 'Ritira al banco con questo foglio' },
   { key: 'orderDisclaimer', value: 'Documento non fiscale — dati dimostrativi' },
   { key: 'orderCategoryStyle', value: 'alternating' },
+  // The demo showcases customer self-ordering: /order is always open.
+  { key: 'customerOrdering', value: 'on' },
 ])
 
 // ---- menu ----
@@ -98,11 +100,14 @@ type DemoItem = { p: string; qty: number; note?: string; done?: boolean }
 const EVENING: Array<{
   customer: string
   minAgo: number
-  by: number
+  /** null = customer self-order (no staff author). */
+  by: number | null
   covers: number
   note?: string
   completed?: boolean
   cancelled?: boolean
+  /** Fixed token so the demo status page has a stable URL. */
+  publicToken?: string
   items: DemoItem[]
 }> = [
   {
@@ -152,6 +157,16 @@ const EVENING: Array<{
       { p: 'Birra media', qty: 1 },
     ],
   },
+  // A customer self-order (phase A): no staff author, still to be paid at
+  // pickup — shows the Customer badge in Orders and on the kitchen display.
+  {
+    customer: 'Tavolo 5 — Colombo', minAgo: 2, by: null, covers: 2,
+    publicToken: 'demo-customer-token-0001',
+    items: [
+      { p: 'Panino con salsiccia', qty: 2 },
+      { p: 'Coca-Cola', qty: 2 },
+    ],
+  },
 ]
 
 const serviceDay = serviceDayOf()
@@ -172,6 +187,8 @@ for (const [index, o] of EVENING.entries()) {
         note: o.note ?? null,
         totalCents,
         createdBy: o.by,
+        origin: o.by === null ? 'customer' : 'staff',
+        publicToken: o.publicToken ?? null,
         createdAt,
         printError: 'printer_not_configured',
         cancelledAt: o.cancelled ? createdAt + 120 : null,
