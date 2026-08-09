@@ -81,6 +81,12 @@ jobs:
       - name: Boot test the image (systemd-nspawn)
         run: sudo -E bash rpi/test-image.sh ${{ steps.bake.outputs.image }}
 
+      # Tier-2: the access point over a virtual radio (mac80211_hwsim) —
+      # a host-side "phone" joins the WPA2 network, gets DHCP, resolves via
+      # the catch-all DNS and logs into FoodDesk over the air.
+      - name: Wi-Fi test (mac80211_hwsim)
+        run: sudo -E bash rpi/test-wifi.sh ${{ steps.bake.outputs.image }}
+
       - name: Compress and checksum
         run: |
           name=fooddesk-rpi-${{ steps.version.outputs.version }}

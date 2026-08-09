@@ -18,8 +18,12 @@ echo "== packages =="
 apt-get update
 # make/g++/python3 are the node-gyp fallback in case a native module has no
 # prebuilt arm64 binary; better-sqlite3 normally ships one.
+# dnsmasq-base and wpasupplicant are what NetworkManager's shared-mode AP
+# actually runs on — they are only Recommends of the NM package, so pin
+# them rather than trust the base image.
 apt-get install -y --no-install-recommends \
   nginx-light sqlite3 avahi-daemon rfkill \
+  dnsmasq-base wpasupplicant \
   cups cups-client ipp-usb \
   cage chromium fonts-liberation \
   ca-certificates curl xz-utils make g++ python3

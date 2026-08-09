@@ -210,6 +210,15 @@ una copia dell'immagine parte sotto systemd-nspawn con emulazione arm64, e
 la run verifica il provisioning del primo avvio, la salute dell'app, le
 risposte di nginx ai controlli di connettività, un login vero con la
 password admin generata, e che modificare `fooddesk.txt` venga riapplicato
-al riavvio senza toccare quella password. (In CI non esiste una radio
-Wi-Fi — radio, stampanti e comportamento all'accensione restano compito
-del test su hardware vero.)
+al riavvio senza toccare quella password.
+
+Anche il **Wi-Fi viene testato** (`rpi/test-wifi.sh`): il simulatore
+`mac80211_hwsim` del kernel dà alla CI due radio virtuali — una entra nel
+container avviato, dove NetworkManager attiva il vero profilo
+`fooddesk-ap`, l'altra fa il telefono del cameriere: si collega alla rete
+WPA2, riceve un indirizzo DHCP, risolve i nomi tramite il DNS pigliatutto
+(compreso l'IP magico NCSI di Windows), supera il controllo Android e fa
+login su FoodDesk attraverso l'aria simulata — poi si ricollega dopo una
+riconfigurazione di SSID e password. (Portata e capacità della radio
+vera, stampanti e comportamento all'accensione restano compito del test
+su hardware vero.)

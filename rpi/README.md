@@ -195,5 +195,13 @@ the image boots under systemd-nspawn with arm64 emulation, and the run
 asserts first-boot provisioning, app health, the nginx connectivity
 probes, a real login with the generated admin password, and that editing
 `fooddesk.txt` re-applies across a reboot without touching that password.
-(No Wi-Fi radio exists in CI — the radio, printers and power behavior
+
+The **Wi-Fi is tested too** (`rpi/test-wifi.sh`): the kernel's
+`mac80211_hwsim` simulator gives CI two virtual radios — one moves into
+the booted container where NetworkManager runs the real `fooddesk-ap`
+profile, the other plays a waiter's phone that joins the WPA2 network,
+gets a DHCP lease, resolves through the catch-all DNS (including the
+Windows NCSI magic IP), passes the Android probe and logs into FoodDesk
+over the simulated air — then rejoins after an SSID+password
+re-provision. (Real radio range/capacity, printers and power behavior
 remain the bench test's job.)
