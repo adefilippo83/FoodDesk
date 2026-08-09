@@ -1,17 +1,16 @@
-import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import type { FastifyInstance } from 'fastify'
 import { buildApp } from '../src/app.js'
 import { hashPassword } from '../src/auth/password.js'
-import { createDb, type Db } from '../src/db/index.js'
+import { createDb, runMigrations, type Db } from '../src/db/index.js'
 import { users, type Role } from '../src/db/schema.js'
 
 const migrationsFolder = resolve(dirname(fileURLToPath(import.meta.url)), '../drizzle')
 
 export async function makeTestApp(): Promise<{ app: FastifyInstance; db: Db; close: () => void }> {
   const { db, sqlite } = createDb(':memory:')
-  migrate(db, { migrationsFolder })
+  runMigrations({ db, sqlite }, migrationsFolder)
   const app = await buildApp(db, { logger: false, serveStatic: false })
   await app.ready()
   return { app, db, close: () => sqlite.close() }
