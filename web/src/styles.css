@@ -448,6 +448,13 @@ label.field span {
   overflow-x: auto;
 }
 
+/* Mid-width screens: action buttons and badges wrap onto extra lines
+   instead of sliding out of the card behind an invisible scrollbar. */
+.orders-table td .btn.small {
+  margin-top: 2px;
+  margin-bottom: 2px;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;

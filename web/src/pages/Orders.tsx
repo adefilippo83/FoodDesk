@@ -205,7 +205,7 @@ export default function Orders() {
                   <td data-label={t('total')} className="num">
                     €{formatMoney(o.totalCents)}
                   </td>
-                  <td data-label={t('colKitchen')} style={{ whiteSpace: 'nowrap' }}>
+                  <td data-label={t('colKitchen')}>
                     <PrintStatus order={o} />
                     {o.completedAt !== null && o.cancelledAt === null && (
                       <span className="badge ok" style={{ marginLeft: 4 }}>
@@ -231,7 +231,7 @@ export default function Orders() {
                       </span>
                     )}
                   </td>
-                  <td className="num" style={{ whiteSpace: 'nowrap' }}>
+                  <td className="num">
                     <button className="btn small" onClick={() => void api.order(o.id).then(setOpen)}>
                       {t('view')}
                     </button>{' '}
@@ -345,7 +345,7 @@ export default function Orders() {
                         )}
                       </td>
                       <td className="num">€{formatMoney(i.priceCentsSnapshot * i.qty)}</td>
-                      <td className="num" style={{ whiteSpace: 'nowrap' }}>
+                      <td className="num">
                         {open.cancelledAt === null && i.cancelledAt === null && (
                           <>
                             {i.qty > 1 && (
