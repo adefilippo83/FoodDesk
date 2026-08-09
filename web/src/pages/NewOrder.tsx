@@ -189,6 +189,11 @@ export default function NewOrder() {
     [lines, covers, coverChargeCents],
   )
 
+  const qtyById = useMemo(
+    () => new Map(lines.map((l) => [l.productId, l.qty] as const)),
+    [lines],
+  )
+
   const stockById = useMemo(
     () =>
       new Map<number, number | null>(
@@ -338,6 +343,11 @@ export default function NewOrder() {
                         · ×{p.stockRemaining}
                       </span>
                     )}
+                    {(qtyById.get(p.id) ?? 0) > 0 && (
+                      <span className="badge ok" style={{ marginLeft: 6 }}>
+                        ×{qtyById.get(p.id)}
+                      </span>
+                    )}
                   </span>
                 </button>
               ))}
@@ -409,30 +419,29 @@ export default function NewOrder() {
           ) : (
             <div>
               {lines.map((l) => (
-                <div className="cart-line" key={l.productId}>
-                  <div>
-                    <div style={{ fontWeight: 600 }}>{l.name}</div>
-                    <div className="muted" style={{ fontSize: 13 }}>
-                      €{formatMoney(l.priceCents)} {t('each')}
+                <div key={l.productId} className="field">
+                  <div className="row" style={{ alignItems: 'center' }}>
+                    <span style={{ flex: 1, fontWeight: 600 }}>{l.name}</span>
+                    <div className="qty-controls">
+                      <button
+                        className="qty-btn"
+                        onClick={() => changeQty(l.productId, -1)}
+                        aria-label={t('oneLess', { name: l.name })}
+                      >
+                        −
+                      </button>
+                      <span className="qty" style={{ minWidth: 28 }}>{l.qty}</span>
+                      <button
+                        className="qty-btn"
+                        onClick={() => changeQty(l.productId, 1)}
+                        aria-label={t('oneMore', { name: l.name })}
+                      >
+                        +
+                      </button>
                     </div>
-                  </div>
-                  <div className="line-total">€{formatMoney(l.priceCents * l.qty)}</div>
-                  <div className="qty-controls">
-                    <button
-                      className="qty-btn"
-                      onClick={() => changeQty(l.productId, -1)}
-                      aria-label={t('oneLess', { name: l.name })}
-                    >
-                      −
-                    </button>
-                    <span className="qty">{l.qty}</span>
-                    <button
-                      className="qty-btn"
-                      onClick={() => changeQty(l.productId, 1)}
-                      aria-label={t('oneMore', { name: l.name })}
-                    >
-                      +
-                    </button>
+                    <span className="line-total" style={{ minWidth: 70, textAlign: 'right' }}>
+                      €{formatMoney(l.priceCents * l.qty)}
+                    </span>
                   </div>
                 </div>
               ))}

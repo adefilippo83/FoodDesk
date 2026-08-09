@@ -388,14 +388,6 @@ label.field span {
   color: var(--danger);
 }
 
-.cart-line {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 6px 10px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border);
-}
-
 .qty-controls {
   display: flex;
   align-items: center;
