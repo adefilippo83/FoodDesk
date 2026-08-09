@@ -25,20 +25,24 @@ IMG_SRC="${1:?usage: test-wifi.sh <image-file>}"
 CLIENT_IF=''
 WPA_PID=''
 
-# Minimal dhclient hook: assign the address and NOTHING else — the default
-# script would rewrite the runner's /etc/resolv.conf with the AP's catch-all
-# DNS and break every later workflow step. NM shared mode hands out /24.
-DHS="$WORK/dhclient-addr-only.sh"
+# Minimal udhcpc hook: assign the address and NOTHING else — a full client's
+# default hooks would rewrite the runner's /etc/resolv.conf with the AP's
+# catch-all DNS and break every later workflow step. (dhclient is unusable
+# here: its AppArmor profile silently blocks hook scripts outside /etc.)
+# NM shared mode hands out /24.
+DHS="$WORK/udhcpc-addr-only.sh"
 cat > "$DHS" <<'EOF'
 #!/bin/bash
-case "$reason" in
-  BOUND | RENEW | REBIND | REBOOT)
+echo "udhcpc: $1 ip=${ip:-} iface=${interface:-}" >> "${DHCP_LOG:-/tmp/dhcp.log}"
+case "$1" in
+  bound | renew)
     ip addr flush dev "$interface"
-    ip addr add "$new_ip_address/24" dev "$interface"
+    ip addr add "$ip/24" dev "$interface"
     ;;
 esac
 EOF
 chmod +x "$DHS"
+export DHCP_LOG="$WORK/dhcp.log"
 
 dump_diagnostics() {
   say "DIAGNOSTICS"
@@ -56,15 +60,16 @@ dump_diagnostics() {
   say "what the client can see (scan)"
   [ -n "$CLIENT_IF" ] && timeout 20 iw dev "$CLIENT_IF" scan 2>/dev/null \
     | grep -E 'BSS|SSID|freq|signal' | head -20 || true
-  say "wpa_supplicant log"
+  say "wpa_supplicant + dhcp logs"
   tail -n 40 "$WORK"/wpa-*.log 2>/dev/null || true
+  cat "$WORK/dhcp.log" 2>/dev/null || true
   dmesg 2>/dev/null | grep -i hwsim | tail -10 || true
 }
 trap dump_diagnostics ERR
 
 cleanup_all() {
   [ -n "$WPA_PID" ] && kill "$WPA_PID" 2>/dev/null || true
-  pkill -f "dhclient.*$CLIENT_IF" 2>/dev/null || true
+  pkill -f "udhcpc.*$CLIENT_IF" 2>/dev/null || true
   [ -n "$CLIENT_IF" ] && ip addr flush dev "$CLIENT_IF" 2>/dev/null || true
   cleanup_image
 }
@@ -88,7 +93,6 @@ join_and_verify() { # ssid, psk, label
 
   say "host client joins '$ssid' over the air"
   [ -n "$WPA_PID" ] && kill "$WPA_PID" 2>/dev/null || true
-  dhclient -r "$CLIENT_IF" 2>/dev/null || true
   ip addr flush dev "$CLIENT_IF" 2>/dev/null || true
   local conf="$WORK/wpa-$label.conf"
   # ctrl_interface is what wpa_cli talks to — wpa_passphrase alone omits it.
@@ -107,7 +111,7 @@ join_and_verify() { # ssid, psk, label
   [ -n "$joined" ] || { echo "client never associated to $ssid"; false; }
   echo "WPA2 association: ok"
 
-  timeout 60 dhclient -1 -sf "$DHS" "$CLIENT_IF"
+  timeout 60 busybox udhcpc -f -q -n -i "$CLIENT_IF" -s "$DHS"
   ip -4 addr show "$CLIENT_IF" | grep -q 'inet 10\.42\.0\.' \
     || { echo "no 10.42.0.x lease"; ip -4 addr show "$CLIENT_IF"; false; }
   echo "DHCP lease from the AP: ok"
@@ -130,7 +134,7 @@ join_and_verify() { # ssid, psk, label
 }
 
 say "install host dependencies (wifi tooling)"
-install_host_deps iw wpasupplicant dnsutils isc-dhcp-client
+install_host_deps iw wpasupplicant dnsutils busybox
 
 say "create two virtual radios"
 echo "runner kernel: $(uname -r)"
