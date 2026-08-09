@@ -48,12 +48,13 @@ function autoPrintOrderSheet(
       const alt = config.orderCategoryStyle === 'alternating' && i % 2 === 1
       const sep =
         config.orderCategoryStyle === 'separator' && i > 0 ? '<div class="sep"></div>' : ''
+      // Each item and its note travel as one .row, atomic across page breaks.
       const lines = g.items
         .map(
           (it) =>
-            `<div class="line"><span>${it.qty} × ${esc(it.nameSnapshot)}</span><span>${money(
+            `<div class="row"><div class="line"><span>${it.qty} × ${esc(it.nameSnapshot)}</span><span>${money(
               it.priceCentsSnapshot * it.qty,
-            )}</span></div>` + (it.note ? `<div class="inote">» ${esc(it.note)}</div>` : ''),
+            )}</span></div>${it.note ? `<div class="inote">» ${esc(it.note)}</div>` : ''}</div>`,
         )
         .join('')
       return `${sep}<div class="block${alt ? ' alt' : ''}"><div class="cat">${esc(g.name)}</div>${lines}</div>`
@@ -68,27 +69,41 @@ function autoPrintOrderSheet(
       : ''
 
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>
-    @page { margin: 5mm; }
+    /* Page number in the bottom margin, like the server-rendered PDFs.
+       Chromium supports @page margin boxes; other engines ignore them. */
+    @page {
+      margin: 5mm 5mm 9mm;
+      @bottom-center {
+        content: counter(page) " / " counter(pages);
+        font-family: -apple-system, 'Segoe UI', Roboto, sans-serif;
+        font-size: 9px;
+        color: #666;
+      }
+    }
     body { font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; color: #000; background: #fff; margin: 0; }
     /* Disclaimer and footer sit at the bottom of the printed page, like on
        the server-rendered order.pdf (issue #32). */
     .sheet { display: flex; flex-direction: column; min-height: calc(100vh - 2mm); }
     .spacer { flex: 1; }
-    img.hf { display: block; max-width: 100%; height: auto; margin: 0 auto 4px; }
+    img.hf { display: block; max-width: 100%; height: auto; margin: 0 auto 4px; break-inside: avoid; }
     .htext { text-align: center; font-size: ${config.orderHeaderFontSize}pt; color: #333; margin: 0 0 4px; }
     .info { font-size: 17px; font-weight: 800; text-align: center; margin: 2px 0; }
     hr { border: 0; border-top: 2px dashed #000; margin: 8px 0; }
     .block { padding: 3px 5px; }
     .block.alt { background: #f0f0f0; }
     .sep { border-top: 1px solid #999; margin: 5px 0; }
-    .cat { font-size: 11px; font-weight: 700; text-transform: uppercase; color: #555; margin: 2px 0; }
-    .line { display: flex; justify-content: space-between; gap: 8px; font-size: 15px; margin: 2px 0; }
+    /* A category label sticks to its first row; a row (item + note) never
+       splits across pages — long categories break between rows, exactly
+       like the server-rendered order.pdf. */
+    .cat { font-size: 11px; font-weight: 700; text-transform: uppercase; color: #555; margin: 2px 0; break-after: avoid; }
+    .row { break-inside: avoid; }
+    .line { display: flex; justify-content: space-between; gap: 8px; font-size: 15px; margin: 2px 0; break-inside: avoid; }
     .line.coperto { padding: 3px 5px; }
     .inote { font-style: italic; font-size: 12px; margin: 0 0 3px 14px; }
-    .total { display: flex; justify-content: space-between; font-size: 18px; font-weight: 800; background: #e5e5e5; padding: 6px; margin-top: 8px; }
+    .total { display: flex; justify-content: space-between; font-size: 18px; font-weight: 800; background: #e5e5e5; padding: 6px; margin-top: 8px; break-inside: avoid; }
     .note { font-style: italic; font-size: 14px; margin: 4px 0; }
-    .disclaimer { font-size: ${config.orderDisclaimerFontSize}pt; font-weight: 700; color: #555; text-align: center; margin: 8px 0 0; }
-    .ftext { text-align: center; font-size: ${config.orderFooterFontSize}pt; color: #444; margin: 8px 0 0; }
+    .disclaimer { font-size: ${config.orderDisclaimerFontSize}pt; font-weight: 700; color: #555; text-align: center; margin: 8px 0 0; break-inside: avoid; }
+    .ftext { text-align: center; font-size: ${config.orderFooterFontSize}pt; color: #444; margin: 8px 0 0; break-inside: avoid; }
   </style></head><body>
     <div class="sheet">
       ${config.orderHeaderImageUrl ? `<img class="hf" style="width:${config.orderHeaderImageWidthPct}%" src="${config.orderHeaderImageUrl}">` : ''}
