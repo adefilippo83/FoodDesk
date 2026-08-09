@@ -29,9 +29,38 @@ export type OrderSummary = {
   note: string | null
   totalCents: number
   createdAt: number
-  createdByName: string
+  /** null on customer self-orders — they have no staff author. */
+  createdByName: string | null
+  origin: 'staff' | 'customer'
+  paidAt: number | null
+  paymentMethod: 'cash' | 'stripe' | 'paypal' | null
   printedAt: number | null
   printError: string | null
+}
+
+/** Customer self-ordering (public, unauthenticated). */
+export type PublicMenu = {
+  restaurantName: string
+  coverChargeCents: number
+  menu: { id: number; name: string; products: { id: number; name: string; priceCents: number }[] }[]
+}
+export type PublicOrderStatus = {
+  dailyNumber: number
+  customerName: string | null
+  covers: number
+  coverChargeCents: number
+  totalCents: number
+  createdAt: number
+  completedAt: number | null
+  cancelledAt: number | null
+  paidAt: number | null
+  items: {
+    nameSnapshot: string
+    priceCentsSnapshot: number
+    qty: number
+    doneAt: number | null
+    cancelledAt: number | null
+  }[]
 }
 export type OrderItem = {
   id: number
@@ -62,7 +91,7 @@ export type KitchenOrder = {
   createdAt: number
   cancelledAt: number | null
   completedAt: number | null
-  createdByName: string
+  createdByName: string | null
   items: KitchenItem[]
 }
 
@@ -94,6 +123,7 @@ export type PaperSize = 'roll80' | 'a5' | 'a4' | 'letter'
 export type AppSettings = OrderSheetLayout & {
   restaurantName: string
   coverChargeCents: number
+  customerOrdering: boolean
   /** Receipt paper size. */
   paperSize: PaperSize
   /** Order sheet and kitchen ticket paper sizes — independent since #34/#35. */
@@ -204,6 +234,22 @@ export const api = {
     items: { productId: number; qty: number; note?: string }[]
   }) => request<OrderDetail>('POST', '/api/orders', input),
   cancelOrder: (id: number) => request<OrderSummary>('POST', `/api/orders/${id}/cancel`),
+  markPaid: (id: number) => request<OrderSummary>('POST', `/api/orders/${id}/paid`),
+  publicMenu: () => request<PublicMenu>('GET', '/api/public/menu'),
+  publicCreateOrder: (input: {
+    customerName: string
+    covers: number
+    note?: string
+    clientKey?: string
+    items: { productId: number; qty: number }[]
+  }) =>
+    request<{ publicToken: string; dailyNumber: number; totalCents: number }>(
+      'POST',
+      '/api/public/orders',
+      input,
+    ),
+  publicOrderStatus: (token: string) =>
+    request<PublicOrderStatus>('GET', `/api/public/orders/${encodeURIComponent(token)}`),
   cancelOrderItem: (orderId: number, itemId: number) =>
     request<OrderDetail>('POST', `/api/orders/${orderId}/items/${itemId}/cancel`),
   updateOrderItemQty: (orderId: number, itemId: number, qty: number) =>

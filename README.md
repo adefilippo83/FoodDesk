@@ -148,6 +148,7 @@ npm test          # 105 server tests; `npm run test:e2e` for the browser smoke t
 | `PDF_LANG` | `it` | Default document language (it/en/es/fr/pt) — Settings overrides |
 | `CURRENCY_SYMBOL` | `€` | Currency symbol on receipts and totals |
 | `SERVICE_DAY_CUTOFF_HOUR` | `5` | Orders before this hour count as the previous service day |
+| `CUSTOMER_ORDER_CAP` | `30` | Max simultaneous open (unpaid) customer self-orders before new ones get "venue busy" |
 | `KIOSK_AUTOLOGIN_USER` | unset | Kitchen-role account auto-logged-in via `/api/auth/kiosk` — loopback-only, for an attached kiosk display ([rpi/README.md](rpi/README.md)) |
 
 ## Under the hood

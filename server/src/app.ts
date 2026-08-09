@@ -13,6 +13,7 @@ import { authRoutes } from './routes/auth.js'
 import { kitchenRoutes } from './routes/kitchen.js'
 import { menuRoutes } from './routes/menu.js'
 import { orderRoutes } from './routes/orders.js'
+import { publicRoutes } from './routes/public.js'
 import { reportRoutes } from './routes/reports.js'
 import { settingsRoutes } from './routes/settings.js'
 import { userRoutes } from './routes/users.js'
@@ -125,6 +126,7 @@ export async function buildApp(
   await app.register(userRoutes(db))
   await app.register(menuRoutes(db))
   await app.register(orderRoutes(db))
+  await app.register(publicRoutes(db))
   await app.register(kitchenRoutes(db))
   await app.register(reportRoutes(db))
   await app.register(settingsRoutes(db))

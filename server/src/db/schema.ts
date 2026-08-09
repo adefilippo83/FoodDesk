@@ -87,9 +87,16 @@ export const orders = sqliteTable(
     clientKey: text('client_key'),
     note: text('note'),
     totalCents: integer('total_cents').notNull(),
-    createdBy: integer('created_by')
-      .notNull()
-      .references(() => users.id),
+    // Who placed it: staff orders carry the waiter's account; customer
+    // self-ordering (phase A) has no staff author — createdBy stays null.
+    origin: text('origin', { enum: ['staff', 'customer'] }).notNull().default('staff'),
+    // Customers track their order by this unguessable token, never by id.
+    publicToken: text('public_token'),
+    // Payment: null = not (yet) paid. Phase A only knows cash-at-pickup;
+    // the method column already reserves room for the gateways of phase B.
+    paidAt: integer('paid_at'),
+    paymentMethod: text('payment_method', { enum: ['cash', 'stripe', 'paypal'] }),
+    createdBy: integer('created_by').references(() => users.id),
     createdAt: integer('created_at').notNull().default(sql`(unixepoch())`),
     // Print state: an order is never lost because a printer jammed.
     printedAt: integer('printed_at'),
@@ -100,6 +107,7 @@ export const orders = sqliteTable(
     uniqueIndex('orders_day_number_unique').on(t.serviceDay, t.dailyNumber),
     // NULLs are distinct in SQLite, so key-less orders are unaffected.
     uniqueIndex('orders_client_key_unique').on(t.clientKey),
+    uniqueIndex('orders_public_token_unique').on(t.publicToken),
     index('orders_created_by_idx').on(t.createdBy),
   ],
 )

@@ -31,6 +31,7 @@ export default function Orders() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [reprinting, setReprinting] = useState<number | null>(null)
+  const [marking, setMarking] = useState<number | null>(null)
   const [confirmingCancel, setConfirmingCancel] = useState<number | null>(null)
   const [cancelling, setCancelling] = useState(false)
   const [confirmingItemCancel, setConfirmingItemCancel] = useState<number | null>(null)
@@ -117,6 +118,18 @@ export default function Orders() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  async function markPaid(id: number) {
+    setMarking(id)
+    try {
+      await api.markPaid(id)
+      await load()
+    } catch {
+      setError(t('errMarkPaid'))
+    } finally {
+      setMarking(null)
+    }
+  }
+
   useOrdersEvents(() => void load())
 
   const dayTotal = orders.reduce((sum, o) => sum + o.totalCents, 0)
@@ -178,7 +191,9 @@ export default function Orders() {
                       </>
                     )}
                   </td>
-                  <td data-label={t('colWaiter')}>{o.createdByName}</td>
+                  <td data-label={t('colWaiter')}>
+                    {o.createdByName ?? <span className="badge">{t('customerBadge')}</span>}
+                  </td>
                   <td data-label={t('colTime')} className="muted">
                     {new Date(o.createdAt * 1000).toLocaleTimeString([], {
                       hour: '2-digit',
@@ -193,6 +208,11 @@ export default function Orders() {
                     {o.completedAt !== null && o.cancelledAt === null && (
                       <span className="badge ok" style={{ marginLeft: 4 }}>
                         {t('readyBadge')}
+                      </span>
+                    )}
+                    {o.origin === 'customer' && o.paidAt === null && o.cancelledAt === null && (
+                      <span className="badge fail" style={{ marginLeft: 4 }}>
+                        {t('unpaidBadge')}
                       </span>
                     )}
                   </td>
@@ -219,6 +239,17 @@ export default function Orders() {
                           ? t('reprint')
                           : t('print')}
                     </button>{' '}
+                    {o.origin === 'customer' && o.paidAt === null && o.cancelledAt === null && (
+                      <>
+                        <button
+                          className="btn small primary"
+                          disabled={marking === o.id}
+                          onClick={() => void markPaid(o.id)}
+                        >
+                          {t('markPaid')}
+                        </button>{' '}
+                      </>
+                    )}
                     {(user?.role === 'admin' || user?.role === 'maitre') && o.cancelledAt === null && (
                       confirmingCancel === o.id ? (
                         <button

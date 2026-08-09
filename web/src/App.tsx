@@ -1,6 +1,8 @@
-import { NavLink, Navigate, Route, Routes } from 'react-router-dom'
+import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { useAuth } from './auth'
 import { LangToggle, useI18n } from './i18n'
+import CustomerOrder from './pages/CustomerOrder'
+import CustomerStatus from './pages/CustomerStatus'
 import Kitchen from './pages/Kitchen'
 import Login from './pages/Login'
 import NewOrder from './pages/NewOrder'
@@ -135,6 +137,7 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
 export default function App() {
   const { user, loading, logout } = useAuth()
   const { t } = useI18n()
+  const location = useLocation()
   const [showPassword, setShowPassword] = useState(false)
   const [kitchenEnabled, setKitchenEnabled] = useState(false)
 
@@ -153,6 +156,17 @@ export default function App() {
     window.addEventListener('fd-users-changed', refresh)
     return () => window.removeEventListener('fd-users-changed', refresh)
   }, [managerRole])
+
+  // Customer self-ordering lives entirely outside the staff shell: public
+  // pages, no login, no navigation — rendered before the auth gate.
+  if (location.pathname === '/order' || location.pathname.startsWith('/o/')) {
+    return (
+      <Routes>
+        <Route path="/order" element={<CustomerOrder />} />
+        <Route path="/o/:token" element={<CustomerStatus />} />
+      </Routes>
+    )
+  }
 
   if (loading) return <div className="empty">{t('loading')}</div>
   if (!user) return <Login />
