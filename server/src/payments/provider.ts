@@ -1,4 +1,5 @@
 import type { Order } from '../db/schema.js'
+import { paypalProvider } from './paypal.js'
 import { stripeProvider } from './stripe.js'
 
 /**
@@ -45,6 +46,12 @@ export function providersFromEnv(): ProviderRegistry {
   const registry: ProviderRegistry = new Map()
   if (process.env.STRIPE_SECRET_KEY) {
     registry.set('stripe', stripeProvider(process.env.STRIPE_SECRET_KEY))
+  }
+  if (process.env.PAYPAL_CLIENT_ID && process.env.PAYPAL_CLIENT_SECRET) {
+    registry.set(
+      'paypal',
+      paypalProvider(process.env.PAYPAL_CLIENT_ID, process.env.PAYPAL_CLIENT_SECRET),
+    )
   }
   return registry
 }

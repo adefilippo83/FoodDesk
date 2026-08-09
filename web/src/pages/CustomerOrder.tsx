@@ -220,28 +220,27 @@ export default function CustomerOrder() {
             />
           </label>
 
-          {(data.paymentMethods ?? []).includes('stripe') && (
+          {(data.paymentMethods ?? []).some((m) => m !== 'counter') && (
             <div className="field">
               <span style={{ display: 'block', marginBottom: 6 }}>{t('custPayHow')}</span>
-              <div className="row" style={{ gap: 16 }}>
-                <label className="row" style={{ gap: 6, alignItems: 'center' }}>
-                  <input
-                    type="radio"
-                    name="payment"
-                    checked={payment === 'counter'}
-                    onChange={() => setPayment('counter')}
-                  />
-                  <span>{t('custPayCounter')}</span>
-                </label>
-                <label className="row" style={{ gap: 6, alignItems: 'center' }}>
-                  <input
-                    type="radio"
-                    name="payment"
-                    checked={payment === 'stripe'}
-                    onChange={() => setPayment('stripe')}
-                  />
-                  <span>{t('custPayCard')}</span>
-                </label>
+              <div className="row" style={{ gap: 16, flexWrap: 'wrap' }}>
+                {(data.paymentMethods ?? []).map((m) => (
+                  <label key={m} className="row" style={{ gap: 6, alignItems: 'center' }}>
+                    <input
+                      type="radio"
+                      name="payment"
+                      checked={payment === m}
+                      onChange={() => setPayment(m)}
+                    />
+                    <span>
+                      {m === 'counter'
+                        ? t('custPayCounter')
+                        : m === 'stripe'
+                          ? t('custPayCard')
+                          : 'PayPal'}
+                    </span>
+                  </label>
+                ))}
               </div>
             </div>
           )}
