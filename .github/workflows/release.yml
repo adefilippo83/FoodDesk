@@ -44,7 +44,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # Maintenance line: never steal the "Latest" badge from 0.2.x.
           gh release create "$GITHUB_REF_NAME" \
             "fooddesk-${GITHUB_REF_NAME}.tar.gz" \
             --title "FoodDesk $GITHUB_REF_NAME" \
-            --generate-notes
+            --generate-notes \
+            --latest=false
