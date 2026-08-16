@@ -160,6 +160,38 @@ describe('order events (SSE) and idempotency', () => {
     assert.equal(copies.length, 1, 'the retry must not create a twin order')
   })
 
+  it('rejects a reused clientKey whose payload changed, instead of silently replaying', async () => {
+    const base = { customerName: 'Edited', clientKey: 'edit-key-1' }
+    const first = await app.inject({
+      method: 'POST',
+      url: '/api/orders',
+      headers: { cookie: opCookie },
+      payload: { ...base, items: [{ productId: beerId, qty: 1 }] },
+    })
+    assert.equal(first.statusCode, 201)
+
+    // Same key, an extra portion: a naive replay would return the 1-item order
+    // and lose the change. It must 409 so the client knows to use a fresh key.
+    const edited = await app.inject({
+      method: 'POST',
+      url: '/api/orders',
+      headers: { cookie: opCookie },
+      payload: { ...base, items: [{ productId: beerId, qty: 2 }] },
+    })
+    assert.equal(edited.statusCode, 409)
+    assert.equal(edited.json().error, 'payload_mismatch')
+
+    // The identical resubmission still replays cleanly (200, same order).
+    const same = await app.inject({
+      method: 'POST',
+      url: '/api/orders',
+      headers: { cookie: opCookie },
+      payload: { ...base, items: [{ productId: beerId, qty: 1 }] },
+    })
+    assert.equal(same.statusCode, 200)
+    assert.equal(same.json().id, first.json().id)
+  })
+
   it('treats distinct keys (and missing keys) as distinct orders', async () => {
     for (const clientKey of ['test-key-002', 'test-key-003', undefined]) {
       const res = await app.inject({

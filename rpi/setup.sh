@@ -209,8 +209,12 @@ echo "== maintenance login =="
 if ! id fooddesk-admin >/dev/null 2>&1; then
   # lpadmin: the same account authenticates on the CUPS web interface.
   useradd -m -s /bin/bash -G sudo,lpadmin fooddesk-admin
-  echo 'fooddesk-admin:fooddesk' | chpasswd
-  chage -d 0 fooddesk-admin   # force a password change on first login
+  # NO baked password. The venue Wi-Fi is shared with untrusted customer
+  # phones and sshd ships with password auth on, so a fixed default would
+  # hand root to anyone on the AP. The account is LOCKED here; first-boot
+  # provisioning sets a per-device random password and records it on the SD
+  # card (fooddesk-info.txt), exactly like the app admin password.
+  passwd -l fooddesk-admin
 fi
 
 echo "== smoke checks =="

@@ -83,12 +83,19 @@ nmcli connection modify fooddesk-ap \
 nmcli connection up fooddesk-ap || log "AP not up yet — it will start on the next boot"
 
 # ---- app configuration ----
-if [ -n "$RESTAURANT_NAME" ]; then
-  sed -i "s|^RESTAURANT_NAME=.*|RESTAURANT_NAME=$RESTAURANT_NAME|" "$ENV_FILE"
-fi
-if [ -n "$PDF_LANG" ]; then
-  sed -i "s|^PDF_LANG=.*|PDF_LANG=$PDF_LANG|" "$ENV_FILE"
-fi
+# Write values SINGLE-QUOTED. Both a shell `. env` (used by the updater and
+# backup scripts) and systemd's EnvironmentFile accept single-quoted values and
+# strip the quotes; without quoting, a value with a space like "Sagra del Borgo"
+# makes a sourcing script run "del Borgo" as a command and abort. printf (not
+# sed) writes the value so & | and friends are never re-interpreted.
+set_env() {
+  key="$1"
+  esc=$(printf '%s' "$2" | sed "s/'/'\\\\''/g")
+  sed -i "/^#\\?${key}=/d" "$ENV_FILE"
+  printf "%s='%s'\n" "$key" "$esc" >> "$ENV_FILE"
+}
+if [ -n "$RESTAURANT_NAME" ]; then set_env RESTAURANT_NAME "$RESTAURANT_NAME"; fi
+if [ -n "$PDF_LANG" ]; then set_env PDF_LANG "$PDF_LANG"; fi
 
 # ---- database + admin account ----
 # First boot: create everything, generating a password if none was given.
@@ -108,6 +115,18 @@ if [ -n "$ADMIN_PASSWORD" ]; then
   ADMIN_NOTE="$ADMIN_PASSWORD"
 fi
 systemctl restart --no-block fooddesk.service || true
+
+# ---- maintenance OS account (SSH / CUPS) password ----
+# Per-device random password, set on first boot only. Never a fixed default:
+# the account is shipped LOCKED (rpi/setup.sh) precisely so there is no
+# known-password window on the shared venue Wi-Fi. Written to fooddesk-info.txt.
+OS_ADMIN_NOTE='(unchanged)'
+if [ "$FIRST_RUN" = yes ] && id fooddesk-admin >/dev/null 2>&1; then
+  OS_ADMIN_PW="$(tr -dc 'a-z0-9' 2>/dev/null < /dev/urandom | head -c 14)"
+  echo "fooddesk-admin:$OS_ADMIN_PW" | chpasswd
+  chage -d 0 fooddesk-admin   # force a change on the first interactive login
+  OS_ADMIN_NOTE="$OS_ADMIN_PW"
+fi
 
 # ---- kiosk mode: the attached screen becomes the kitchen display ----
 if [ "$KIOSK" = "kitchen" ]; then
@@ -145,6 +164,9 @@ Open in the browser:  http://10.42.0.1/  (or http://fooddesk.local/)
 
 App login:       admin
 App password:    $ADMIN_NOTE
+
+SSH / maintenance (user fooddesk-admin):  $OS_ADMIN_NOTE
+  — a per-device password; you are prompted to change it on first SSH login.
 
 Change the admin password after the first login (tap your name, top right).
 To reconfigure: edit fooddesk.txt on this SD card partition (or over SSH)

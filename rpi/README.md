@@ -102,8 +102,9 @@ Two guarantees worth knowing:
 - Provisioning (`fooddesk-provision.service`): applies `fooddesk.txt` on
   first boot and re-applies it whenever the file changes; seeds the admin
   account and writes `fooddesk-info.txt` + the QR leaflet
-- Maintenance login `fooddesk-admin` / `fooddesk` (sudo; password change
-  forced at first login), SSH enabled
+- Maintenance login `fooddesk-admin` (sudo, SSH enabled) — its per-device
+  password is generated on first boot and printed in `fooddesk-info.txt`; you
+  are prompted to change it at first login
 - Ethernet stays free: plug in an uplink for internet or a network printer
 
 ## Printing

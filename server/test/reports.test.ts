@@ -179,4 +179,39 @@ describe('reports', () => {
     assert.equal(res.json()[0].ordersCount, 2)
     assert.equal(res.json()[0].revenueCents, 3250)
   })
+
+  it('neutralizes spreadsheet formula injection from an unauthenticated name', async () => {
+    // Runs last: this order changes the day's totals, which earlier tests assert.
+    const cat = await app.inject({
+      method: 'POST',
+      url: '/api/categories',
+      headers: { cookie: adminCookie },
+      payload: { name: 'Snacks' },
+    })
+    const chips = await app.inject({
+      method: 'POST',
+      url: '/api/products',
+      headers: { cookie: adminCookie },
+      payload: { name: 'Chips', priceCents: 300, categoryId: cat.json().id },
+    })
+    // A customer name Excel would evaluate as a formula.
+    await app.inject({
+      method: 'POST',
+      url: '/api/orders',
+      headers: { cookie: adminCookie },
+      payload: { customerName: '=1+2', items: [{ productId: chips.json().id, qty: 1 }] },
+    })
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/reports/daily.csv',
+      headers: { cookie: adminCookie },
+    })
+    const line = res.body.split('\r\n').find((l) => l.includes('=1+2'))!
+    // The cell is prefixed with a quote so it is treated as text, and no cell
+    // begins with a bare '='.
+    assert.ok(line.includes(";'=1+2;"), `formula not neutralized: ${line}`)
+    for (const cell of line.split(';')) {
+      assert.ok(!/^=/.test(cell), `a cell still starts with =: ${cell}`)
+    }
+  })
 })

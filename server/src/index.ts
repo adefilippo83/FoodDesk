@@ -4,7 +4,7 @@ import { buildApp } from './app.js'
 import { createDb, runMigrations } from './db/index.js'
 import { purgeExpiredSessions } from './auth/session.js'
 import { retryFailedPrints } from './print/service.js'
-import { sweepHeldOrders } from './payments/lifecycle.js'
+import { sweepHeldOrders, sweepStaleCounterOrders } from './payments/lifecycle.js'
 import { providersFromEnv } from './payments/provider.js'
 
 const DATABASE_FILE = process.env.DATABASE_FILE ?? './data/fooddesk.db'
@@ -34,6 +34,14 @@ const paymentProviders = providersFromEnv()
 setInterval(
   () => void sweepHeldOrders(db, paymentProviders, app.log).catch(() => {}),
   30 * 1000,
+).unref()
+
+// Unpaid customer counter orders reserve stock but have no provider to expire
+// them: reclaim the stock of ones the customer never came to pay for. Runs
+// even with no payment providers configured (counter ordering can be on alone).
+setInterval(
+  () => void sweepStaleCounterOrders(db, app.log).catch(() => {}),
+  60 * 1000,
 ).unref()
 
 const shutdown = async (signal: string) => {

@@ -26,6 +26,18 @@ health_ok() {
   return 1
 }
 
+# Read one key from the EnvironmentFile without sourcing it. `. "$ENV_FILE"`
+# under `set -e` aborts the whole update if any value has an unquoted space
+# (older appliances wrote RESTAURANT_NAME=Sagra del Borgo); this parser strips
+# optional surrounding quotes and never executes the value.
+read_env() {
+  line=$(grep -E "^$1=" "$ENV_FILE" 2>/dev/null | tail -n1) || return 0
+  val=${line#*=}
+  val=${val#[\"\']}
+  val=${val%[\"\']}
+  printf '%s' "$val"
+}
+
 if [ "${1:-}" = "--rollback" ]; then
   [ -d "$APP.prev" ] || { echo "no previous version at $APP.prev"; exit 1; }
   echo "== rolling back =="
@@ -71,7 +83,18 @@ echo "== installing dependencies (arm64) =="
 (cd "$STAGING" && npm ci --omit=dev && npm cache clean --force)
 
 echo "== snapshot before switching =="
-set -a; . "$ENV_FILE"; set +a
+DB="$(read_env DATABASE_FILE)"; DB="${DB:-/var/lib/fooddesk/fooddesk.db}"
+export DATABASE_FILE="$DB"
+BACKUP_DIR_VAL="$(read_env BACKUP_DIR)"; [ -n "$BACKUP_DIR_VAL" ] && export BACKUP_DIR="$BACKUP_DIR_VAL"
+# A dedicated pre-update snapshot at a known path: the new version migrates the
+# schema at boot, so if we later roll back the CODE the OLD binary may not read
+# the migrated DB — this snapshot is what makes the rollback actually recover.
+PRE_SNAPSHOT="$APP.pre-$TAG.db"
+if [ -f "$DB" ]; then
+  sqlite3 "$DB" ".backup '$PRE_SNAPSHOT'" || { echo "warning: pre-update DB snapshot failed"; PRE_SNAPSHOT=''; }
+else
+  PRE_SNAPSHOT=''
+fi
 "$APP/deploy/fooddesk-backup.sh" || echo "warning: pre-update backup failed"
 
 echo "== switching =="
@@ -84,12 +107,32 @@ systemctl start fooddesk.service
 
 if health_ok; then
   echo "updated to $TAG — previous version kept at $APP.prev (fooddesk-update --rollback)"
+  [ -n "$PRE_SNAPSHOT" ] && rm -f "$PRE_SNAPSHOT"
 else
   echo "health check FAILED — rolling back automatically"
   systemctl stop fooddesk.service
   mv "$APP" "$APP.failed-$TAG"
   mv "$APP.prev" "$APP"
   systemctl start fooddesk.service
-  echo "rolled back; the failed tree is at $APP.failed-$TAG"
+  if health_ok; then
+    echo "rolled back to the previous version; the failed tree is at $APP.failed-$TAG"
+    exit 1
+  fi
+  # The old code is unhealthy too — almost always because the new version
+  # already migrated the database forward and the old binary cannot read it.
+  # Restore the pre-update snapshot and try once more before giving up.
+  echo "rollback still unhealthy — restoring the pre-update database snapshot"
+  if [ -n "$PRE_SNAPSHOT" ] && [ -f "$PRE_SNAPSHOT" ]; then
+    systemctl stop fooddesk.service
+    rm -f "$DB" "$DB-wal" "$DB-shm"
+    cp "$PRE_SNAPSHOT" "$DB"
+    chown fooddesk:fooddesk "$DB" 2>/dev/null || true
+    systemctl start fooddesk.service
+    if health_ok; then
+      echo "restored the pre-update database; the appliance is back up (failed tree at $APP.failed-$TAG)"
+      exit 1
+    fi
+  fi
+  echo "CRITICAL: the appliance is DOWN after rollback. Restore a backup from ${BACKUP_DIR_VAL:-/var/backups/fooddesk} and reboot."
   exit 1
 fi

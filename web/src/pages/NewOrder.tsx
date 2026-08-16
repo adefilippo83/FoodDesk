@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api, formatMoney, type AppConfig, type MenuCategory, type OrderDetail } from '../api'
 import { useI18n } from '../i18n'
+import { newClientKey } from '../lib/clientKey'
 import { useOrdersEvents } from '../useOrdersEvents'
 
 type Line = { productId: number; name: string; priceCents: number; qty: number }
@@ -250,10 +251,7 @@ export default function NewOrder() {
     setError(null)
     try {
       // crypto.randomUUID needs a secure context; the venue LAN is plain http.
-      orderKeyRef.current ??=
-        typeof crypto.randomUUID === 'function'
-          ? crypto.randomUUID()
-          : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`
+      orderKeyRef.current ??= newClientKey()
       const order = await api.createOrder({
         customerName: customerName.trim(),
         // No coperto configured → no covers to count on this order.

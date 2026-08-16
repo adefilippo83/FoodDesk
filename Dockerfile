@@ -38,7 +38,10 @@ COPY docker/entrypoint.sh /usr/local/bin/fooddesk-entrypoint
 
 RUN chmod +x /usr/local/bin/fooddesk-entrypoint \
   && mkdir -p /data && chown node:node /data
-USER node
+# NOTE: no `USER node` here. The entrypoint starts as root ONLY to fix the
+# ownership of a root-owned host bind-mount, then drops to `node` for the app
+# (see docker/entrypoint.sh). A named volume already has correct ownership, so
+# the chown is a harmless no-op there.
 VOLUME /data
 EXPOSE 3000
 

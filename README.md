@@ -158,6 +158,7 @@ npm test          # 105 server tests; `npm run test:e2e` for the browser smoke t
 | `STRIPE_SECRET_KEY` | unset | Enables online card payments for customer self-orders (Stripe hosted checkout). Kept in env, never in the database or its backups |
 | `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET` | unset | Enables PayPal for customer self-orders (hosted approval; capture on verification). Env only, like the Stripe key |
 | `PAYPAL_ENV` | `live` | Set `sandbox` to test against PayPal's sandbox |
+| `COUNTER_ORDER_TTL_MIN` | `30` | Minutes an unpaid customer counter order keeps its reserved stock before it auto-expires and restocks |
 | `CUSTOMER_ORDER_CAP` | `30` | Max simultaneous open (unpaid) customer self-orders before new ones get "venue busy" |
 | `KIOSK_AUTOLOGIN_USER` | unset | Kitchen-role account auto-logged-in via `/api/auth/kiosk` — loopback-only, for an attached kiosk display ([rpi/README.md](rpi/README.md)) |
 

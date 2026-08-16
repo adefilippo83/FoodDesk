@@ -7,7 +7,7 @@ import { orderItems, orders, products, users, type Order } from '../db/schema.js
 import { notifyOrdersChanged } from '../lib/events.js'
 import { isServiceDay, serviceDayOf } from '../lib/serviceDay.js'
 import { parseItems, placeOrder } from '../lib/placeOrder.js'
-import { isHeld } from '../payments/lifecycle.js'
+import { cancelHeldOrder, isHeld } from '../payments/lifecycle.js'
 import type { OnlineMethod, ProviderRegistry } from '../payments/provider.js'
 import { renderKitchenTicket, renderOrderSheet, renderReceipt } from '../print/pdf.js'
 import { kitchenQueue, printKitchenTicket } from '../print/service.js'
@@ -68,6 +68,9 @@ export function orderRoutes(db: Db, providers: ProviderRegistry) {
         }
         if (result.code === 'products_unavailable') {
           return reply.code(409).send({ error: 'products_unavailable', unavailable: result.ids })
+        }
+        if (result.code === 'payload_mismatch') {
+          return reply.code(409).send({ error: 'payload_mismatch' })
         }
         return reply.code(409).send({ error: 'out_of_stock', unavailable: result.ids })
       }
@@ -135,13 +138,51 @@ export function orderRoutes(db: Db, providers: ProviderRegistry) {
       if (!order) return reply.code(404).send({ error: 'not_found' })
       if (order.cancelledAt) return { ...order } // idempotent
 
-      const updated = (
-        await db
+      // A held (mid-checkout, unpaid) online order is a different animal: the
+      // plain cancel below neither kills the live provider checkout — so the
+      // customer could still pay after the cancel with no refund — nor gives
+      // the reserved stock back. Route it through the lifecycle instead.
+      if (isHeld(order)) {
+        const outcome = await cancelHeldOrder(db, providers, order, req.log, req.user!.id)
+        if (outcome === 'in_progress' || outcome === 'paid') {
+          // Payment is completing (or just completed): do not cancel now. A
+          // retry once it settles takes the normal paid-cancel+refund path.
+          return reply.code(409).send({ error: 'payment_in_progress' })
+        }
+        const row = (await db.select().from(orders).where(eq(orders.id, id)).limit(1))[0]!
+        return { ...row }
+      }
+
+      const now = Math.floor(Date.now() / 1000)
+      const updated = db.transaction((tx) => {
+        const row = tx
           .update(orders)
-          .set({ cancelledAt: Math.floor(Date.now() / 1000), cancelledBy: req.user!.id })
+          .set({ cancelledAt: now, cancelledBy: req.user!.id })
           .where(eq(orders.id, id))
           .returning()
-      )[0]!
+          .get()!
+        // The whole order is off — its active lines return their reserved
+        // stock, exactly like cancelling each line individually does. A
+        // product that sold out through this order comes back on the menu.
+        const items = tx.select().from(orderItems).where(eq(orderItems.orderId, id)).all()
+        for (const item of items.filter((i) => i.cancelledAt === null)) {
+          tx.update(products)
+            .set({ stockRemaining: sql`${products.stockRemaining} + ${item.qty}` })
+            .where(and(eq(products.id, item.productId), isNotNull(products.stockRemaining)))
+            .run()
+          tx.update(products)
+            .set({ active: true })
+            .where(
+              and(
+                eq(products.id, item.productId),
+                eq(products.active, false),
+                eq(products.stockRemaining, item.qty),
+              ),
+            )
+            .run()
+        }
+        return row
+      })
       req.log.info(
         {
           event: 'order_cancelled',
@@ -424,13 +465,22 @@ export function orderRoutes(db: Db, providers: ProviderRegistry) {
         return reply.code(409).send({ error: 'online_payment_pending' })
       }
 
+      // Conditional: the counter-order TTL sweep may cancel this very order
+      // between our read and this write. The WHERE makes exactly one of the
+      // two win — an order can never end up both cancelled and paid.
       const updated = (
         await db
           .update(orders)
           .set({ paidAt: Math.floor(Date.now() / 1000), paymentMethod: 'cash' })
-          .where(eq(orders.id, id))
+          .where(and(eq(orders.id, id), isNull(orders.paidAt), isNull(orders.cancelledAt)))
           .returning()
-      )[0]!
+      )[0]
+      if (!updated) {
+        // Lost the race: report what actually happened.
+        const now = (await db.select().from(orders).where(eq(orders.id, id)).limit(1))[0]!
+        if (now.cancelledAt) return reply.code(409).send({ error: 'order_cancelled' })
+        return { ...now } // paid by a colleague meanwhile — idempotent
+      }
       req.log.info(
         { event: 'order_paid', by: req.user!.id, orderId: id, method: 'cash' },
         'audit',
@@ -523,7 +573,14 @@ export function orderRoutes(db: Db, providers: ProviderRegistry) {
               .limit(1)
           )[0]?.name ?? null)
         : null
-      return { ...order, cancelledByName, items }
+      // Never hand the client the provider payment reference, the idempotency
+      // key or the unguessable public token — none are staff business and the
+      // token would let anyone follow the customer's order.
+      const safe: Partial<typeof order> = { ...order }
+      delete safe.paymentRef
+      delete safe.clientKey
+      delete safe.publicToken
+      return { ...safe, held: isHeld(order), cancelledByName, items }
     })
   }
 }

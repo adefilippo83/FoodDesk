@@ -135,7 +135,10 @@ export default function Orders() {
   useOrdersEvents(() => void load())
 
   // Held payments are provisional: on screen, but not in the day's money.
-  const settled = orders.filter((o) => !o.held)
+  // The day's money: exclude held (payment in progress), cancelled and
+  // auto-refunded/expired orders, so the header agrees with the Reports page
+  // and the cash drawer instead of counting orders that earned nothing.
+  const settled = orders.filter((o) => !o.held && o.cancelledAt === null)
   const dayTotal = settled.reduce((sum, o) => sum + o.totalCents, 0)
 
   if (loading) return <div className="empty">{t('loading')}</div>

@@ -231,4 +231,46 @@ describe('stock and quantity edits', () => {
     assert.equal(tooMany.json().error, 'out_of_stock')
     assert.equal((await stockOf(trackedId)).stockRemaining, 2, 'nothing consumed on refusal')
   })
+
+  it('returns reserved stock when the whole order is cancelled', async () => {
+    const cat = await app.inject({
+      method: 'POST',
+      url: '/api/categories',
+      headers: { cookie: adminCookie },
+      payload: { name: 'Dolci' },
+    })
+    const tiramisu = await app.inject({
+      method: 'POST',
+      url: '/api/products',
+      headers: { cookie: adminCookie },
+      payload: { name: 'Tiramisù', priceCents: 400, categoryId: cat.json().id },
+    })
+    const id = tiramisu.json().id
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/products/${id}`,
+      headers: { cookie: adminCookie },
+      payload: { stockRemaining: 2 },
+    })
+
+    // Order the last two: stock hits 0 and the product drops off the menu.
+    const order = await app.inject({
+      method: 'POST',
+      url: '/api/orders',
+      headers: { cookie: marcoCookie },
+      payload: { customerName: 'Bianchi', items: [{ productId: id, qty: 2 }] },
+    })
+    assert.equal(order.statusCode, 201)
+    assert.deepEqual(await stockOf(id), { stockRemaining: 0, active: false })
+
+    // Cancelling the whole order gives the portions back and re-lists it —
+    // exactly like cancelling each line does.
+    const cancel = await app.inject({
+      method: 'POST',
+      url: `/api/orders/${order.json().id}/cancel`,
+      headers: { cookie: adminCookie },
+    })
+    assert.equal(cancel.statusCode, 200)
+    assert.deepEqual(await stockOf(id), { stockRemaining: 2, active: true })
+  })
 })

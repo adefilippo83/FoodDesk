@@ -168,7 +168,13 @@ function buildReport(day: string, data: { orders: OrderRow[]; items: ItemRow[] }
 function toCsv(data: { orders: OrderRow[]; items: ItemRow[] }): string {
   const esc = (v: string | number | null): string => {
     const s = v === null ? '' : String(v)
-    return /[;"\n]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s
+    // Neutralize spreadsheet formula injection: a customer name (unauthenticated
+    // input) like =HYPERLINK(...) or a DDE payload would otherwise be evaluated
+    // when the CSV is opened. A leading formula/control char gets a ' prefix so
+    // Excel/LibreOffice treat the cell as text. \r is quoted too — a lone one
+    // would split the record.
+    const guarded = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s
+    return /[;"\n\r]/.test(guarded) ? `"${guarded.replaceAll('"', '""')}"` : guarded
   }
   const money = (cents: number) => (cents / 100).toFixed(2).replace('.', ',')
   const byOrder = new Map<number, ItemRow[]>()
@@ -227,8 +233,20 @@ async function renderReportPdf(
     doc.on('error', reject)
   })
   const pageW = 595.28
+  const pageH = 841.89
+  const pageBottom = pageH - margin
   const innerW = pageW - margin * 2
   const money = (cents: number) => `€ ${(cents / 100).toFixed(2).replace('.', ',')}`
+
+  // Break to a new page when the next block would run past the bottom margin,
+  // so a row's name never lands on a page while its qty/revenue stay behind.
+  const ensureRoom = (h: number) => {
+    if (doc.y + h > pageBottom) {
+      doc.addPage()
+      doc.x = margin
+      doc.y = margin
+    }
+  }
 
   doc.font('Helvetica-Bold').fontSize(20).text(restaurantName)
   doc.font('Helvetica').fontSize(12).fillColor('#555').text(`Report · ${report.serviceDay}`)
@@ -254,26 +272,31 @@ async function renderReportPdf(
   doc.x = margin
   doc.y = statY + 40
 
+    const colQty = margin + innerW - 140
+    const colRev = margin + innerW - 70
+    const nameW = colQty - margin - 8
   const table = (title: string, rows: Tally[]) => {
     // Reset the cursor: the previous table leaves doc.x at its last column.
     doc.x = margin
     doc.moveDown(1)
+    // Keep the title, the header row and the first data row together.
+    ensureRoom(46)
     doc.font('Helvetica-Bold').fontSize(13).text(title, margin, doc.y, { width: innerW })
     doc.moveDown(0.3)
-    const colQty = margin + innerW - 140
-    const colRev = margin + innerW - 70
     const header = doc.y
     doc.font('Helvetica').fontSize(9).fillColor('#555')
-    doc.text('Nome', margin, header, { width: colQty - margin - 8 })
+    doc.text('Nome', margin, header, { width: nameW })
     doc.text('Q.tà', colQty, header, { width: 60, align: 'right' })
     doc.text('Incasso', colRev, header, { width: 70, align: 'right' })
     doc.fillColor('#000')
     doc.moveTo(margin, doc.y + 2).lineTo(margin + innerW, doc.y + 2).strokeColor('#999').stroke()
     doc.y += 6
     for (const r of rows) {
-      const y = doc.y
       doc.font('Helvetica').fontSize(10)
-      doc.text(r.name, margin, y, { width: colQty - margin - 8 })
+      const rowH = Math.max(doc.heightOfString(r.name, { width: nameW }), 12) + 2
+      ensureRoom(rowH)
+      const y = doc.y
+      doc.text(r.name, margin, y, { width: nameW })
       const bottom = doc.y
       doc.text(String(r.qty), colQty, y, { width: 60, align: 'right' })
       doc.text(money(r.revenueCents), colRev, y, { width: 70, align: 'right' })

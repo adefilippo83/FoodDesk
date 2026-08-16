@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ApiError, api, formatMoney, type PublicMenu } from '../api'
 import { LangToggle, useI18n } from '../i18n'
+import { newClientKey } from '../lib/clientKey'
 import { rememberMyOrder } from '../myOrders'
 
 /**
@@ -70,7 +71,7 @@ export default function CustomerOrder() {
     if (lines.length === 0) return setError(t('custCartEmpty'))
     setSending(true)
     setError(null)
-    orderKeyRef.current ??= crypto.randomUUID()
+    orderKeyRef.current ??= newClientKey()
     try {
       const res = await api.publicCreateOrder({
         customerName: name.trim(),
@@ -89,7 +90,11 @@ export default function CustomerOrder() {
       }
       navigate(`/o/${res.publicToken}`)
     } catch (err) {
-      orderKeyRef.current = crypto.randomUUID() // fresh key for a changed retry
+      // Rotate the key ONLY when the server definitively rejected the order
+      // (an ApiError means it responded and created nothing usable). On a
+      // network-level failure the order may actually have landed, so keep the
+      // key: the retry then replays that order instead of creating a twin.
+      if (err instanceof ApiError) orderKeyRef.current = newClientKey()
       setError(
         err instanceof ApiError && err.code === 'venue_busy'
           ? t('custBusy')

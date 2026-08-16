@@ -111,8 +111,9 @@ Due garanzie da conoscere:
 - Provisioning (`fooddesk-provision.service`): applica `fooddesk.txt` al
   primo avvio e lo riapplica ogni volta che il file cambia; crea l'account
   admin e scrive `fooddesk-info.txt` + il volantino QR
-- Login di manutenzione `fooddesk-admin` / `fooddesk` (sudo; cambio
-  password obbligatorio al primo accesso), SSH abilitato
+- Login di manutenzione `fooddesk-admin` (sudo, SSH abilitato) — la password,
+  diversa per ogni dispositivo, viene generata al primo avvio e scritta in
+  `fooddesk-info.txt`; ti viene chiesto di cambiarla al primo accesso
 - La Ethernet resta libera: collega un uplink per internet o una stampante
   di rete
 

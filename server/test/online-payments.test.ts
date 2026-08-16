@@ -356,4 +356,96 @@ describe('online payments (phase B, fake provider)', () => {
       bare.close()
     }
   })
+
+  /** The held row's order id, via the staff list (held rows are listed flagged). */
+  const heldOrderId = async (customerName: string) => {
+    const listed = await app.inject({
+      method: 'GET',
+      url: '/api/orders',
+      headers: { cookie: adminCookie },
+    })
+    const row = listed
+      .json()
+      .orders.find((o: { customerName: string }) => o.customerName === customerName)
+    assert.ok(row, 'held order should be listed for staff')
+    assert.equal(row.held, true)
+    return row.id as number
+  }
+
+  it('manager cancel of a held order kills the checkout, restocks, and blocks late payment', async () => {
+    const before = await stockOf()
+    const refundsBefore = fake.state.refunds.length
+    const created = await createOrder({ customerName: 'Held Hilda' })
+    const { publicToken, paymentUrl } = created.json()
+    const ref = paymentUrl.split('/').pop()!
+    assert.equal(await stockOf(), before! - 1) // reserved while held
+
+    const id = await heldOrderId('Held Hilda')
+    const cancel = await app.inject({
+      method: 'POST',
+      url: `/api/orders/${id}/cancel`,
+      headers: { cookie: adminCookie },
+    })
+    assert.equal(cancel.statusCode, 200)
+
+    // The provider checkout was cancelled (Stripe: session expired) so the
+    // customer cannot pay after the cancel, and the stock came back.
+    assert.ok(fake.state.cancels.includes(ref), 'provider checkout must be cancelled')
+    assert.equal(await stockOf(), before!) // restocked
+
+    // Even if the provider now reports paid, the cancelled order never flips
+    // to paid, and nothing was captured so no refund was needed.
+    fake.state.checks.set(ref, 'paid')
+    const st = await status(publicToken)
+    assert.equal(st.json().paymentState, 'failed')
+    assert.equal(fake.state.refunds.length, refundsBefore) // nothing captured → nothing to refund
+  })
+
+  it('refuses to cancel a held order whose payment is completing, keeping it recoverable', async () => {
+    const before = await stockOf()
+    const created = await createOrder({ customerName: 'Racing Rina' })
+    const { publicToken, paymentUrl } = created.json()
+    const ref = paymentUrl.split('/').pop()!
+    const id = await heldOrderId('Racing Rina')
+
+    // Provider refuses the cancel: the payment is already completing.
+    fake.state.cancelThrows = true
+    const cancel = await app.inject({
+      method: 'POST',
+      url: `/api/orders/${id}/cancel`,
+      headers: { cookie: adminCookie },
+    })
+    assert.equal(cancel.statusCode, 409)
+    assert.equal(cancel.json().error, 'payment_in_progress')
+    // Still held, stock still reserved — the money is not lost.
+    assert.equal(await stockOf(), before! - 1)
+    assert.equal((await heldOrderId('Racing Rina')) > 0, true)
+
+    // The payment completes; the next poll delivers the order to the kitchen.
+    fake.state.cancelThrows = false
+    fake.state.checks.set(ref, 'paid')
+    const st = await status(publicToken)
+    assert.equal(st.json().paymentState, 'paid')
+  })
+
+  it('never leaks paymentRef, clientKey or publicToken from the order detail', async () => {
+    const created = await createOrder({ customerName: 'Leaky Lena' })
+    const { publicToken, paymentUrl } = created.json()
+    const ref = paymentUrl.split('/').pop()!
+    const id = await heldOrderId('Leaky Lena')
+    fake.state.checks.set(ref, 'paid')
+    await status(publicToken) // finalize
+
+    const detail = await app.inject({
+      method: 'GET',
+      url: `/api/orders/${id}`,
+      headers: { cookie: adminCookie },
+    })
+    assert.equal(detail.statusCode, 200)
+    const body = detail.json()
+    assert.equal(body.paymentRef, undefined, 'provider reference must not leak')
+    assert.equal(body.clientKey, undefined, 'idempotency key must not leak')
+    assert.equal(body.publicToken, undefined, 'the follow-your-order token must not leak')
+    assert.equal(body.paymentMethod, 'stripe', 'non-sensitive fields are still present')
+  })
 })

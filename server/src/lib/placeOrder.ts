@@ -53,7 +53,25 @@ export type PlaceOrderInput = {
 
 export type PlaceOrderResult =
   | { ok: true; order: Order; items: OrderItem[]; replayed: boolean }
-  | { ok: false; code: 'unknown_products' | 'products_unavailable' | 'out_of_stock'; ids: number[] }
+  | {
+      ok: false
+      code: 'unknown_products' | 'products_unavailable' | 'out_of_stock' | 'payload_mismatch'
+      ids: number[]
+    }
+
+/** Canonical signature of what an order is FOR: which products, how many,
+ *  how many covers, whose name — order-insensitive across the item list. */
+function orderSignature(
+  items: { productId: number; qty: number }[],
+  covers: number,
+  customerName: string,
+): string {
+  const lines = items
+    .map((i) => `${i.productId}x${i.qty}`)
+    .sort()
+    .join(',')
+  return `${lines}|${covers}|${customerName}`
+}
 
 export async function placeOrder(db: Db, input: PlaceOrderInput): Promise<PlaceOrderResult> {
   // Idempotency: a retry of a submission that actually landed (flaky venue
@@ -67,6 +85,12 @@ export async function placeOrder(db: Db, input: PlaceOrderInput): Promise<PlaceO
       .select()
       .from(orderItems)
       .where(eq(orderItems.orderId, existing.id))
+    // The key identifies a submission, not a blank cheque: a retry that
+    // changed the cart (a waiter added a line after a flaky-network timeout)
+    // must NOT silently return the original order and lose the change.
+    const submitted = orderSignature(input.items, input.covers, input.customerName)
+    const stored = orderSignature(existingItems, existing.covers, existing.customerName ?? '')
+    if (submitted !== stored) return { ok: false, code: 'payload_mismatch', ids: [] }
     return { ok: true, order: existing, items: existingItems, replayed: true }
   }
   if (input.clientKey) {

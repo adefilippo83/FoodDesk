@@ -26,7 +26,19 @@ function orderCap(): number {
   return Number.isInteger(n) && n > 0 ? n : 30
 }
 
+// A held SSE socket costs a file descriptor and an event-bus listener for its
+// whole lifetime. The per-IP rate limit caps the connect RATE but not how many
+// stay open, so an attacker could hold thousands and exhaust the process. Cap
+// concurrent public streams globally and per IP, and force-close a stream after
+// an absolute lifetime (the client's EventSource reconnects on its own).
+const MAX_PUBLIC_SSE_TOTAL = 200
+const MAX_PUBLIC_SSE_PER_IP = 5
+const PUBLIC_SSE_MAX_LIFETIME_MS = 30 * 60 * 1000
+
 export function publicRoutes(db: Db, providers: ProviderRegistry) {
+  let publicSseTotal = 0
+  const publicSsePerIp = new Map<string, number>()
+
   return async function register(app: FastifyInstance) {
     /** 404 when the feature is off: the surface simply does not exist. */
     async function enabled(): Promise<boolean> {
@@ -164,6 +176,9 @@ export function publicRoutes(db: Db, providers: ProviderRegistry) {
           if (result.code === 'products_unavailable') {
             return reply.code(409).send({ error: 'products_unavailable', unavailable: result.ids })
           }
+          if (result.code === 'payload_mismatch') {
+            return reply.code(409).send({ error: 'payload_mismatch' })
+          }
           return reply.code(409).send({ error: 'out_of_stock', unavailable: result.ids })
         }
 
@@ -264,6 +279,14 @@ export function publicRoutes(db: Db, providers: ProviderRegistry) {
         )[0]
         if (!known) return reply.code(404).send({ error: 'not_found' })
 
+        // Refuse when the global or per-IP ceiling is reached: better to drop
+        // the live nudge (the phone still polls) than to exhaust the server.
+        const ip = req.ip
+        const perIp = publicSsePerIp.get(ip) ?? 0
+        if (publicSseTotal >= MAX_PUBLIC_SSE_TOTAL || perIp >= MAX_PUBLIC_SSE_PER_IP) {
+          return reply.code(503).send({ error: 'too_many_streams' })
+        }
+
         reply.hijack()
         const raw = reply.raw
         raw.writeHead(200, {
@@ -272,14 +295,28 @@ export function publicRoutes(db: Db, providers: ProviderRegistry) {
           'x-accel-buffering': 'no',
         })
         raw.write('retry: 3000\n\n')
+        publicSseTotal++
+        publicSsePerIp.set(ip, perIp + 1)
+        let closed = false
+        const close = () => {
+          if (closed) return
+          closed = true
+          clearInterval(heartbeat)
+          clearTimeout(lifetime)
+          ordersBus.off('orders', onOrders)
+          publicSseTotal--
+          const n = (publicSsePerIp.get(ip) ?? 1) - 1
+          if (n <= 0) publicSsePerIp.delete(ip)
+          else publicSsePerIp.set(ip, n)
+          raw.end()
+        }
         const onOrders = () => raw.write('event: orders\ndata: {}\n\n')
         ordersBus.on('orders', onOrders)
         const heartbeat = setInterval(() => raw.write(': keep-alive\n\n'), 25_000)
         heartbeat.unref()
-        req.raw.on('close', () => {
-          clearInterval(heartbeat)
-          ordersBus.off('orders', onOrders)
-        })
+        const lifetime = setTimeout(close, PUBLIC_SSE_MAX_LIFETIME_MS)
+        lifetime.unref()
+        req.raw.on('close', close)
       },
     )
 
