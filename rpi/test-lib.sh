@@ -117,6 +117,21 @@ wait_http() { # url, timeout-iterations (x4s) — a service can be "active"
   return 1
 }
 
+wait_app_env() { # KEY=VALUE, timeout-iterations (x4s) — provisioning restarts
+  # the app with --no-block, so the new process may not be up yet.
+  local want="$1" tries="${2:-15}" i
+  for i in $(seq 1 "$tries"); do
+    if run_in sh -c \
+      "p=\$(systemctl show -p MainPID --value fooddesk.service); tr '\\0' '\\n' < /proc/\$p/environ | grep -qxF '$want'" \
+      2>/dev/null; then
+      return 0
+    fi
+    sleep 4
+  done
+  echo "timeout waiting for the app process to see $want"
+  return 1
+}
+
 wait_active() { # unit, timeout-iterations (x5s)
   local unit="$1" tries="${2:-60}" i
   for i in $(seq 1 "$tries"); do

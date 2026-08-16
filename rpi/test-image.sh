@@ -91,8 +91,16 @@ boot_machine
 wait_active fooddesk-provision.service 90
 wait_active fooddesk.service 30
 wait_http http://127.0.0.1:3000/api/health
-grep -q '^RESTAURANT_NAME=CI Sagra$' "$MNT/etc/fooddesk/env"
-echo "restaurant name applied: ok"
+# Values land shell-QUOTED. The updater and the backup scripts source this
+# file under `set -e`, where an unquoted multi-word value makes the shell run
+# its stray words as commands ("Sagra del Borgo" → `del Borgo`) and abort.
+grep -q "^RESTAURANT_NAME='CI Sagra'\$" "$MNT/etc/fooddesk/env"
+run_in sh -c 'set -eu; . /etc/fooddesk/env; test "$RESTAURANT_NAME" = "CI Sagra"'
+echo "restaurant name applied, sources cleanly in a shell: ok"
+# systemd strips those quotes again on the way to the app — a literal quote
+# here would end up printed on every receipt.
+wait_app_env 'RESTAURANT_NAME=CI Sagra'
+echo "app process sees the unquoted value: ok"
 grep -q 'CISagra' "$INFO" && grep -q 'App password:  *(unchanged)' "$INFO"
 echo "info file rewritten, password untouched: ok"
 run_in curl -fsS -X POST http://127.0.0.1:3000/api/auth/login \

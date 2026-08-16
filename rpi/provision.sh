@@ -92,6 +92,11 @@ set_env() {
   key="$1"
   esc=$(printf '%s' "$2" | sed "s/'/'\\\\''/g")
   sed -i "/^#\\?${key}=/d" "$ENV_FILE"
+  # A hand-edited file may lack its final newline; appending blind would then
+  # glue our assignment onto the previous line.
+  if [ -s "$ENV_FILE" ] && [ -n "$(tail -c1 "$ENV_FILE")" ]; then
+    printf '\n' >> "$ENV_FILE"
+  fi
   printf "%s='%s'\n" "$key" "$esc" >> "$ENV_FILE"
 }
 if [ -n "$RESTAURANT_NAME" ]; then set_env RESTAURANT_NAME "$RESTAURANT_NAME"; fi
