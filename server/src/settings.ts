@@ -240,12 +240,17 @@ export async function saveSettings(
     writes.push([key, v])
   }
 
-  for (const [key, value] of writes) {
-    await db
-      .insert(settings)
-      .values({ key, value })
-      .onConflictDoUpdate({ target: settings.key, set: { value } })
-  }
+  // All or nothing: a failure part-way through the loop would otherwise leave
+  // half a settings page saved, which is how you get a receipt with the new
+  // logo and the old paper size.
+  db.transaction((tx) => {
+    for (const [key, value] of writes) {
+      tx.insert(settings)
+        .values({ key, value })
+        .onConflictDoUpdate({ target: settings.key, set: { value } })
+        .run()
+    }
+  })
   return null
 }
 

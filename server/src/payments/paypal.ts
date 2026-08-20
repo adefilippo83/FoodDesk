@@ -1,4 +1,5 @@
 import type { Order } from '../db/schema.js'
+import { PROVIDER_TIMEOUT_MS } from './http.js'
 import type { CreatedPayment, PaymentCheck, PaymentProvider } from './provider.js'
 
 /**
@@ -44,6 +45,7 @@ export function paypalProvider(clientId: string, clientSecret: string): PaymentP
         'content-type': 'application/x-www-form-urlencoded',
       },
       body: 'grant_type=client_credentials',
+      signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
     })
     const body = (await res.json().catch(() => ({}))) as Json
     if (!res.ok || typeof body.access_token !== 'string') {
@@ -63,6 +65,7 @@ export function paypalProvider(clientId: string, clientSecret: string): PaymentP
           'content-type': 'application/json',
         },
         body: payload === undefined ? undefined : JSON.stringify(payload),
+        signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
       })
     let res = await call(await accessToken())
     // A stale cached token gets exactly one refresh-and-retry.

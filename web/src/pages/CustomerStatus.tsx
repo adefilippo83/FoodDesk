@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ApiError, api, formatMoney, type PublicOrderStatus } from '../api'
 import { LangToggle, useI18n } from '../i18n'
@@ -19,29 +19,36 @@ export default function CustomerStatus() {
   // page keeps polling fast until the money question is settled; after that
   // SSE carries the updates and the poll is only a slow safety net.
   const pendingPayment = order?.paymentState === 'pending'
-  useEffect(() => {
+
+  // One fetcher, stable for the life of the token, so neither effect below
+  // has to be re-created when the payment state changes.
+  const load = useCallback(async () => {
     if (!token) return
-    const es = new EventSource(`/api/public/orders/${token}/events`)
-    const timer: { id?: ReturnType<typeof setInterval> } = {}
-    const stop = () => {
-      es.close()
-      if (timer.id) clearInterval(timer.id)
+    try {
+      setOrder(await api.publicOrderStatus(token))
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) setMissing(true)
     }
-    const load = () =>
-      api
-        .publicOrderStatus(token)
-        .then(setOrder)
-        .catch((err) => {
-          if (err instanceof ApiError && err.status === 404) {
-            setMissing(true)
-            stop()
-          }
-        })
+  }, [token])
+
+  // The live channel belongs to the token alone. Keyed on anything else it
+  // would drop and re-open the stream every time the payment state moved —
+  // reconnecting mid-checkout, exactly when the customer is watching.
+  useEffect(() => {
+    if (!token || missing) return
     void load()
+    const es = new EventSource(`/api/public/orders/${token}/events`)
     es.addEventListener('orders', () => void load())
-    timer.id = setInterval(() => void load(), pendingPayment ? 5000 : 30000)
-    return stop
-  }, [token, pendingPayment])
+    return () => es.close()
+  }, [token, missing, load])
+
+  // The safety-net poll runs fast only while a payment still needs verifying
+  // (verification rides on the fetch); once settled, SSE carries the updates.
+  useEffect(() => {
+    if (!token || missing) return
+    const timer = setInterval(() => void load(), pendingPayment ? 5000 : 30000)
+    return () => clearInterval(timer)
+  }, [token, missing, pendingPayment, load])
 
   if (missing) {
     return (

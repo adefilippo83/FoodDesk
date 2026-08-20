@@ -13,7 +13,7 @@ There are two supported ways to run it — pick one:
 | Install | Docker + one compose file | `sudo deploy/install.sh` |
 | Update | `docker compose pull && docker compose up -d` | `git pull && sudo deploy/install.sh` |
 | Rollback | Point the compose file at the previous version tag | `git checkout v…` + reinstall |
-| Backups | One cron line (below) | Bundled 15-minute systemd timer |
+| Backups | Two cron lines (below) | Bundled 15-minute systemd timer |
 | Printing | Via the **host's** CUPS (`CUPS_SERVER`) | Host CUPS, direct |
 
 Either way, CUPS itself runs on the host — set the printer up once (§ Printing).
@@ -50,7 +50,8 @@ cd /opt/fooddesk && sudo docker compose pull && sudo docker compose up -d
 ```
 
 **Backups** — a consistent snapshot every 15 minutes, kept one day deep
-(96 rotating files named by time of day), plus 14 daily archives:
+(96 rotating files named by time of day), plus a daily archive per weekday
+(7 files, each overwritten a week later):
 
 ```bash
 sudo apt-get install -y sqlite3
@@ -84,8 +85,8 @@ cd FoodDesk
 sudo deploy/install.sh
 ```
 
-> Node 26 becomes LTS in late October 2026; until this repo's CI targets it,
-> stay on 24 — it is supported through April 2028.
+> Node 26 becomes LTS in late October 2026. CI already builds and tests on
+> both, but 24 is the supported runtime here — it lasts through April 2028.
 
 The installer is idempotent — it creates the `fooddesk` system user, builds
 into `/opt/fooddesk`, seeds the admin account (**the generated password is
@@ -106,6 +107,9 @@ migrations run automatically when the service starts.
 ```bash
 systemctl stop fooddesk
 gunzip -c /var/backups/fooddesk/fooddesk-<stamp>.db.gz > /var/lib/fooddesk/fooddesk.db
+# Remove the old write-ahead log: left behind, SQLite would replay it over
+# the snapshot you just restored and undo the restore.
+rm -f /var/lib/fooddesk/fooddesk.db-wal /var/lib/fooddesk/fooddesk.db-shm
 chown fooddesk:fooddesk /var/lib/fooddesk/fooddesk.db
 systemctl start fooddesk
 ```

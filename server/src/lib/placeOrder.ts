@@ -81,6 +81,13 @@ export async function placeOrder(db: Db, input: PlaceOrderInput): Promise<PlaceO
       await db.select().from(orders).where(eq(orders.clientKey, input.clientKey!)).limit(1)
     )[0]
     if (!existing) return null
+    // A key identifies one submitter's submission. Matching on the key alone
+    // would let a customer's "retry" hand back a staff order — different
+    // surface, different fields, someone else's data.
+    if (existing.origin !== input.origin) return { ok: false, code: 'payload_mismatch', ids: [] }
+    if (input.origin === 'staff' && existing.createdBy !== input.createdBy) {
+      return { ok: false, code: 'payload_mismatch', ids: [] }
+    }
     const existingItems = await db
       .select()
       .from(orderItems)

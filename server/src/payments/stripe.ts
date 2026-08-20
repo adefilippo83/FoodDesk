@@ -1,4 +1,5 @@
 import type { Order } from '../db/schema.js'
+import { PROVIDER_TIMEOUT_MS } from './http.js'
 import type { CreatedPayment, PaymentCheck, PaymentProvider } from './provider.js'
 
 /**
@@ -23,6 +24,9 @@ async function stripeReq(
       ...(params ? { 'content-type': 'application/x-www-form-urlencoded' } : {}),
     },
     body: params ? new URLSearchParams(params).toString() : undefined,
+    // Without a deadline a hung provider connection blocks a sweep pass (and
+    // a customer's status poll) indefinitely.
+    signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
   })
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>
   if (!res.ok) {
