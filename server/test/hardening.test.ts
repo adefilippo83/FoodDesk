@@ -370,11 +370,16 @@ describe('hardening regressions', () => {
       'evil.example.com/../@attacker.test',
     ]) {
       const url = await orderWithHost(host, `Forged ${host}`)
-      assert.ok(
-        !url.includes('attacker') && !url.includes('evil.example.com'),
-        `return URL followed a forged Host ${host}: ${url}`,
+      // Compare the parsed HOST component, never substrings of the whole URL:
+      // the token is random and could contain anything, so a substring test
+      // would be both weaker and liable to fail for the wrong reason.
+      const returned = new URL(url)
+      assert.equal(
+        returned.host,
+        'localhost',
+        `forged Host ${host} reached the return URL: ${url}`,
       )
-      assert.match(url, /\/o\/[A-Za-z0-9_-]{20,}$/)
+      assert.match(returned.pathname, /^\/o\/[A-Za-z0-9_-]{20,}$/)
     }
   })
 
@@ -383,7 +388,9 @@ describe('hardening regressions', () => {
     // and nginx passes that Host through. Those must keep working.
     for (const host of ['10.42.0.1', 'fooddesk.local', '192.168.1.50:8080']) {
       const url = await orderWithHost(host, `Local ${host}`)
-      assert.ok(url.startsWith(`http://${host}/o/`), `lost the venue address: ${url}`)
+      const returned = new URL(url)
+      assert.equal(returned.host, host, `lost the venue address: ${url}`)
+      assert.match(returned.pathname, /^\/o\/[A-Za-z0-9_-]{20,}$/)
     }
   })
 
@@ -391,7 +398,9 @@ describe('hardening regressions', () => {
     process.env.PUBLIC_BASE_URL = 'https://ordini.example.com/'
     try {
       const url = await orderWithHost('attacker.test', 'Domain Dora')
-      assert.ok(url.startsWith('https://ordini.example.com/o/'), url)
+      const returned = new URL(url)
+      assert.equal(returned.origin, 'https://ordini.example.com', url)
+      assert.match(returned.pathname, /^\/o\/[A-Za-z0-9_-]{20,}$/)
     } finally {
       delete process.env.PUBLIC_BASE_URL
     }
