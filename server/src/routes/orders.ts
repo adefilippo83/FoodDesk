@@ -155,12 +155,16 @@ export function orderRoutes(db: Db, providers: ProviderRegistry) {
 
       const now = Math.floor(Date.now() / 1000)
       const updated = db.transaction((tx) => {
+        // Conditional on "not already cancelled": two managers hitting cancel
+        // at once would otherwise both pass the read check above, both restock,
+        // and both fire a refund — charging the venue twice.
         const row = tx
           .update(orders)
           .set({ cancelledAt: now, cancelledBy: req.user!.id })
-          .where(eq(orders.id, id))
+          .where(and(eq(orders.id, id), isNull(orders.cancelledAt)))
           .returning()
-          .get()!
+          .get()
+        if (!row) return null
         // The whole order is off — its active lines return their reserved
         // stock, exactly like cancelling each line individually does. A
         // product that sold out through this order comes back on the menu.
@@ -183,6 +187,12 @@ export function orderRoutes(db: Db, providers: ProviderRegistry) {
         }
         return row
       })
+      if (!updated) {
+        // A concurrent cancel won: it is doing (or has done) the restock and
+        // the refund. Answer idempotently with the current row.
+        const current = (await db.select().from(orders).where(eq(orders.id, id)).limit(1))[0]!
+        return { ...current }
+      }
       req.log.info(
         {
           event: 'order_cancelled',
@@ -269,10 +279,14 @@ export function orderRoutes(db: Db, providers: ProviderRegistry) {
         const all = tx.select().from(orderItems).where(eq(orderItems.orderId, id)).all()
         const active = all.filter((i) => i.cancelledAt === null)
 
-        const totalCents =
-          active.reduce((sum, i) => sum + i.priceCentsSnapshot * i.qty, 0) +
-          order.covers * order.coverChargeCents
         const orderCancelled = active.length === 0
+        // Nothing left to serve means nothing owed — not even the coperto.
+        // Otherwise the cancelled order would keep a phantom cover-charge
+        // total that shows up on screen and in the CSV.
+        const totalCents = orderCancelled
+          ? 0
+          : active.reduce((sum, i) => sum + i.priceCentsSnapshot * i.qty, 0) +
+            order.covers * order.coverChargeCents
         const completedAt =
           !orderCancelled && active.every((i) => i.doneAt !== null)
             ? (order.completedAt ?? now)
@@ -338,16 +352,24 @@ export function orderRoutes(db: Db, providers: ProviderRegistry) {
       if (item.cancelledAt) return reply.code(409).send({ error: 'item_cancelled' })
       if (qty === item.qty) return reply.code(400).send({ error: 'nothing_to_update' })
 
-      const delta = qty - item.qty
       const now = Math.floor(Date.now() / 1000)
       let result
       try {
         result = db.transaction((tx) => {
+          // The delta has to come from the row as it is NOW, inside the
+          // transaction: two waiters editing the same line concurrently would
+          // otherwise both compute their delta against the same stale qty and
+          // move the stock twice for one change.
+          const fresh = tx.select().from(orderItems).where(eq(orderItems.id, itemId)).get()
+          if (!fresh || fresh.cancelledAt) throw new Error('ITEM_GONE')
+          const delta = qty - fresh.qty
+          if (delta === 0) throw new Error('NOTHING_TO_UPDATE')
+
           if (delta > 0) {
             const product = tx
               .select()
               .from(products)
-              .where(eq(products.id, item.productId))
+              .where(eq(products.id, fresh.productId))
               .get()
             if (!product || !product.active) throw new Error('PRODUCT_UNAVAILABLE')
             if (product.stockRemaining !== null) {
@@ -356,7 +378,7 @@ export function orderRoutes(db: Db, providers: ProviderRegistry) {
                 .set({ stockRemaining: sql`${products.stockRemaining} - ${delta}` })
                 .where(
                   and(
-                    eq(products.id, item.productId),
+                    eq(products.id, fresh.productId),
                     isNotNull(products.stockRemaining),
                     gte(products.stockRemaining, delta),
                   ),
@@ -365,20 +387,20 @@ export function orderRoutes(db: Db, providers: ProviderRegistry) {
               if (res.changes === 0) throw new Error('OUT_OF_STOCK')
               tx.update(products)
                 .set({ active: false })
-                .where(and(eq(products.id, item.productId), lte(products.stockRemaining, 0)))
+                .where(and(eq(products.id, fresh.productId), lte(products.stockRemaining, 0)))
                 .run()
             }
           } else {
             const back = -delta
             tx.update(products)
               .set({ stockRemaining: sql`${products.stockRemaining} + ${back}` })
-              .where(and(eq(products.id, item.productId), isNotNull(products.stockRemaining)))
+              .where(and(eq(products.id, fresh.productId), isNotNull(products.stockRemaining)))
               .run()
             tx.update(products)
               .set({ active: true })
               .where(
                 and(
-                  eq(products.id, item.productId),
+                  eq(products.id, fresh.productId),
                   eq(products.active, false),
                   eq(products.stockRemaining, back),
                 ),
@@ -415,6 +437,13 @@ export function orderRoutes(db: Db, providers: ProviderRegistry) {
         }
         if (err instanceof Error && err.message === 'PRODUCT_UNAVAILABLE') {
           return reply.code(409).send({ error: 'products_unavailable' })
+        }
+        // The line changed under us between the read and the transaction.
+        if (err instanceof Error && err.message === 'ITEM_GONE') {
+          return reply.code(409).send({ error: 'item_cancelled' })
+        }
+        if (err instanceof Error && err.message === 'NOTHING_TO_UPDATE') {
+          return reply.code(400).send({ error: 'nothing_to_update' })
         }
         throw err
       }
@@ -547,7 +576,7 @@ export function orderRoutes(db: Db, providers: ProviderRegistry) {
         serviceDay: day,
         orders: rows.map(({ paymentRef, ...r }) => ({
           ...r,
-          held: paymentRef !== null && r.paidAt === null && r.cancelledAt === null,
+          held: isHeld({ ...r, paymentRef }),
         })),
       }
     })

@@ -79,8 +79,9 @@ ordine con logo, intestazioni, dimensioni carattere, filigrana e formato
 carta (rotolo termico 80mm compreso) in cinque lingue.
 
 **📊 Chi fa i conti** — dashboard giornaliera in tempo reale (incasso,
-coperti, medio a coperto, dettaglio per prodotto e categoria), CSV che si
-apre corretto in Excel/LibreOffice e report PDF in una pagina. Gli ordini
+coperti, medio a coperto, dettaglio per prodotto e categoria), CSV che si apre
+corretto in Excel/LibreOffice con le impostazioni italiane (punto e virgola
+e virgola decimale) e report PDF in una pagina. Gli ordini
 annullati escono dai totali ma non spariscono mai dai registri.
 
 **🖨 La stampa** — i ticket cucina vanno dritti a qualunque stampante CUPS
@@ -145,7 +146,7 @@ npm install
 npm run migrate   # crea/aggiorna il database
 npm run seed      # crea l'account admin (stampa la password)
 npm run dev       # API su :3000, UI su :5173
-npm test          # 105 test server; `npm run test:e2e` per lo smoke test browser
+npm test          # la suite server; `npm run test:e2e` per lo smoke test browser
 ```
 
 ## Configurazione
@@ -164,6 +165,8 @@ npm test          # 105 test server; `npm run test:e2e` per lo smoke test browse
 | `STRIPE_SECRET_KEY` | non impostata | Abilita i pagamenti online con carta per gli ordini dei clienti (checkout Stripe). Resta nell'env, mai nel database o nei suoi backup |
 | `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET` | non impostate | Abilita PayPal per gli ordini dei clienti (approvazione hosted; incasso alla verifica). Solo env, come la chiave Stripe |
 | `PAYPAL_ENV` | `live` | Imposta `sandbox` per provare contro la sandbox PayPal |
+| `STRIPE_CURRENCY` / `PAYPAL_CURRENCY` | `eur` | Valuta dei pagamenti online, se il locale non è nell'area euro |
+| `PUBLIC_BASE_URL` | dedotto dalla richiesta | URL di ritorno dopo il pagamento. Impostalo se davanti all'app c'è un dominio vero |
 | `COUNTER_ORDER_TTL_MIN` | `30` | Minuti per cui un ordine cliente non pagato in cassa tiene le porzioni riservate prima di scadere e ripristinare lo stock |
 | `CUSTOMER_ORDER_CAP` | `30` | Massimo di ordini clienti aperti (non pagati) prima che i nuovi ricevano "locale al completo" |
 | `KIOSK_AUTOLOGIN_USER` | non impostata | Account cucina auto-connesso via `/api/auth/kiosk` — solo loopback, per un display kiosk collegato ([rpi/README.md](rpi/README.md)) |
@@ -192,7 +195,7 @@ PWA · pdfkit + CUPS. Principi che il codice fa rispettare davvero:
 
 ## CI/CD
 
-Ogni push e PR esegue i test (105 server + smoke Playwright end-to-end),
+Ogni push e PR esegue i test (suite server + smoke Playwright end-to-end),
 ESLint, la build completa su Node 24 e 26, CodeQL e una build dell'immagine
 Docker che viene davvero avviata e autenticata. Il tag `v*` pubblica una
 Release GitHub con tarball installabile più le immagini container

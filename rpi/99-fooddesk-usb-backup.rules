@@ -1,3 +1,6 @@
 # A partition on a USB disk appearing (stick plugged in, or present at boot)
-# starts the backup-mirror service for it. ID_BUS filters out the SD card.
-ACTION=="add", SUBSYSTEM=="block", ENV{DEVTYPE}=="partition", ENV{ID_BUS}=="usb", TAG+="systemd", ENV{SYSTEMD_WANTS}+="fooddesk-usb-backup@%k.service"
+# starts the backup-mirror service for it. ID_BUS filters out the SD card,
+# and the two label exclusions skip a Pi that boots from a USB SSD, whose
+# root/boot partitions look exactly like a stick here. usb-backup.sh checks
+# the system disk properly as well — this is only the cheap first filter.
+ACTION=="add", SUBSYSTEM=="block", ENV{DEVTYPE}=="partition", ENV{ID_BUS}=="usb", ENV{ID_FS_LABEL}!="bootfs", ENV{ID_FS_LABEL}!="rootfs", TAG+="systemd", ENV{SYSTEMD_WANTS}+="fooddesk-usb-backup@%k.service"

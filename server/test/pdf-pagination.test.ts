@@ -27,6 +27,7 @@ function makeSettings(paper: PaperSize): AppSettings {
     orderDisclaimerFontSize: 8,
     orderHeaderImageWidthPct: 100,
     orderFooterImageWidthPct: 100,
+    customerOrdering: false,
   }
 }
 
@@ -43,6 +44,12 @@ function makeOrder(itemCount: number, cancelled = false): { order: Order; items:
     cancelledBy: null,
     completedAt: null,
     clientKey: null,
+    origin: 'staff',
+    publicToken: null,
+    paidAt: null,
+    paymentMethod: null,
+    paymentRef: null,
+    refundedAt: null,
     note: 'no onions on half of these, please',
     totalCents: itemCount * 650 + 4 * 150,
     createdBy: 1,

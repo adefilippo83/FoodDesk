@@ -170,14 +170,25 @@ festa non può usarla in nessun modo.
 
 ## Backup su chiavetta USB
 
-Inserisci una chiavetta USB qualsiasi (FAT32/exFAT/ext4) nel Pi: riceve
-una cartella `fooddesk-backups/` con lo storico degli snapshot più uno
-snapshot fresco, e poi viene aggiornata ogni 15 minuti finché resta
-inserita. Il resto della chiavetta non viene toccato. I mount sono
-sincroni, quindi sfilarla senza cerimonie va bene — nel peggiore dei casi
-perdi lo snapshot in scrittura in quell'istante, mai i precedenti. Lascia
-una chiavetta inserita per tutto il servizio e l'incasso della serata
-sopravvive anche a una SD morta.
+Il backup è **opt-in per chiavetta**: una chiavetta prestata per spostare
+foto non deve portarsi via l'incasso della serata e gli hash delle password
+del personale. Prepara la chiavetta una volta sola creando un file vuoto
+chiamato `FOODDESK_BACKUP` nella sua radice — da qualsiasi computer:
+
+```bash
+touch /media/<la-tua-chiavetta>/FOODDESK_BACKUP
+```
+
+Inserisci quella chiavetta (FAT32/exFAT/ext4) nel Pi: riceve una cartella
+`fooddesk-backups/` con lo storico degli snapshot più uno nuovo, poi si
+aggiorna ogni 15 minuti finché resta inserita. Una chiavetta senza il file
+marcatore viene lasciata completamente in pace, e l'appliance si rifiuta di
+copiare i backup sul proprio disco di sistema (un Pi avviato da SSD USB).
+Il resto della chiavetta non viene toccato. I mount sono sincroni, quindi
+sfilarla senza cerimonie va bene: al massimo perdi lo snapshot in scrittura
+in quell'istante, mai quelli precedenti. Lascia una chiavetta inserita per
+tutto il servizio e l'incasso della serata sopravvive anche a una microSD
+morta.
 
 ## Aggiornamenti
 
@@ -190,8 +201,13 @@ sudo fooddesk-update            # ultima release (oppure: fooddesk-update v1.2.3
 Fa uno snapshot del database, scarica il tarball della release, installa,
 scambia e verifica la salute del servizio — tornando indietro da solo se
 la nuova versione non parte. `sudo fooddesk-update --rollback` riporta
-alla versione precedente in qualunque momento. Gli aggiornamenti non
-toccano mai il database.
+alla versione precedente in qualunque momento.
+
+I tuoi dati non vengono mai buttati via, ma il database *viene* modificato:
+la nuova versione migra lo schema all'avvio, ed è per questo che prima viene
+fatto uno snapshot. Se durante un rollback la versione precedente non riesce
+a leggere lo schema migrato, l'updater ripristina quello snapshot da solo e
+te lo dice.
 
 ## Compilarla da soli
 

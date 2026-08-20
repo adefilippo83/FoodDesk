@@ -1,9 +1,10 @@
 import { randomBytes } from 'node:crypto'
 import { and, count, eq, isNull } from 'drizzle-orm'
-import type { FastifyInstance } from 'fastify'
+import type { FastifyInstance, FastifyRequest } from 'fastify'
 import type { Db } from '../db/index.js'
 import { categories, orderItems, orders, products } from '../db/schema.js'
-import { notifyOrdersChanged, ordersBus } from '../lib/events.js'
+import { notifyOrdersChanged } from '../lib/events.js'
+import { openOrdersStream } from '../lib/sse.js'
 import { parseItems, placeOrder } from '../lib/placeOrder.js'
 import { serviceDayOf } from '../lib/serviceDay.js'
 import { expireHeldOrder, isHeld, verifyHeldOrder } from '../payments/lifecycle.js'
@@ -34,6 +35,57 @@ function orderCap(): number {
 const MAX_PUBLIC_SSE_TOTAL = 200
 const MAX_PUBLIC_SSE_PER_IP = 5
 const PUBLIC_SSE_MAX_LIFETIME_MS = 30 * 60 * 1000
+
+/**
+ * Where the provider should send the customer back to after paying.
+ *
+ * The Host header is client-controlled and nginx passes it straight through
+ * (`proxy_set_header Host $host`), so it cannot be trusted on its own: an
+ * attacker could mint a payment link whose return URL points at their site
+ * and hand it to a victim, who pays for real and then lands on a page of the
+ * attacker's choosing. But the appliance has no fixed name — customers reach
+ * it as 10.42.0.1 or fooddesk.local — so we cannot simply ignore the header.
+ *
+ * The rule: an explicit PUBLIC_BASE_URL always wins; otherwise the Host is
+ * accepted only when it names something on the local network, which cannot
+ * be used to send a victim anywhere interesting. Anything else (a public
+ * domain, i.e. a deployment behind a real proxy) must set PUBLIC_BASE_URL —
+ * without it we fall back to the address we are actually listening on.
+ */
+const HOST_RE = /^[A-Za-z0-9.-]{1,253}(:\d{1,5})?$/
+
+function isLocalAuthority(host: string): boolean {
+  const name = host.replace(/:\d+$/, '').toLowerCase()
+  if (name === 'localhost' || name.endsWith('.local')) return true
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(name)
+  if (!m) return false
+  const parts = m.slice(1).map(Number)
+  if (parts.some((n) => n > 255)) return false
+  const [a, b] = parts as [number, number, number, number]
+  return (
+    a === 10 ||
+    a === 127 ||
+    (a === 192 && b === 168) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 169 && b === 254)
+  )
+}
+
+function publicBase(req: FastifyRequest): string {
+  const configured = process.env.PUBLIC_BASE_URL
+  if (configured) return configured.replace(/\/+$/, '')
+  const host = String(req.headers.host ?? '')
+  if (HOST_RE.test(host) && isLocalAuthority(host)) return `${req.protocol}://${host}`
+  // Not a local address: fall back to what we are listening on. (req.hostname
+  // is no help — Fastify derives it from the very header we are distrusting.)
+  const sock = req.raw.socket
+  let addr = sock.localAddress ?? 'localhost'
+  if (addr.startsWith('::ffff:')) addr = addr.slice(7)
+  const authority = addr.includes(':') ? `[${addr}]` : addr
+  const port = sock.localPort
+  const suffix = port && port !== 80 && port !== 443 ? `:${port}` : ''
+  return `${req.protocol}://${authority}${suffix}`
+}
 
 export function publicRoutes(db: Db, providers: ProviderRegistry) {
   let publicSseTotal = 0
@@ -136,6 +188,21 @@ export function publicRoutes(db: Db, providers: ProviderRegistry) {
             ? body.clientKey.trim().slice(0, 64)
             : null
 
+        // A retry of an order that already landed is not a new order, so it
+        // must not be turned away by the cap — the customer would be stuck
+        // with an order they cannot see. Let placeOrder replay it instead.
+        const isReplay = clientKey
+          ? Boolean(
+              (
+                await db
+                  .select({ id: orders.id })
+                  .from(orders)
+                  .where(eq(orders.clientKey, clientKey))
+                  .limit(1)
+              )[0],
+            )
+          : false
+
         // The flood brake: too many open customer orders means the kitchen
         // is drowning (or someone is playing games on the open Wi-Fi).
         const open = (
@@ -151,7 +218,7 @@ export function publicRoutes(db: Db, providers: ProviderRegistry) {
               ),
             )
         )[0]!.n
-        if (open >= orderCap()) {
+        if (!isReplay && open >= orderCap()) {
           req.log.warn({ event: 'customer_order_cap', open, ip: req.ip }, 'audit')
           return reply.code(503).send({ error: 'venue_busy' })
         }
@@ -202,7 +269,7 @@ export function publicRoutes(db: Db, providers: ProviderRegistry) {
         // provider cannot take the payment, roll the order back (restock)
         // and let the customer fall back to paying at the counter.
         if (provider) {
-          const returnUrl = `${req.protocol}://${req.headers.host}/o/${result.order.publicToken}`
+          const returnUrl = `${publicBase(req)}/o/${result.order.publicToken}`
           try {
             const payment = await provider.createPayment(result.order, returnUrl)
             await db
@@ -287,36 +354,17 @@ export function publicRoutes(db: Db, providers: ProviderRegistry) {
           return reply.code(503).send({ error: 'too_many_streams' })
         }
 
-        reply.hijack()
-        const raw = reply.raw
-        raw.writeHead(200, {
-          'content-type': 'text/event-stream',
-          'cache-control': 'no-cache',
-          'x-accel-buffering': 'no',
-        })
-        raw.write('retry: 3000\n\n')
         publicSseTotal++
         publicSsePerIp.set(ip, perIp + 1)
-        let closed = false
-        const close = () => {
-          if (closed) return
-          closed = true
-          clearInterval(heartbeat)
-          clearTimeout(lifetime)
-          ordersBus.off('orders', onOrders)
-          publicSseTotal--
-          const n = (publicSsePerIp.get(ip) ?? 1) - 1
-          if (n <= 0) publicSsePerIp.delete(ip)
-          else publicSsePerIp.set(ip, n)
-          raw.end()
-        }
-        const onOrders = () => raw.write('event: orders\ndata: {}\n\n')
-        ordersBus.on('orders', onOrders)
-        const heartbeat = setInterval(() => raw.write(': keep-alive\n\n'), 25_000)
-        heartbeat.unref()
-        const lifetime = setTimeout(close, PUBLIC_SSE_MAX_LIFETIME_MS)
-        lifetime.unref()
-        req.raw.on('close', close)
+        openOrdersStream(req, reply, {
+          maxLifetimeMs: PUBLIC_SSE_MAX_LIFETIME_MS,
+          onClose: () => {
+            publicSseTotal--
+            const n = (publicSsePerIp.get(ip) ?? 1) - 1
+            if (n <= 0) publicSsePerIp.delete(ip)
+            else publicSsePerIp.set(ip, n)
+          },
+        })
       },
     )
 
@@ -375,6 +423,9 @@ export function publicRoutes(db: Db, providers: ProviderRegistry) {
               : 'pending'
           : 'none'
 
+        // The customer's own order, with their name on it: not for any
+        // shared cache sitting between the phone and the venue box.
+        reply.header('cache-control', 'no-store')
         return {
           dailyNumber: order.dailyNumber,
           customerName: order.customerName,

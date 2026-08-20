@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, formatMoney, type DailyReport } from '../api'
 import { useI18n } from '../i18n'
+import { paymentLabel } from '../lib/paymentLabel'
 
 function Breakdown({
   title,
@@ -144,12 +145,7 @@ export default function Reports() {
             <Breakdown
               title={t('byPayment')}
               rows={(report.byPayment ?? []).map((p) => ({
-                name:
-                  p.method === 'counter'
-                    ? t('payMethodCounter')
-                    : p.method === 'stripe'
-                      ? 'Stripe'
-                      : 'PayPal',
+                name: paymentLabel(p.method, t),
                 ordersCount: p.ordersCount,
                 revenueCents: p.revenueCents,
               }))}

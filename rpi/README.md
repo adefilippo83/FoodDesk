@@ -138,7 +138,7 @@ Attach an HDMI screen (ideally touch), set `KIOSK=kitchen` in
 Chromium full-screen on a minimal Wayland compositor, no tablet needed.
 `KIOSK=off` (and a reboot) turns it back off.
 
-Under the hood: first boot creates a kitchen-role account with an unusable
+Under the hood: provisioning creates a kitchen-role account with an unusable
 random password and sets `KIOSK_AUTOLOGIN_USER` in `/etc/fooddesk/env`; the
 kiosk browser then logs itself in through `/api/auth/kiosk`, a route that
 only exists when that variable is set, only answers on the loopback
@@ -157,10 +157,21 @@ so a phone on the venue Wi-Fi can never use it.
 
 ## USB stick backups
 
-Plug any USB stick (FAT32/exFAT/ext4) into the Pi: it gets a
+Backups are **opt-in per stick**, so a stick borrowed to move photos never
+comes away with a copy of the evening's takings and the staff password
+hashes. Prepare a stick once by creating an empty file named
+`FOODDESK_BACKUP` in its root — on any computer:
+
+```bash
+touch /media/<your-stick>/FOODDESK_BACKUP
+```
+
+Plug that stick (FAT32/exFAT/ext4) into the Pi and it gets a
 `fooddesk-backups/` folder with the existing snapshot history plus a fresh
-snapshot, then mirrors every 15 minutes for as long as it stays in.
-Nothing else on the stick is touched. Mounts are synchronous, so pulling
+snapshot, then mirrors every 15 minutes for as long as it stays in. A stick
+without the marker is left completely alone, and the appliance refuses to
+mirror onto its own system disk (a Pi booted from a USB SSD). Nothing else
+on the stick is touched. Mounts are synchronous, so pulling
 the stick out without ceremony is fine — worst case you lose the snapshot
 being written that second, never the ones before. Leave a stick in for the
 whole service and the night's ledger survives even a dead SD card.
@@ -176,7 +187,12 @@ sudo fooddesk-update            # latest release (or: fooddesk-update v1.2.3)
 It snapshots the database, downloads the release tarball, installs, swaps,
 and health-checks — rolling back automatically if the new version does not
 come up. `sudo fooddesk-update --rollback` returns to the previous version
-at any time. The database is never touched by updates.
+at any time.
+
+Your data is never discarded, but the database *is* touched: the new version
+migrates the schema in place at boot, which is why a snapshot is taken first.
+If a rollback finds the old version cannot read the migrated schema, the
+updater restores that snapshot automatically and says so.
 
 ## Build it yourself
 

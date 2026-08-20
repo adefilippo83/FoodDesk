@@ -1,10 +1,11 @@
-import { and, desc, eq, isNotNull, isNull, or, sql } from 'drizzle-orm'
+import { and, desc, eq, isNull, sql } from 'drizzle-orm'
 import PDFDocument from 'pdfkit'
 import type { FastifyInstance } from 'fastify'
 import { requireManager } from '../auth/acl.js'
 import type { Db } from '../db/index.js'
 import { orderItems, orders, users } from '../db/schema.js'
 import { isServiceDay, serviceDayOf } from '../lib/serviceDay.js'
+import { notHeldFilter } from '../payments/lifecycle.js'
 import { loadSettings } from '../settings.js'
 
 /**
@@ -59,7 +60,7 @@ async function loadDay(db: Db, day: string): Promise<{ orders: OrderRow[]; items
       and(
         eq(orders.serviceDay, day),
         // Held online-payment orders are not money (yet): out of the books.
-        or(isNull(orders.paymentRef), isNotNull(orders.paidAt), isNotNull(orders.cancelledAt)),
+        notHeldFilter,
       ),
     )
     .orderBy(orders.dailyNumber)
@@ -80,7 +81,7 @@ async function loadDay(db: Db, day: string): Promise<{ orders: OrderRow[]; items
       and(
         eq(orders.serviceDay, day),
         // Held online-payment orders are not money (yet): out of the books.
-        or(isNull(orders.paymentRef), isNotNull(orders.paidAt), isNotNull(orders.cancelledAt)),
+        notHeldFilter,
       ),
     )
     : []
@@ -336,10 +337,7 @@ export function reportRoutes(db: Db) {
         })
         .from(orders)
         .where(
-          and(
-            isNull(orders.cancelledAt),
-            or(isNull(orders.paymentRef), isNotNull(orders.paidAt)),
-          ),
+          and(isNull(orders.cancelledAt), notHeldFilter),
         )
         .groupBy(orders.serviceDay)
         .orderBy(desc(orders.serviceDay))

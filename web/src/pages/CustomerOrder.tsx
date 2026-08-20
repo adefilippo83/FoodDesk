@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { ApiError, api, formatMoney, type PublicMenu } from '../api'
 import { LangToggle, useI18n } from '../i18n'
 import { newClientKey } from '../lib/clientKey'
-import { rememberMyOrder } from '../myOrders'
+import { myOrders, rememberMyOrder } from '../myOrders'
 
 /**
  * Customer self-ordering: the public menu + cart page behind the QR code.
@@ -23,6 +23,11 @@ export default function CustomerOrder() {
   const [error, setError] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
   const orderKeyRef = useRef<string | null>(null)
+
+  // Orders this phone placed today. Read once on mount: it is how a customer
+  // who closed the tab (or wandered off and came back through the QR) finds
+  // their way back to the status page.
+  const [mine] = useState(() => myOrders())
 
   useEffect(() => {
     api
@@ -138,6 +143,21 @@ export default function CustomerOrder() {
       </header>
       <main>
         {error && <div className="error">{error}</div>}
+
+        {mine.length > 0 && (
+          <div className="card" style={{ marginBottom: 12 }}>
+            <span className="muted" style={{ fontSize: 13 }}>
+              {t('custYourOrdersToday')}
+            </span>
+            <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
+              {mine.map((o) => (
+                <Link key={o.token} className="btn small" to={`/o/${o.token}`}>
+                  #{String(o.dailyNumber).padStart(3, '0')}
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="cat-tabs">
           {data.menu.map((c) => (

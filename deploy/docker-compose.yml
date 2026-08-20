@@ -4,8 +4,10 @@
 #   docker compose up -d
 #   docker compose logs        # the generated admin password is printed once
 #
-# The database lives in ./fooddesk-data next to this file: a plain copy (or
-# the sqlite3 .backup cron from the README) is a backup.
+# The database lives in ./fooddesk-data next to this file. Back it up with the
+# sqlite3 .backup cron from deploy/README.md rather than copying the file:
+# SQLite runs in WAL mode, so a plain copy taken mid-service can miss the most
+# recent orders.
 services:
   fooddesk:
     image: ghcr.io/adefilippo83/fooddesk:latest

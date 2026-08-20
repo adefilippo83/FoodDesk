@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { ApiError, api, formatMoney, type OrderDetail, type OrderSummary } from '../api'
 import { useAuth } from '../auth'
 import { useI18n } from '../i18n'
+import { paymentLabel } from '../lib/paymentLabel'
 import { useOrdersEvents } from '../useOrdersEvents'
 
 function PrintStatus({ order }: { order: OrderSummary }) {
@@ -139,6 +140,14 @@ export default function Orders() {
   // auto-refunded/expired orders, so the header agrees with the Reports page
   // and the cash drawer instead of counting orders that earned nothing.
   const settled = orders.filter((o) => !o.held && o.cancelledAt === null)
+  // An online-paid order's lines are frozen server-side (online_paid_locked):
+  // the only change allowed is a full cancel, which refunds. Showing the
+  // per-line buttons would just produce errors the waiter cannot act on.
+  const onlinePaidLocked =
+    open !== null &&
+    open.paidAt !== null &&
+    open.paymentMethod !== null &&
+    open.paymentMethod !== 'cash'
   const dayTotal = settled.reduce((sum, o) => sum + o.totalCents, 0)
 
   if (loading) return <div className="empty">{t('loading')}</div>
@@ -219,7 +228,7 @@ export default function Orders() {
                     )}
                     {o.held ? (
                       <span className="badge" style={{ marginLeft: 4 }}>
-                        {t('paymentInProgress')} · {o.paymentMethod === 'paypal' ? 'PayPal' : 'Stripe'}
+                        {t('paymentInProgress')} · {paymentLabel(o.paymentMethod, t)}
                       </span>
                     ) : (
                       o.origin === 'customer' &&
@@ -235,7 +244,7 @@ export default function Orders() {
                       o.paidAt !== null &&
                       o.cancelledAt === null && (
                         <span className="badge ok" style={{ marginLeft: 4 }}>
-                          {o.paymentMethod === 'paypal' ? 'PayPal' : 'Stripe'} ✓
+                          {paymentLabel(o.paymentMethod, t)} ✓
                         </span>
                       )}
                     {o.refundedAt != null && (
@@ -363,7 +372,7 @@ export default function Orders() {
                       </td>
                       <td className="num">€{formatMoney(i.priceCentsSnapshot * i.qty)}</td>
                       <td className="num">
-                        {open.cancelledAt === null && i.cancelledAt === null && (
+                        {open.cancelledAt === null && i.cancelledAt === null && !onlinePaidLocked && (
                           <>
                             {i.qty > 1 && (
                               <button
@@ -410,6 +419,11 @@ export default function Orders() {
                 </tbody>
               </table>
             </div>
+            {onlinePaidLocked && (
+              <p className="muted" style={{ fontSize: 13, margin: '8px 0 0' }}>
+                {t('onlinePaidLockedHint')}
+              </p>
+            )}
             {open.covers > 0 && open.coverChargeCents > 0 && (
               <p style={{ display: 'flex', justifyContent: 'space-between', margin: '8px 0 0' }}>
                 <span>

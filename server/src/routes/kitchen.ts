@@ -109,6 +109,29 @@ export function kitchenRoutes(db: Db) {
       // A cancelled line is out of the game — nothing left to prepare.
       if (item.cancelledAt) return reply.code(409).send({ error: 'item_cancelled' })
 
+      // The parent order has to be one this display is actually working: the
+      // route is reachable with any item id, so a stale tablet (or a crafted
+      // request from a kitchen account) must not tick dishes on a cancelled
+      // order, on last night's service, or on a customer order whose money is
+      // still in flight — none of which the display ever shows.
+      const parent = (
+        await db.select().from(orders).where(eq(orders.id, item.orderId)).limit(1)
+      )[0]
+      if (!parent) return reply.code(404).send({ error: 'not_found' })
+      // Exactly the rule the display query above uses: a customer order is
+      // the kitchen's business only once it is PAID — whether that is an
+      // online capture or cash at the register. Anything narrower (e.g. only
+      // held orders) leaves unpaid counter orders tickable although they were
+      // never shown, which would flip the customer's status page to "ready"
+      // for food nobody has paid for or started cooking.
+      if (parent.origin === 'customer' && parent.paidAt === null) {
+        return reply.code(404).send({ error: 'not_found' })
+      }
+      if (parent.cancelledAt) return reply.code(409).send({ error: 'order_cancelled' })
+      if (parent.serviceDay !== serviceDayOf()) {
+        return reply.code(409).send({ error: 'stale_service_day' })
+      }
+
       const now = Math.floor(Date.now() / 1000)
       // Item state and the order's completion flag move together: the order is
       // completed exactly when its last pending active item is marked done,

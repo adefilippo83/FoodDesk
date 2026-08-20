@@ -107,7 +107,7 @@ function autoPrintOrderSheet(
     .ftext { text-align: center; font-size: ${config.orderFooterFontSize}pt; color: #444; margin: 8px 0 0; break-inside: avoid; }
   </style></head><body>
     <div class="sheet">
-      ${config.orderHeaderImageUrl ? `<img class="hf" style="width:${config.orderHeaderImageWidthPct}%" src="${config.orderHeaderImageUrl}">` : ''}
+      ${config.orderHeaderImageUrl ? `<img class="hf" style="width:${Number(config.orderHeaderImageWidthPct) || 100}%" src="${esc(config.orderHeaderImageUrl)}">` : ''}
       ${config.orderHeaderText ? `<p class="htext">${text(config.orderHeaderText)}</p>` : ''}
       <p class="info">${esc(labels.orderWord)} #${String(order.dailyNumber).padStart(3, '0')} · ${order.serviceDay} · ${time}${order.customerName ? ` · ${esc(order.customerName)}` : ''}</p>
       <hr>
@@ -118,7 +118,7 @@ function autoPrintOrderSheet(
       <div class="spacer"></div>
       ${config.orderDisclaimer ? `<p class="disclaimer">${text(config.orderDisclaimer)}</p>` : ''}
       ${config.orderFooterText ? `<p class="ftext">${text(config.orderFooterText)}</p>` : ''}
-      ${config.orderFooterImageUrl ? `<img class="hf" style="width:${config.orderFooterImageWidthPct}%" src="${config.orderFooterImageUrl}">` : ''}
+      ${config.orderFooterImageUrl ? `<img class="hf" style="width:${Number(config.orderFooterImageWidthPct) || 100}%" src="${esc(config.orderFooterImageUrl)}">` : ''}
     </div>
   </body></html>`
 

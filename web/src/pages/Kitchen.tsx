@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api, type KitchenItem, type KitchenOrder } from '../api'
 import { useI18n } from '../i18n'
 import { useOrdersEvents } from '../useOrdersEvents'
@@ -115,10 +115,36 @@ export default function Kitchen() {
     })
   }
 
+  // Ticks the cook has made but the server has not confirmed yet, so a
+  // refetch that overtakes the in-flight mutation cannot visually un-tick a
+  // dish under their hand. Each entry clears itself once the server agrees.
+  const pendingTicks = useRef(new Map<number, boolean>())
+
+  function applyPendingTicks(list: KitchenOrder[]): KitchenOrder[] {
+    if (pendingTicks.current.size === 0) return list
+    return list.map((o) => ({
+      ...o,
+      items: o.items.map((i) => {
+        if (!pendingTicks.current.has(i.id)) return i
+        const done = pendingTicks.current.get(i.id)!
+        return { ...i, doneAt: done ? (i.doneAt ?? Math.floor(Date.now() / 1000)) : null }
+      }),
+    }))
+  }
+
   async function load() {
     try {
       const res = await api.kitchenOrders()
-      setOrders(res.orders)
+      // Drop the optimistic entries the server has caught up on; keep the rest.
+      for (const o of res.orders) {
+        for (const i of o.items) {
+          const want = pendingTicks.current.get(i.id)
+          if (want !== undefined && (i.doneAt !== null) === want) {
+            pendingTicks.current.delete(i.id)
+          }
+        }
+      }
+      setOrders(applyPendingTicks(res.orders))
       setError(null)
     } catch {
       setError(t('errLoadOrders'))
@@ -177,7 +203,9 @@ export default function Kitchen() {
               },
         ) ?? prev,
     )
+    pendingTicks.current.set(item.id, done)
     api.setItemDone(item.id, done).catch(() => {
+      pendingTicks.current.delete(item.id)
       setError(t('kdsErrUpdate'))
       void load()
     })

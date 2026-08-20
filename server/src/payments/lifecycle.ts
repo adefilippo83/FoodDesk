@@ -1,4 +1,4 @@
-import { and, eq, isNotNull, isNull, lt, sql } from 'drizzle-orm'
+import { and, eq, isNotNull, isNull, lt, or, sql } from 'drizzle-orm'
 import type { FastifyBaseLogger } from 'fastify'
 import type { Db } from '../db/index.js'
 import { orderItems, orders, products, type Order } from '../db/schema.js'
@@ -18,9 +18,19 @@ import type { OnlineMethod, ProviderRegistry } from './provider.js'
  */
 
 /** How long an unpaid held order may live before it is expired. */
-export const HELD_TTL_S = 15 * 60
+const HELD_TTL_S = 15 * 60
 
-export function isHeld(order: Order): boolean {
+/**
+ * How long a held order waits when its payment provider has vanished from the
+ * configuration. Long enough that the provider's own checkout has expired on
+ * their side, so releasing the stock cannot strand a late payment.
+ */
+const PROVIDER_GONE_GRACE_S = 24 * 60 * 60
+
+/** A row is held when its online payment is still in flight. */
+export function isHeld(
+  order: Pick<Order, 'origin' | 'paymentRef' | 'paidAt' | 'cancelledAt'>,
+): boolean {
   return (
     order.origin === 'customer' &&
     order.paymentRef !== null &&
@@ -28,6 +38,24 @@ export function isHeld(order: Order): boolean {
     order.cancelledAt === null
   )
 }
+
+/** isHeld() as a query filter — the same rule, expressed for the database. */
+export const heldOrderFilter = and(
+  eq(orders.origin, 'customer'),
+  isNotNull(orders.paymentRef),
+  isNull(orders.paidAt),
+  isNull(orders.cancelledAt),
+)
+
+/**
+ * The negation, for "everything except money still in flight": an order with
+ * no provider reference, one already paid, or one already cancelled.
+ */
+export const notHeldFilter = or(
+  isNull(orders.paymentRef),
+  isNotNull(orders.paidAt),
+  isNotNull(orders.cancelledAt),
+)
 
 /**
  * A per-order-id async lock. The venue box is a single Node process, so an
@@ -59,7 +87,7 @@ async function loadOrder(db: Db, id: number): Promise<Order | undefined> {
 /** Money confirmed: release the order to the kitchen. Idempotent — the
  * conditional update makes exactly one caller the winner. Returns false when
  * the order was no longer finalizable (already paid, or cancelled meanwhile). */
-export async function finalizeHeldOrder(
+async function finalizeHeldOrder(
   db: Db,
   order: Order,
   log?: FastifyBaseLogger,
@@ -183,8 +211,26 @@ export async function verifyHeldOrder(
     if (fresh.cancelledAt) return 'expired' // expired/cancelled by another pass
     if (!isHeld(fresh)) return 'pending'
 
+    const age = Math.floor(Date.now() / 1000) - fresh.createdAt
+
     const provider = providers.get(fresh.paymentMethod as OnlineMethod)
-    if (!provider) return 'pending' // provider vanished from config: leave held
+    if (!provider) {
+      // The provider was removed from the configuration while this order was
+      // mid-checkout. We can neither verify nor cancel it, so we hold — but
+      // not forever, or its stock and its slot under the order cap are lost
+      // for the rest of the service. After a long grace the provider's own
+      // checkout has expired on their side too (Stripe sessions last at most
+      // 24h), so releasing the stock can no longer strand a late payment.
+      if (age > PROVIDER_GONE_GRACE_S) {
+        log?.warn(
+          { event: 'held_order_released_provider_gone', orderId: fresh.id, method: fresh.paymentMethod },
+          'payment provider is no longer configured — releasing the reserved stock',
+        )
+        await expireHeldOrder(db, fresh, log)
+        return 'expired'
+      }
+      return 'pending'
+    }
 
     const check = await provider.verifyPayment(fresh.paymentRef!)
     if (check === 'paid') {
@@ -204,7 +250,6 @@ export async function verifyHeldOrder(
       return 'expired'
     }
 
-    const age = Math.floor(Date.now() / 1000) - fresh.createdAt
     if (age > HELD_TTL_S) {
       // Make sure the payment can never complete late, THEN cancel. If the
       // provider refuses (e.g. it just completed), stay held: the next verify
@@ -286,7 +331,19 @@ function counterTtlS(): number {
  * The conditional update inside expireHeldOrder is the arbiter against a
  * cashier marking the same order paid at that moment: exactly one wins.
  */
+let counterSweepRunning = false
+
 export async function sweepStaleCounterOrders(db: Db, log?: FastifyBaseLogger) {
+  if (counterSweepRunning) return
+  counterSweepRunning = true
+  try {
+    await runCounterSweep(db, log)
+  } finally {
+    counterSweepRunning = false
+  }
+}
+
+async function runCounterSweep(db: Db, log?: FastifyBaseLogger) {
   const cutoff = Math.floor(Date.now() / 1000) - counterTtlS()
   const stale = await db
     .select()
@@ -309,20 +366,31 @@ export async function sweepStaleCounterOrders(db: Db, log?: FastifyBaseLogger) {
   }
 }
 
+// One sweep at a time. A slow or hanging provider makes a pass outlast the
+// 30-second interval; without this the passes stack up, each re-verifying the
+// same orders and multiplying the outbound calls.
+let heldSweepRunning = false
+
 /** Background sweep for customers who closed their browser mid-payment. */
 export async function sweepHeldOrders(db: Db, providers: ProviderRegistry, log?: FastifyBaseLogger) {
-  if (providers.size === 0) return
-  const held = await db
-    .select()
-    .from(orders)
-    .where(
-      and(
-        eq(orders.origin, 'customer'),
-        isNotNull(orders.paymentRef),
-        isNull(orders.paidAt),
-        isNull(orders.cancelledAt),
-      ),
-    )
+  // No early return on an empty registry: a venue that removed its only
+  // provider key is EXACTLY the case where held orders need releasing, and
+  // skipping the sweep there would strand their stock for the whole service.
+  // With nothing held the query below costs one indexed lookup.
+  if (heldSweepRunning) {
+    log?.debug('held-order sweep still running; skipping this tick')
+    return
+  }
+  heldSweepRunning = true
+  try {
+    await runHeldSweep(db, providers, log)
+  } finally {
+    heldSweepRunning = false
+  }
+}
+
+async function runHeldSweep(db: Db, providers: ProviderRegistry, log?: FastifyBaseLogger) {
+  const held = await db.select().from(orders).where(heldOrderFilter)
   for (const order of held) {
     try {
       await verifyHeldOrder(db, providers, order, log)
