@@ -6,6 +6,7 @@ import type { Db } from '../db/index.js'
 import { orderItems, orders, products, users, type Order } from '../db/schema.js'
 import { notifyOrdersChanged } from '../lib/events.js'
 import { isServiceDay, serviceDayOf } from '../lib/serviceDay.js'
+import { loadOrderItemsInMenuOrder } from '../lib/orderItems.js'
 import { parseItems, placeOrder } from '../lib/placeOrder.js'
 import { cancelHeldOrder, isHeld } from '../payments/lifecycle.js'
 import type { OnlineMethod, ProviderRegistry } from '../payments/provider.js'
@@ -109,7 +110,7 @@ export function orderRoutes(db: Db, providers: ProviderRegistry) {
         if (order === 'not_found') return reply.code(404).send({ error: 'not_found' })
         if (order === 'forbidden') return reply.code(403).send({ error: 'forbidden' })
 
-        const items = await db.select().from(orderItems).where(eq(orderItems.orderId, id))
+        const items = await loadOrderItemsInMenuOrder(db, id)
         const s = await loadSettings(db)
         const pdf =
           kind === 'receipt'
@@ -592,7 +593,9 @@ export function orderRoutes(db: Db, providers: ProviderRegistry) {
         return reply.code(403).send({ error: 'forbidden' })
       }
 
-      const items = await db.select().from(orderItems).where(eq(orderItems.orderId, id))
+      // Menu order here too: this response feeds the browser print fallback
+      // (and the order detail modal), so the printed sheet matches the PDFs.
+      const items = await loadOrderItemsInMenuOrder(db, id)
       const cancelledByName = order.cancelledBy
         ? ((
             await db

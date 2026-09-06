@@ -2,6 +2,7 @@ import { and, eq, gt, isNotNull, isNull, lt, sql } from 'drizzle-orm'
 import type { FastifyBaseLogger } from 'fastify'
 import type { Db } from '../db/index.js'
 import { orderItems, orders, type Order } from '../db/schema.js'
+import { loadOrderItemsInMenuOrder } from '../lib/orderItems.js'
 import { notifyOrdersChanged } from '../lib/events.js'
 import { loadSettings } from '../settings.js'
 import { renderKitchenTicket } from './pdf.js'
@@ -68,7 +69,7 @@ export async function printKitchenTicket(db: Db, order: Order): Promise<PrintRes
     return { ok: false, error: 'printer_not_configured' }
   }
 
-  const items = await db.select().from(orderItems).where(eq(orderItems.orderId, order.id))
+  const items = await loadOrderItemsInMenuOrder(db, order.id)
 
   try {
     const pdf = await renderKitchenTicket(order, items, await loadSettings(db))
