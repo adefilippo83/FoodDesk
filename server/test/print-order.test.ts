@@ -76,6 +76,34 @@ describe('printed sheets follow the menu order', () => {
     assert.deepEqual(namesOf(await loadOrderItemsInMenuOrder(db, id)), MENU_ORDER)
   })
 
+  it('returns the CREATED order in menu order — the sheet auto-printed right after placing it', async () => {
+    // Without a CUPS printer the waiter's browser prints the order sheet from
+    // this very response, not from a later GET. Tap order scrambled across
+    // and within categories.
+    const res = await post('/api/orders', {
+      customerName: 'Tavolo 7',
+      items: ['Salsiccia', 'Risotto', 'Tagliere', 'Bistecca', 'Lasagne', 'Bruschetta'].map((n) => ({
+        productId: prod[n],
+        qty: 1,
+      })),
+    })
+    assert.equal(res.statusCode, 201)
+    assert.deepEqual(namesOf(res.json().items), MENU_ORDER)
+  })
+
+  it('replays a retried submission in menu order too', async () => {
+    const payload = {
+      customerName: 'Retry Remo',
+      clientKey: 'menu-order-replay-key',
+      items: ['Bistecca', 'Bruschetta', 'Risotto'].map((n) => ({ productId: prod[n], qty: 1 })),
+    }
+    const first = await post('/api/orders', payload)
+    assert.equal(first.statusCode, 201)
+    const again = await post('/api/orders', payload)
+    assert.equal(again.statusCode, 200, 'a replay answers 200')
+    assert.deepEqual(namesOf(again.json().items), ['Bruschetta', 'Risotto', 'Bistecca'])
+  })
+
   it('serves the order detail — what the browser print fallback renders — in menu order', async () => {
     const id = await orderTapping('Bistecca', 'Bruschetta', 'Risotto')
     const res = await app.inject({ method: 'GET', url: `/api/orders/${id}`, headers: { cookie } })

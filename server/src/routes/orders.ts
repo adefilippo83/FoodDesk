@@ -68,10 +68,8 @@ export function orderRoutes(db: Db) {
           await db.select().from(orders).where(eq(orders.clientKey, clientKey!)).limit(1)
         )[0]
         if (!existing) return null
-        const existingItems = await db
-          .select()
-          .from(orderItems)
-          .where(eq(orderItems.orderId, existing.id))
+        // Menu order, like every response a sheet is printed from.
+        const existingItems = await loadOrderItemsInMenuOrder(db, existing.id)
         return { ...existing, items: existingItems }
       }
       if (clientKey) {
@@ -205,7 +203,10 @@ export function orderRoutes(db: Db) {
         throw err
       }
 
-      const items = await db.select().from(orderItems).where(eq(orderItems.orderId, created.id))
+      // The waiter's browser prints the order sheet straight from THIS response
+      // when no CUPS printer is configured, so it has to be in menu order too —
+      // the PDFs and the order detail being sorted is not enough.
+      const items = await loadOrderItemsInMenuOrder(db, created.id)
 
       // Print in the background: the waiter gets their confirmation now, and a
       // slow or jammed printer shows up as printError on the order instead.
