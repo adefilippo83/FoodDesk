@@ -5,6 +5,7 @@ import { isManager, requireFloorStaff, requireManager } from '../auth/acl.js'
 import type { Db } from '../db/index.js'
 import { categories, orderItems, orders, products, users, type Order } from '../db/schema.js'
 import { notifyOrdersChanged } from '../lib/events.js'
+import { loadOrderItemsInMenuOrder } from '../lib/orderItems.js'
 import { isServiceDay, serviceDayOf } from '../lib/serviceDay.js'
 import { renderKitchenTicket, renderOrderSheet, renderReceipt } from '../print/pdf.js'
 import { kitchenQueue, printKitchenTicket } from '../print/service.js'
@@ -232,7 +233,7 @@ export function orderRoutes(db: Db) {
         if (order === 'not_found') return reply.code(404).send({ error: 'not_found' })
         if (order === 'forbidden') return reply.code(403).send({ error: 'forbidden' })
 
-        const items = await db.select().from(orderItems).where(eq(orderItems.orderId, id))
+        const items = await loadOrderItemsInMenuOrder(db, id)
         const s = await loadSettings(db)
         const pdf =
           kind === 'receipt'
@@ -552,7 +553,9 @@ export function orderRoutes(db: Db) {
         return reply.code(403).send({ error: 'forbidden' })
       }
 
-      const items = await db.select().from(orderItems).where(eq(orderItems.orderId, id))
+      // Menu order here too: this response feeds the browser print fallback
+      // (and the order detail modal), so the printed sheet matches the PDFs.
+      const items = await loadOrderItemsInMenuOrder(db, id)
       const cancelledByName = order.cancelledBy
         ? ((
             await db
