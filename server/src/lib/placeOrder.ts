@@ -8,6 +8,7 @@ import {
   type Order,
   type OrderItem,
 } from '../db/schema.js'
+import { loadOrderItemsInMenuOrder } from './orderItems.js'
 import { serviceDayOf } from './serviceDay.js'
 
 /**
@@ -88,10 +89,10 @@ export async function placeOrder(db: Db, input: PlaceOrderInput): Promise<PlaceO
     if (input.origin === 'staff' && existing.createdBy !== input.createdBy) {
       return { ok: false, code: 'payload_mismatch', ids: [] }
     }
-    const existingItems = await db
-      .select()
-      .from(orderItems)
-      .where(eq(orderItems.orderId, existing.id))
+    // Menu order: a replay is answered with the same lines a fresh order is,
+    // and the sheet gets printed from either. (orderSignature sorts its
+    // input, so the payload check below does not care about the order.)
+    const existingItems = await loadOrderItemsInMenuOrder(db, existing.id)
     // The key identifies a submission, not a blank cheque: a retry that
     // changed the cart (a waiter added a line after a flaky-network timeout)
     // must NOT silently return the original order and lose the change.
@@ -225,6 +226,9 @@ export async function placeOrder(db: Db, input: PlaceOrderInput): Promise<PlaceO
     throw err
   }
 
-  const items = await db.select().from(orderItems).where(eq(orderItems.orderId, created.id))
+  // The waiter's browser prints the order sheet straight from the create
+  // response when no CUPS printer is configured, so these lines have to be in
+  // menu order too — sorting the PDFs and the order detail is not enough.
+  const items = await loadOrderItemsInMenuOrder(db, created.id)
   return { ok: true, order: created, items, replayed: false }
 }
