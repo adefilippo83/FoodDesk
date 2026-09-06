@@ -1,7 +1,7 @@
 import { and, eq, gt, isNotNull, isNull, lt, sql } from 'drizzle-orm'
 import type { FastifyBaseLogger } from 'fastify'
 import type { Db } from '../db/index.js'
-import { orderItems, orders, type Order } from '../db/schema.js'
+import { orders, type Order } from '../db/schema.js'
 import { loadOrderItemsInMenuOrder } from '../lib/orderItems.js'
 import { notifyOrdersChanged } from '../lib/events.js'
 import { loadSettings } from '../settings.js'
