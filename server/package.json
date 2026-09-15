@@ -21,13 +21,13 @@
     "@fastify/static": "^10.1.3",
     "better-sqlite3": "^13.0.3",
     "drizzle-orm": "^0.45.2",
-    "fastify": "^5.12.3",
+    "fastify": "^5.12.4",
     "pdfkit": "^0.20.2",
     "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",
-    "@types/node": "^26.4.1",
+    "@types/node": "^26.5.1",
     "@types/pdfkit": "^0.17.6",
     "drizzle-kit": "^0.31.10",
     "tsx": "^4.23.13",
