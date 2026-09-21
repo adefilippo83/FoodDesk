@@ -164,6 +164,7 @@ npm test          # the server suite; `npm run test:e2e` for the browser smoke t
 | `STRIPE_CURRENCY` / `PAYPAL_CURRENCY` | `eur` | Currency for online payments, if your venue is not in the euro area |
 | `PUBLIC_BASE_URL` | derived from the request | Base URL customers are sent back to after paying. Set it when the venue has a real domain in front of the app |
 | `COUNTER_ORDER_TTL_MIN` | `30` | Minutes an unpaid customer counter order keeps its reserved stock before it auto-expires and restocks |
+| `DEMO_RESET_TOKEN` | unset | **Public demo only.** Enables `POST /api/demo/reset` (`Authorization: Bearer <token>`, 32+ characters), which wipes the database and reloads the demo evening in one transaction. Never set it on a real venue's box |
 | `CUSTOMER_ORDER_CAP` | `30` | Max simultaneous open (unpaid) customer self-orders before new ones get "venue busy" |
 | `KIOSK_AUTOLOGIN_USER` | unset | Kitchen-role account auto-logged-in via `/api/auth/kiosk` — loopback-only, for an attached kiosk display ([rpi/README.md](rpi/README.md)) |
 

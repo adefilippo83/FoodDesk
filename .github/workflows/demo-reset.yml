@@ -2,6 +2,13 @@ name: Demo reset
 
 # Restores the public demo (https://fooddesk.fly.dev) to its canonical fake
 # dataset every 6 hours — and on demand from the Actions tab.
+#
+# The app resets itself: POST /api/demo/reset (enabled by the DEMO_RESET_TOKEN
+# secret on the Fly app, same value as the repository secret below) reloads
+# the demo evening in-process, in one transaction. The previous approach —
+# SSH into the machine and start a second Node process to run the seed —
+# needed a Fly API tunnel and an SSH dial that both failed at times, and on a
+# 256 MB machine the extra process got the live server OOM-killed.
 on:
   schedule:
     - cron: '15 */6 * * *'
@@ -10,24 +17,29 @@ on:
 permissions:
   contents: read
 
+# One reset at a time; a slow one must never pile up behind the next.
+concurrency:
+  group: demo-reset
+  cancel-in-progress: false
+
 jobs:
   reset:
     name: Reset demo data
     runs-on: ubuntu-latest
+    timeout-minutes: 5
 
     steps:
-      - uses: superfly/flyctl-actions/setup-flyctl@master
-
-      # The machine auto-stops when idle; the first request wakes it.
-      - name: Wake the demo machine
-        run: |
-          for i in $(seq 1 12); do
-            curl -sf -m 15 https://fooddesk.fly.dev/api/health >/dev/null && exit 0
-            sleep 5
-          done
-          echo "::error::demo never woke up"; exit 1
-
       - name: Reseed the demo dataset
-        run: flyctl ssh console -a fooddesk -C "sh -c 'cd /app && DATABASE_FILE=/data/fooddesk.db node server/dist/db/seed-demo.js'"
+        # The machine auto-stops when idle and the first request wakes it,
+        # which takes a few seconds. The reset is one transaction, so a
+        # request that failed or timed out midway is safe to retry.
+        run: |
+          if [ -z "$DEMO_RESET_TOKEN" ]; then
+            echo "::error::DEMO_RESET_TOKEN repository secret is not set"; exit 1
+          fi
+          curl -sS -f -m 90 --retry 6 --retry-delay 10 --retry-all-errors \
+            -X POST -H "Authorization: Bearer $DEMO_RESET_TOKEN" \
+            https://fooddesk.fly.dev/api/demo/reset
+          echo
         env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          DEMO_RESET_TOKEN: ${{ secrets.DEMO_RESET_TOKEN }}

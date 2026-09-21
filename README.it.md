@@ -170,6 +170,7 @@ npm test          # la suite server; `npm run test:e2e` per lo smoke test browse
 | `STRIPE_CURRENCY` / `PAYPAL_CURRENCY` | `eur` | Valuta dei pagamenti online, se il locale non è nell'area euro |
 | `PUBLIC_BASE_URL` | dedotto dalla richiesta | URL di ritorno dopo il pagamento. Impostalo se davanti all'app c'è un dominio vero |
 | `COUNTER_ORDER_TTL_MIN` | `30` | Minuti per cui un ordine cliente non pagato in cassa tiene le porzioni riservate prima di scadere e ripristinare lo stock |
+| `DEMO_RESET_TOKEN` | non impostato | **Solo per la demo pubblica.** Abilita `POST /api/demo/reset` (`Authorization: Bearer <token>`, almeno 32 caratteri), che svuota il database e ricarica la serata demo in un'unica transazione. Mai impostarlo sulla macchina di una sagra vera |
 | `CUSTOMER_ORDER_CAP` | `30` | Massimo di ordini clienti aperti (non pagati) prima che i nuovi ricevano "locale al completo" |
 | `KIOSK_AUTOLOGIN_USER` | non impostata | Account cucina auto-connesso via `/api/auth/kiosk` — solo loopback, per un display kiosk collegato ([rpi/README.md](rpi/README.md)) |
 
