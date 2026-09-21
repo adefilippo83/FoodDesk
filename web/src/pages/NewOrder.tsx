@@ -1,7 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { api, formatMoney, type AppConfig, type MenuCategory, type OrderDetail } from '../api'
+import {
+  api,
+  formatMoney,
+  type AppConfig,
+  type CounterPayment,
+  type MenuCategory,
+  type OrderDetail,
+} from '../api'
 import { useI18n } from '../i18n'
 import { newClientKey } from '../lib/clientKey'
+import { centsToInput, parseMoneyInput } from '../lib/money'
+import { paymentLabel } from '../lib/paymentLabel'
 import { useOrdersEvents } from '../useOrdersEvents'
 
 type Line = { productId: number; name: string; priceCents: number; qty: number }
@@ -26,7 +35,14 @@ function escapeHtml(s: string): string {
 function autoPrintOrderSheet(
   order: OrderDetail,
   config: AppConfig,
-  labels: { orderWord: string; coverCharge: string; total: string; notePrefix: string },
+  labels: {
+    orderWord: string
+    coverCharge: string
+    total: string
+    notePrefix: string
+    /** "Pagamento: Contanti" — '' when the order carries no method. */
+    paidWith: string
+  },
 ) {
   const esc = escapeHtml
   const text = (s: string) => esc(s).replaceAll('\n', '<br>')
@@ -118,6 +134,7 @@ function autoPrintOrderSheet(
     .line.coperto { padding: 3px 5px; }
     .inote { font-style: italic; font-size: 12px; margin: 0 0 3px 14px; }
     .total { display: flex; justify-content: space-between; font-size: 18px; font-weight: 800; background: #e5e5e5; padding: 6px; margin-top: 8px; break-inside: avoid; }
+    .paid { text-align: right; font-size: 11px; color: #444; margin: 3px 0 0; }
     .note { font-style: italic; font-size: 14px; margin: 4px 0; }
     .disclaimer { font-size: ${config.orderDisclaimerFontSize}pt; font-weight: 700; color: #555; text-align: center; margin: 8px 0 0; break-inside: avoid; }
     .ftext { text-align: center; font-size: ${config.orderFooterFontSize}pt; color: #444; margin: 8px 0 0; break-inside: avoid; }
@@ -130,6 +147,7 @@ function autoPrintOrderSheet(
       ${coperto}${coperto ? '<div class="sep"></div>' : ''}
       ${blocks}
       <div class="total"><span>${esc(labels.total)}</span><span>${money(order.totalCents)}</span></div>
+      ${labels.paidWith ? `<p class="paid">${esc(labels.paidWith)}</p>` : ''}
       ${order.note ? `<hr><div class="note">${esc(labels.notePrefix)} ${esc(order.note)}</div>` : ''}
       <div class="spacer"></div>
       ${config.orderDisclaimer ? `<p class="disclaimer">${text(config.orderDisclaimer)}</p>` : ''}
@@ -185,6 +203,11 @@ export default function NewOrder() {
   const [customerName, setCustomerName] = useState('')
   const [covers, setCovers] = useState(1)
   const [note, setNote] = useState('')
+  // How the customer is paying at the register (issue #63). Cash is the
+  // default: it is what every order was before the choice existed.
+  const [payment, setPayment] = useState<CounterPayment>('cash')
+  // The change calculator's only input, kept as typed; never sent anywhere.
+  const [received, setReceived] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -226,6 +249,11 @@ export default function NewOrder() {
     () => new Map(lines.map((l) => [l.productId, l.qty] as const)),
     [lines],
   )
+
+  const receivedCents = parseMoneyInput(received)
+  const changeCents = receivedCents === null ? null : receivedCents - total
+  /** A banknote handed over: adds to what was already received. */
+  const addTender = (cents: number) => setReceived(centsToInput((receivedCents ?? 0) + cents))
 
   const stockById = useMemo(
     () =>
@@ -291,6 +319,7 @@ export default function NewOrder() {
         covers: coverChargeCents > 0 ? covers : 0,
         note: note.trim() || undefined,
         clientKey: orderKeyRef.current,
+        payment,
         items: lines.map((l) => ({ productId: l.productId, qty: l.qty })),
       })
       // Clear straight away — the waiter is already walking to the next table.
@@ -299,6 +328,8 @@ export default function NewOrder() {
       setCustomerName('')
       setCovers(1)
       setNote('')
+      setPayment('cash')
+      setReceived('')
       setToast(t('orderSent', { n: order.dailyNumber }))
       // No CUPS printer? Hand the order sheet to the browser's print dialog.
       if (config && !config.printerConfigured) {
@@ -307,6 +338,10 @@ export default function NewOrder() {
           coverCharge: t('coverCharge'),
           total: t('total'),
           notePrefix: t('notePrefix'),
+          paidWith:
+            order.paidAt && order.paymentMethod
+              ? `${t('paymentLabel')}: ${paymentLabel(order.paymentMethod, t)}`
+              : '',
         })
       }
     } catch (err) {
@@ -484,6 +519,75 @@ export default function NewOrder() {
             <strong style={{ fontSize: 18 }}>{t('total')}</strong>
             <strong style={{ marginLeft: 'auto', fontSize: 20 }}>€{formatMoney(total)}</strong>
           </div>
+
+          <div className="field" style={{ marginTop: 12 }}>
+            <span style={{ display: 'block', marginBottom: 6 }}>{t('paymentLabel')}</span>
+            <div className="pay-toggle" role="radiogroup" aria-label={t('paymentLabel')}>
+              {(['cash', 'pos'] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  role="radio"
+                  aria-checked={payment === m}
+                  className={payment === m ? 'active' : ''}
+                  onClick={() => setPayment(m)}
+                >
+                  {m === 'cash' ? t('payMethodCash') : t('payMethodPos')}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {payment === 'cash' && (
+            <div className="field">
+              <div className="row" style={{ alignItems: 'center', gap: 8 }}>
+                <span style={{ flex: 1 }}>{t('receivedLabel')}</span>
+                <input
+                  className="input"
+                  inputMode="decimal"
+                  aria-label={t('receivedLabel')}
+                  placeholder="0,00"
+                  value={received}
+                  onChange={(e) => setReceived(e.target.value)}
+                  style={{ width: 120, textAlign: 'right' }}
+                />
+                <button
+                  type="button"
+                  className="qty-btn"
+                  aria-label={t('clear')}
+                  disabled={!received}
+                  onClick={() => setReceived('')}
+                >
+                  ×
+                </button>
+              </div>
+              <div className="tender-keys">
+                <button
+                  type="button"
+                  className="btn small"
+                  onClick={() => setReceived(centsToInput(total))}
+                >
+                  {t('exactAmount')}
+                </button>
+                {[500, 1000, 2000, 5000].map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    className="btn small"
+                    onClick={() => addTender(c)}
+                  >
+                    +{c / 100}
+                  </button>
+                ))}
+              </div>
+              {changeCents !== null && (
+                <div className={`change-due${changeCents < 0 ? ' short' : ''}`}>
+                  <span>{changeCents < 0 ? t('shortBy') : t('changeLabel')}</span>
+                  <span className="amount">€{formatMoney(Math.abs(changeCents))}</span>
+                </div>
+              )}
+            </div>
+          )}
 
           <button
             className="btn primary"

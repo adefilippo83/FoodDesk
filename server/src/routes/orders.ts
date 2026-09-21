@@ -9,7 +9,8 @@ import { isServiceDay, serviceDayOf } from '../lib/serviceDay.js'
 import { loadOrderItemsInMenuOrder } from '../lib/orderItems.js'
 import { parseItems, placeOrder } from '../lib/placeOrder.js'
 import { cancelHeldOrder, isHeld } from '../payments/lifecycle.js'
-import type { OnlineMethod, ProviderRegistry } from '../payments/provider.js'
+import { isOnlinePayment, parseCounterMethod } from '../payments/method.js'
+import type { ProviderRegistry } from '../payments/provider.js'
 import { renderKitchenTicket, renderOrderSheet, renderReceipt } from '../print/pdf.js'
 import { kitchenQueue, printKitchenTicket } from '../print/service.js'
 import { loadSettings } from '../settings.js'
@@ -48,6 +49,11 @@ export function orderRoutes(db: Db, providers: ProviderRegistry) {
           ? body.clientKey.trim().slice(0, 64)
           : null
 
+      // How the customer paid at the register — cash or the POS terminal —
+      // so the day's books can split the drawer from the terminal (#63).
+      const payment = parseCounterMethod(body?.payment)
+      if (payment === 'invalid') return reply.code(400).send({ error: 'invalid_payment' })
+
       // Snapshot the coperto amount now: changing it in settings tomorrow
       // must not change tonight's bills.
       const { coverChargeCents } = await loadSettings(db)
@@ -62,6 +68,9 @@ export function orderRoutes(db: Db, providers: ProviderRegistry) {
         createdBy: req.user!.id,
         origin: 'staff',
         publicToken: null,
+        // A staff order is paid as it is taken: the money is in the till.
+        paymentMethod: payment,
+        paidAt: Math.floor(Date.now() / 1000),
       })
       if (!result.ok) {
         if (result.code === 'unknown_products') {
@@ -208,8 +217,8 @@ export function orderRoutes(db: Db, providers: ProviderRegistry) {
       // Online-paid order cancelled by a manager: the customer gets their
       // money back, automatically and in full.
       let refundFailed = false
-      if (updated.paidAt && updated.paymentRef && updated.paymentMethod !== 'cash') {
-        const provider = providers.get(updated.paymentMethod as OnlineMethod)
+      if (updated.paidAt && updated.paymentRef && isOnlinePayment(updated.paymentMethod)) {
+        const provider = providers.get(updated.paymentMethod)
         try {
           if (!provider) throw new Error(`no provider for ${updated.paymentMethod}`)
           await provider.refund(updated.paymentRef)
@@ -244,7 +253,9 @@ export function orderRoutes(db: Db, providers: ProviderRegistry) {
       if (order.cancelledAt) return reply.code(409).send({ error: 'order_cancelled' })
       // No partial refunds in phase B: an online-paid order's lines and
       // amounts are frozen; only a full cancel (with full refund) changes it.
-      if (order.paidAt && order.paymentMethod !== null && order.paymentMethod !== 'cash') {
+      // A counter payment (cash, POS) is not: the cashier settles the
+      // difference by hand, so the order stays editable.
+      if (order.paidAt && isOnlinePayment(order.paymentMethod)) {
         return reply.code(409).send({ error: 'online_paid_locked' })
       }
 
@@ -342,7 +353,8 @@ export function orderRoutes(db: Db, providers: ProviderRegistry) {
       if (order.cancelledAt) return reply.code(409).send({ error: 'order_cancelled' })
       // No partial refunds in phase B: an online-paid order's lines and
       // amounts are frozen; only a full cancel (with full refund) changes it.
-      if (order.paidAt && order.paymentMethod !== null && order.paymentMethod !== 'cash') {
+      // Counter-paid (cash, POS) orders stay editable — see the line cancel.
+      if (order.paidAt && isOnlinePayment(order.paymentMethod)) {
         return reply.code(409).send({ error: 'online_paid_locked' })
       }
 
@@ -481,9 +493,14 @@ export function orderRoutes(db: Db, providers: ProviderRegistry) {
       return { ok: true, printedAt: result.printedAt }
     })
 
-    /** Cash at pickup: mark an order as paid (customer self-orders, mostly). */
+    /**
+     * Paid at the counter — cash or POS — for orders that were not paid when
+     * they came in: customer self-orders, mostly.
+     */
     app.post('/api/orders/:id/paid', async (req, reply) => {
       const id = Number((req.params as { id: string }).id)
+      const payment = parseCounterMethod((req.body as { payment?: unknown } | undefined)?.payment)
+      if (payment === 'invalid') return reply.code(400).send({ error: 'invalid_payment' })
       const order = await loadVisibleOrder(id, req.user!)
       if (order === 'not_found') return reply.code(404).send({ error: 'not_found' })
       if (order === 'forbidden') return reply.code(403).send({ error: 'forbidden' })
@@ -491,7 +508,7 @@ export function orderRoutes(db: Db, providers: ProviderRegistry) {
       if (order.paidAt) return { ...order } // idempotent
       // An order routed through an online provider is paid online or not at
       // all — the counter must not be able to bypass the payment flow.
-      if (order.paymentMethod !== null) {
+      if (isOnlinePayment(order.paymentMethod)) {
         return reply.code(409).send({ error: 'online_payment_pending' })
       }
 
@@ -501,7 +518,7 @@ export function orderRoutes(db: Db, providers: ProviderRegistry) {
       const updated = (
         await db
           .update(orders)
-          .set({ paidAt: Math.floor(Date.now() / 1000), paymentMethod: 'cash' })
+          .set({ paidAt: Math.floor(Date.now() / 1000), paymentMethod: payment })
           .where(and(eq(orders.id, id), isNull(orders.paidAt), isNull(orders.cancelledAt)))
           .returning()
       )[0]
@@ -512,7 +529,7 @@ export function orderRoutes(db: Db, providers: ProviderRegistry) {
         return { ...now } // paid by a colleague meanwhile — idempotent
       }
       req.log.info(
-        { event: 'order_paid', by: req.user!.id, orderId: id, method: 'cash' },
+        { event: 'order_paid', by: req.user!.id, orderId: id, method: payment },
         'audit',
       )
       // Paying at the counter is what releases a customer order to the

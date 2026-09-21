@@ -139,8 +139,10 @@ export function settingsRoutes(db: Db, providers: ProviderRegistry) {
         clientKey: null,
         origin: 'staff',
         publicToken: null,
-        paidAt: null,
-        paymentMethod: null,
+        // As a real staff order is: paid at the register when it was taken,
+        // so the preview shows the payment line the sheets carry.
+        paidAt: now,
+        paymentMethod: 'cash',
         paymentRef: null,
         refundedAt: null,
         note: null,

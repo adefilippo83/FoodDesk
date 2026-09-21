@@ -143,7 +143,7 @@ describe('reports with online payments', () => {
     assert.equal(r.ordersCount, 3)
     assert.equal(r.revenueCents, 2000)
     assert.deepEqual(r.byPayment, [
-      { method: 'counter', ordersCount: 2, revenueCents: 1500 },
+      { method: 'cash', ordersCount: 2, revenueCents: 1500 },
       { method: 'stripe', ordersCount: 1, revenueCents: 500 },
     ])
   })
@@ -174,6 +174,6 @@ describe('reports with online payments', () => {
     assert.ok(rita.endsWith(';yes;yes'), `cancel/refund flags missing: ${rita}`)
 
     const carla = lines.find((l) => l.includes('Counter Carla'))!
-    assert.ok(carla.includes(';counter;'), `counter-paid self-order: ${carla}`)
+    assert.ok(carla.includes(';cash;'), `counter-paid self-order: ${carla}`)
   })
 })

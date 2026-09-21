@@ -24,10 +24,19 @@ type OrderRow = {
   coverChargeCents: number
   totalCents: number
   cancelledAt: number | null
-  paymentMethod: 'cash' | 'stripe' | 'paypal' | null
+  paymentMethod: 'cash' | 'pos' | 'stripe' | 'paypal' | null
   refundedAt: number | null
   waiter: string | null
 }
+
+/**
+ * Where the money physically is: the cash drawer, the POS terminal's
+ * end-of-day total, or a provider dashboard. Orders from before the counter
+ * recorded its method (null) were paid at the counter one way or the other —
+ * reported as such, never guessed to be cash.
+ */
+type PaymentBucket = 'cash' | 'pos' | 'stripe' | 'paypal' | 'counter'
+const paymentBucket = (o: OrderRow): PaymentBucket => o.paymentMethod ?? 'counter'
 
 type ItemRow = {
   orderId: number
@@ -123,16 +132,14 @@ function buildReport(day: string, data: { orders: OrderRow[]; items: ItemRow[] }
     byCategory.sort((a, b) => b.revenueCents - a.revenueCents)
   }
 
-  // Where the money physically is: the cash drawer vs the two provider
-  // dashboards. Staff orders and counter-paid self-orders are both drawer.
-  const payKey = (o: OrderRow) =>
-    o.paymentMethod === 'stripe' || o.paymentMethod === 'paypal' ? o.paymentMethod : 'counter'
-  const payMap = new Map<string, { ordersCount: number; revenueCents: number }>()
+  // The drawer, the POS terminal and each provider dashboard get their own
+  // line, so the treasurer can reconcile each against its own total.
+  const payMap = new Map<PaymentBucket, { ordersCount: number; revenueCents: number }>()
   for (const o of active) {
-    const e = payMap.get(payKey(o)) ?? { ordersCount: 0, revenueCents: 0 }
+    const e = payMap.get(paymentBucket(o)) ?? { ordersCount: 0, revenueCents: 0 }
     e.ordersCount += 1
     e.revenueCents += o.totalCents
-    payMap.set(payKey(o), e)
+    payMap.set(paymentBucket(o), e)
   }
   const byPayment = [...payMap.entries()]
     .map(([method, v]) => ({ method, ...v }))
@@ -195,8 +202,7 @@ function toCsv(data: { orders: OrderRow[]; items: ItemRow[] }): string {
     })
     const cancelled = o.cancelledAt ? 'yes' : ''
     const refunded = o.refundedAt ? 'yes' : ''
-    const payment =
-      o.paymentMethod === 'stripe' || o.paymentMethod === 'paypal' ? o.paymentMethod : 'counter'
+    const payment = paymentBucket(o)
     const base = [
       String(o.dailyNumber).padStart(3, '0'),
       time,
@@ -306,11 +312,17 @@ async function renderReportPdf(
     }
   }
 
-  const PAY_LABELS: Record<string, string> = { counter: 'Cassa', stripe: 'Stripe', paypal: 'PayPal' }
+  const PAY_LABELS: Record<PaymentBucket, string> = {
+    cash: 'Contanti',
+    pos: 'POS',
+    stripe: 'Stripe',
+    paypal: 'PayPal',
+    counter: 'Cassa',
+  }
   table(
     'Per pagamento',
     report.byPayment.map((p) => ({
-      name: PAY_LABELS[p.method] ?? p.method,
+      name: PAY_LABELS[p.method],
       qty: p.ordersCount,
       revenueCents: p.revenueCents,
     })),

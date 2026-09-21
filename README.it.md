@@ -47,19 +47,21 @@ sulla tua macchina.
 
 ## Pensato per tutta la squadra
 
-**🧾 I camerieri** — una PWA nata per il telefono: tocchi i prodotti, conti
-i coperti, aggiungi la nota per la cucina, invii. Il totale resta sempre
-sotto il pollice, gli ordini sono numerati per giornata di servizio
-(`#042`) e un singhiozzo di rete non può mai creare un ordine doppio. Un
-piatto battuto per sbaglio si annulla da solo — totale e cucina si
-aggiornano di conseguenza.
+**🧾 I camerieri e la cassa** — una PWA nata per il telefono: tocchi i
+prodotti, conti i coperti, aggiungi la nota per la cucina, invii. Il totale
+resta sempre sotto il pollice, gli ordini sono numerati per giornata di
+servizio (`#042`) e un singhiozzo di rete non può mai creare un ordine
+doppio. In cassa indichi se il cliente paga in contanti o con il POS; per i
+contanti scrivi (o tocchi) quanto ti ha dato e il resto da rendere compare
+in grande. Un piatto battuto per sbaglio si annulla da solo — totale e
+cucina si aggiornano di conseguenza.
 
 **📲 I clienti** — self-ordering opzionale: i clienti inquadrano un QR al
 tavolo (le Impostazioni stampano poster e cartoncini da tavolo), ordinano
 dal proprio telefono e pagano online — Stripe o PayPal — o alla cassa. La
 cucina vede l'ordine solo quando è pagato, il telefono mostra avanzamento
 in tempo reale e numero di ritiro, e annullare un ordine pagato lo rimborsa
-in automatico. I report dividono l'incasso tra cassa e provider.
+in automatico. I report dividono l'incasso tra contanti, POS e provider.
 
 **🍳 La cucina** — un display su tablet che non richiede formazione: gli
 ordini nuovi compaiono nell'istante in cui vengono inviati (senza mai

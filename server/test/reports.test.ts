@@ -84,8 +84,8 @@ describe('reports', () => {
     // Both orders defaulted to covers=1 → 2 covers total.
     assert.equal(r.totalCovers, 2)
     assert.equal(r.avgPerCoverCents, 1625)
-    // No online payments configured: everything is counter money.
-    assert.deepEqual(r.byPayment, [{ method: 'counter', ordersCount: 2, revenueCents: 3250 }])
+    // No online payments configured and the cashier said nothing: cash.
+    assert.deepEqual(r.byPayment, [{ method: 'cash', ordersCount: 2, revenueCents: 3250 }])
     assert.equal(r.refundedCount, 0)
     assert.equal(r.refundedCents, 0)
   })
@@ -165,8 +165,8 @@ describe('reports', () => {
     // 3 beers at 5,00 = 15,00
     const luciaLine = lines.find((l) => l.includes('lucia'))!
     assert.ok(luciaLine.endsWith(';3;5,00;15,00;;'), `bad money format: ${luciaLine}`)
-    // Staff orders are counter money.
-    assert.ok(luciaLine.includes(';counter;'), `missing payment column: ${luciaLine}`)
+    // A staff order is cash unless the cashier picked POS.
+    assert.ok(luciaLine.includes(';cash;'), `missing payment column: ${luciaLine}`)
   })
 
   it('lists service days with counts', async () => {
