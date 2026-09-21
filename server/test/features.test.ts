@@ -217,6 +217,28 @@ describe('coperto, cancellation, settings, passwords, reorder', () => {
     assert.equal(res.json().orderDisclaimer, 'Documento non fiscale')
   })
 
+  it('tells the browser print fallback which paper the order sheet is on (issue #63)', async () => {
+    // Default: a thermal roll — the fallback sizes its page to the content.
+    let res = await app.inject({ method: 'GET', url: '/api/config', headers: { cookie: opCookie } })
+    assert.equal(res.json().orderPaperSize, 'roll80')
+
+    // Switched to a fixed sheet, the fallback keeps its footer-at-the-bottom layout.
+    await app.inject({
+      method: 'PUT',
+      url: '/api/settings',
+      headers: { cookie: adminCookie },
+      payload: { orderPaperSize: 'a4' },
+    })
+    res = await app.inject({ method: 'GET', url: '/api/config', headers: { cookie: opCookie } })
+    assert.equal(res.json().orderPaperSize, 'a4')
+    await app.inject({
+      method: 'PUT',
+      url: '/api/settings',
+      headers: { cookie: adminCookie },
+      payload: { orderPaperSize: 'roll80' },
+    })
+  })
+
   it('serves order-sheet images as cached assets, never as base64 in config', async () => {
     const png = Buffer.concat([
       Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),

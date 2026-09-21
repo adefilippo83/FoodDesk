@@ -34,6 +34,9 @@ export function settingsRoutes(db: Db, providers: ProviderRegistry) {
         restaurantName: s.restaurantName,
         coverChargeCents: s.coverChargeCents,
         printerConfigured: Boolean(kitchenQueue()),
+        // The browser print fallback sizes its page to the content on a roll,
+        // exactly like the order.pdf does — it has to know it is on a roll.
+        orderPaperSize: s.orderPaperSize,
         orderHeaderText: s.orderHeaderText,
         orderHeaderImageUrl: assetUrl('header', s.orderHeaderImage),
         orderFooterText: s.orderFooterText,

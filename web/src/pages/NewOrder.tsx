@@ -32,6 +32,18 @@ function autoPrintOrderSheet(
   const text = (s: string) => esc(s).replaceAll('\n', '<br>')
   const money = (cents: number) => `€ ${formatMoney(cents)}`
 
+  // A thermal roll has no page height of its own: the printer feeds whatever
+  // the page says. Left unsaid, the browser uses the driver's default (the
+  // roll's maximum, often ~15 cm) and prints the rest blank. So on a roll we
+  // do what the order.pdf renderer does — measure the content first and
+  // declare a page exactly that tall — and let the printer cut right after.
+  const roll = config.orderPaperSize === 'roll80'
+  const ROLL_W_MM = 80
+  const PAGE_MARGIN_TOP_MM = 5
+  const PAGE_MARGIN_BOTTOM_MM = 9
+  const ROLL_INNER_MM = ROLL_W_MM - 2 * 5
+  const ROLL_MIN_H_MM = 40 // same floor as the PDF: a stub too short to tear cleanly
+
   const time = new Date(order.createdAt * 1000).toLocaleTimeString([], {
     hour: '2-digit',
     minute: '2-digit',
@@ -82,10 +94,14 @@ function autoPrintOrderSheet(
       }
     }
     body { font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; color: #000; background: #fff; margin: 0; }
-    /* Disclaimer and footer sit at the bottom of the printed page, like on
-       the server-rendered order.pdf (issue #32). */
-    .sheet { display: flex; flex-direction: column; min-height: calc(100vh - 2mm); }
+    /* On a fixed sheet the disclaimer and footer sit at the bottom of the
+       page, like on the server-rendered order.pdf (issue #32). On a roll the
+       page is cut to the content below, so nothing is pushed anywhere —
+       stretching to 100vh there is exactly what printed 15 cm of blank
+       paper (issue #63). */
+    .sheet { display: flex; flex-direction: column; ${roll ? '' : 'min-height: calc(100vh - 2mm);'} }
     .spacer { flex: 1; }
+    ${roll ? `body { width: ${ROLL_INNER_MM}mm; }` : ''}
     img.hf { display: block; max-width: 100%; height: auto; margin: 0 auto 4px; break-inside: avoid; }
     .htext { text-align: center; font-size: ${config.orderHeaderFontSize}pt; color: #333; margin: 0 0 4px; }
     .info { font-size: 17px; font-weight: 800; text-align: center; margin: 2px 0; }
@@ -126,14 +142,31 @@ function autoPrintOrderSheet(
   frame.style.position = 'fixed'
   frame.style.right = '0'
   frame.style.bottom = '0'
-  frame.style.width = '0'
+  // On a roll the frame needs the real printable width so the content wraps
+  // as it will on paper before we measure it; it stays invisible either way.
+  frame.style.width = roll ? `${ROLL_INNER_MM}mm` : '0'
   frame.style.height = '0'
   frame.style.border = '0'
+  frame.style.opacity = '0'
+  frame.style.pointerEvents = 'none'
   frame.srcdoc = html
   frame.onload = () => {
     try {
-      frame.contentWindow?.focus()
-      frame.contentWindow?.print()
+      const win = frame.contentWindow
+      const doc = frame.contentDocument
+      if (roll && win && doc) {
+        // Content height in CSS px → mm, plus the @page margins.
+        const contentMm = (doc.documentElement.scrollHeight * 25.4) / 96
+        const pageMm = Math.max(
+          Math.ceil(contentMm + PAGE_MARGIN_TOP_MM + PAGE_MARGIN_BOTTOM_MM),
+          ROLL_MIN_H_MM,
+        )
+        const size = doc.createElement('style')
+        size.textContent = `@page { size: ${ROLL_W_MM}mm ${pageMm}mm; }`
+        doc.head.appendChild(size)
+      }
+      win?.focus()
+      win?.print()
     } catch {
       window.open(api.orderPdfUrl(order.id), '_blank')
     }
