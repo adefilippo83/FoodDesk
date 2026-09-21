@@ -129,6 +129,8 @@ export type AppConfig = OrderSheetLayout & {
   restaurantName: string
   coverChargeCents: number
   printerConfigured: boolean
+  /** Paper of the order sheet; 'roll80' means a thermal roll of any length. */
+  orderPaperSize: 'roll80' | 'a5' | 'a4' | 'letter'
   /** Versioned, cacheable image URLs — '' when no image is configured. */
   orderHeaderImageUrl: string
   orderFooterImageUrl: string
