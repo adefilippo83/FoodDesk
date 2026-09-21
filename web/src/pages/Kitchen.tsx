@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { api, type KitchenItem, type KitchenOrder } from '../api'
 import { useI18n } from '../i18n'
+import { isOnlinePayment } from '../lib/paymentLabel'
 import { useOrdersEvents } from '../useOrdersEvents'
 
 function minutesSince(ts: number): number {
@@ -58,7 +59,7 @@ function OrderCard({
         <div className="kds-meta">
           <strong>
             {order.customerName}
-            {(order.paymentMethod === 'stripe' || order.paymentMethod === 'paypal') && (
+            {isOnlinePayment(order.paymentMethod) && (
               <span className="badge ok" style={{ marginLeft: 6 }}>
                 {t('prepaidBadge')}
               </span>

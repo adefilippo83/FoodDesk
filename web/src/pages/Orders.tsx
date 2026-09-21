@@ -1,8 +1,15 @@
 import { useEffect, useState } from 'react'
-import { ApiError, api, formatMoney, type OrderDetail, type OrderSummary } from '../api'
+import {
+  ApiError,
+  api,
+  formatMoney,
+  type CounterPayment,
+  type OrderDetail,
+  type OrderSummary,
+} from '../api'
 import { useAuth } from '../auth'
 import { useI18n } from '../i18n'
-import { paymentLabel } from '../lib/paymentLabel'
+import { isOnlinePayment, paymentLabel } from '../lib/paymentLabel'
 import { useOrdersEvents } from '../useOrdersEvents'
 
 function PrintStatus({ order }: { order: OrderSummary }) {
@@ -33,6 +40,8 @@ export default function Orders() {
   const [loading, setLoading] = useState(true)
   const [reprinting, setReprinting] = useState<number | null>(null)
   const [marking, setMarking] = useState<number | null>(null)
+  // "Mark paid" first asks how — cash or POS — like cancel asks "sure?".
+  const [choosingPaid, setChoosingPaid] = useState<number | null>(null)
   const [confirmingCancel, setConfirmingCancel] = useState<number | null>(null)
   const [cancelling, setCancelling] = useState(false)
   const [confirmingItemCancel, setConfirmingItemCancel] = useState<number | null>(null)
@@ -121,10 +130,11 @@ export default function Orders() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  async function markPaid(id: number) {
+  async function markPaid(id: number, payment: CounterPayment) {
+    setChoosingPaid(null)
     setMarking(id)
     try {
-      await api.markPaid(id)
+      await api.markPaid(id, payment)
       await load()
     } catch {
       setError(t('errMarkPaid'))
@@ -135,6 +145,18 @@ export default function Orders() {
 
   useOrdersEvents(() => void load())
 
+  // The cash/POS choice folds back on a tap anywhere else. Not on blur:
+  // Safari never focuses a tapped button, so a blur-based close would fire
+  // while the finger is still on the second button and eat the tap.
+  useEffect(() => {
+    if (choosingPaid === null) return
+    const away = (e: PointerEvent) => {
+      if (!(e.target instanceof Element) || !e.target.closest('.pay-choice')) setChoosingPaid(null)
+    }
+    document.addEventListener('pointerdown', away)
+    return () => document.removeEventListener('pointerdown', away)
+  }, [choosingPaid])
+
   // Held payments are provisional: on screen, but not in the day's money.
   // The day's money: exclude held (payment in progress), cancelled and
   // auto-refunded/expired orders, so the header agrees with the Reports page
@@ -143,11 +165,7 @@ export default function Orders() {
   // An online-paid order's lines are frozen server-side (online_paid_locked):
   // the only change allowed is a full cancel, which refunds. Showing the
   // per-line buttons would just produce errors the waiter cannot act on.
-  const onlinePaidLocked =
-    open !== null &&
-    open.paidAt !== null &&
-    open.paymentMethod !== null &&
-    open.paymentMethod !== 'cash'
+  const onlinePaidLocked = open !== null && open.paidAt !== null && isOnlinePayment(open.paymentMethod)
   const dayTotal = settled.reduce((sum, o) => sum + o.totalCents, 0)
 
   if (loading) return <div className="empty">{t('loading')}</div>
@@ -280,13 +298,33 @@ export default function Orders() {
                     </button>{' '}
                     {o.origin === 'customer' && o.paidAt === null && o.cancelledAt === null && (
                       <>
-                        <button
-                          className="btn small primary"
-                          disabled={marking === o.id}
-                          onClick={() => void markPaid(o.id)}
-                        >
-                          {t('markPaid')}
-                        </button>{' '}
+                        {choosingPaid === o.id ? (
+                          <span className="pay-choice">
+                            <button
+                              className="btn small primary"
+                              disabled={marking === o.id}
+                              onClick={() => void markPaid(o.id, 'cash')}
+                              autoFocus
+                            >
+                              {t('payMethodCash')}
+                            </button>{' '}
+                            <button
+                              className="btn small primary"
+                              disabled={marking === o.id}
+                              onClick={() => void markPaid(o.id, 'pos')}
+                            >
+                              {t('payMethodPos')}
+                            </button>
+                          </span>
+                        ) : (
+                          <button
+                            className="btn small primary"
+                            disabled={marking === o.id}
+                            onClick={() => setChoosingPaid(o.id)}
+                          >
+                            {t('markPaid')}
+                          </button>
+                        )}{' '}
                       </>
                     )}
                     {(user?.role === 'admin' || user?.role === 'maitre') && o.cancelledAt === null && (

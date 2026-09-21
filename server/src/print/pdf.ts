@@ -1,5 +1,6 @@
 import PDFDocument from 'pdfkit'
 import type { Order, OrderItem } from '../db/schema.js'
+import { isOnlinePayment } from '../payments/method.js'
 import { imageBuffer, type AppSettings, type PaperSize, type PdfLang } from '../settings.js'
 
 /**
@@ -23,6 +24,9 @@ const LABELS = {
     prepaid: 'PREPAGATO',
     cancelled: 'ANNULLATO',
     note: 'Nota',
+    payment: 'Pagamento',
+    cash: 'Contanti',
+    pos: 'POS',
   },
   en: {
     order: 'Order',
@@ -34,6 +38,9 @@ const LABELS = {
     prepaid: 'PREPAID',
     cancelled: 'CANCELLED',
     note: 'Note',
+    payment: 'Payment',
+    cash: 'Cash',
+    pos: 'Card (POS)',
   },
   es: {
     order: 'Pedido',
@@ -45,6 +52,9 @@ const LABELS = {
     prepaid: 'PREPAGADO',
     cancelled: 'ANULADO',
     note: 'Nota',
+    payment: 'Pago',
+    cash: 'Efectivo',
+    pos: 'Tarjeta (POS)',
   },
   fr: {
     order: 'Commande',
@@ -56,6 +66,9 @@ const LABELS = {
     prepaid: 'PRÉPAYÉ',
     cancelled: 'ANNULÉE',
     note: 'Note',
+    payment: 'Paiement',
+    cash: 'Espèces',
+    pos: 'Carte (TPE)',
   },
   pt: {
     order: 'Pedido',
@@ -67,7 +80,28 @@ const LABELS = {
     prepaid: 'PRÉ-PAGO',
     cancelled: 'ANULADO',
     note: 'Nota',
+    payment: 'Pagamento',
+    cash: 'Dinheiro',
+    pos: 'Cartão (POS)',
   },
+}
+
+/**
+ * "Payment: Cash" for the customer-facing documents — how the order was
+ * paid, once it is. Brand names stay as they are; a counter payment from
+ * before the method was recorded (null) prints nothing rather than a guess.
+ */
+function paymentLine(order: Order, L: (typeof LABELS)[PdfLang]): string | null {
+  if (!order.paidAt || order.paymentMethod === null) return null
+  const method =
+    order.paymentMethod === 'cash'
+      ? L.cash
+      : order.paymentMethod === 'pos'
+        ? L.pos
+        : order.paymentMethod === 'stripe'
+          ? 'Stripe'
+          : 'PayPal'
+  return `${L.payment}: ${method}`
 }
 
 type Dims = { pageW: number; margin: number; innerW: number; fixedH: number | null }
@@ -316,7 +350,8 @@ export function renderKitchenTicket(
       doc.fontSize(11).text(`${L.covers}: ${order.covers}`, { align: 'center' })
     }
     // Paid online before reaching the kitchen: pickup hands it straight over.
-    if (order.paidAt && order.paymentMethod !== null && order.paymentMethod !== 'cash') {
+    // (Counter payments are the normal case and get no stamp.)
+    if (order.paidAt && isOnlinePayment(order.paymentMethod)) {
       doc.font('Helvetica-Bold').fontSize(13).text(`· ${L.prepaid} ·`, { align: 'center' })
     }
 
@@ -422,6 +457,13 @@ export function renderReceipt(
     doc.font('Helvetica-Bold').fontSize(14).text(L.total, d.margin, y)
     doc.text(money(order.totalCents, lang), d.margin, y, { width: d.innerW, align: 'right' })
     doc.x = d.margin
+
+    const paidWith = paymentLine(order, L)
+    if (paidWith) {
+      ensureRoom(doc, d, 14)
+      doc.font('Helvetica').fontSize(9).fillColor('#444').text(paidWith, { align: 'right' })
+      doc.fillColor('#000')
+    }
 
     doc.moveDown(0.8)
     if (s.footerText) {
@@ -613,6 +655,20 @@ export function renderOrderSheet(
     })
     doc.x = d.margin
     doc.y = rectY + totalH + 6
+
+    // ---- how it was paid (#63): the pickup counter sees it is settled ----
+    const paidWith = paymentLine(order, L)
+    if (paidWith) {
+      ensureRoom(doc, d, 14)
+      doc
+        .font('Helvetica')
+        .fontSize(9)
+        .fillColor('#444')
+        .text(paidWith, d.margin, doc.y, { width: d.innerW - PAD, align: 'right' })
+      doc.fillColor('#000')
+      doc.x = d.margin
+      doc.y += 2
+    }
 
     // ---- kitchen note ----
     if (order.note) {

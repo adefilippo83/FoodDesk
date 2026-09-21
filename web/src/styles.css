@@ -448,6 +448,73 @@ label.field span {
   color: var(--accent);
 }
 
+/* ---------- payment at the register (issue #63) ---------- */
+
+/* Cash / POS: a two-way switch, big enough for a thumb at the till. */
+.pay-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.pay-toggle button {
+  min-height: 44px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-dim);
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.pay-toggle button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+/* Banknote shortcuts: each tap adds a note the customer handed over. */
+.tender-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.tender-keys .btn.small {
+  min-width: 48px;
+  font-variant-numeric: tabular-nums;
+}
+
+.qty-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* The change due, in a size the cashier reads from across the counter. */
+.change-due {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.change-due .amount {
+  font-size: 24px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ok);
+}
+
+.change-due.short .amount {
+  color: var(--danger);
+}
+
 /* ---------- tables ---------- */
 
 .table-scroll {

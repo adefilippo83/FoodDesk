@@ -17,6 +17,11 @@ export type MenuCategory = {
   name: string
   products: { id: number; name: string; priceCents: number; stockRemaining: number | null }[]
 }
+/** How an order was paid: at the counter (cash, POS) or through a provider. */
+export type PaymentMethod = 'cash' | 'pos' | 'stripe' | 'paypal'
+/** The counter's two choices. */
+export type CounterPayment = 'cash' | 'pos'
+
 export type OrderSummary = {
   id: number
   dailyNumber: number
@@ -33,7 +38,7 @@ export type OrderSummary = {
   createdByName: string | null
   origin: 'staff' | 'customer'
   paidAt: number | null
-  paymentMethod: 'cash' | 'stripe' | 'paypal' | null
+  paymentMethod: PaymentMethod | null
   /** Online payment still in progress: listed for awareness, not money yet. */
   held?: boolean
   /** Set when cancelling this order triggered an automatic refund. */
@@ -107,7 +112,7 @@ export type KitchenOrder = {
   cancelledAt: number | null
   completedAt: number | null
   createdByName: string | null
-  paymentMethod: 'cash' | 'stripe' | 'paypal' | null
+  paymentMethod: PaymentMethod | null
   items: KitchenItem[]
 }
 
@@ -178,7 +183,8 @@ export type DailyReport = {
   avgPerCoverCents: number | null
   byProduct: { name: string; qty: number; revenueCents: number }[]
   byCategory: { name: string; qty: number; revenueCents: number }[]
-  byPayment: { method: 'counter' | 'stripe' | 'paypal'; ordersCount: number; revenueCents: number }[]
+  /** 'counter': paid at the register before it recorded cash vs POS. */
+  byPayment: { method: PaymentMethod | 'counter'; ordersCount: number; revenueCents: number }[]
   refundedCount: number
   refundedCents: number
 }
@@ -254,10 +260,13 @@ export const api = {
     covers: number
     note?: string
     clientKey?: string
+    /** Cash when omitted. */
+    payment?: CounterPayment
     items: { productId: number; qty: number; note?: string }[]
   }) => request<OrderDetail>('POST', '/api/orders', input),
   cancelOrder: (id: number) => request<OrderSummary>('POST', `/api/orders/${id}/cancel`),
-  markPaid: (id: number) => request<OrderSummary>('POST', `/api/orders/${id}/paid`),
+  markPaid: (id: number, payment: CounterPayment = 'cash') =>
+    request<OrderSummary>('POST', `/api/orders/${id}/paid`, { payment }),
   publicMenu: () => request<PublicMenu>('GET', '/api/public/menu'),
   publicCreateOrder: (input: {
     customerName: string

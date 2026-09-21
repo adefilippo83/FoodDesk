@@ -37,13 +37,32 @@ test('login → menu → order → kitchen display', async ({ page }) => {
   await page.getByRole('link', { name: 'New order' }).click()
   await page.getByRole('button', { name: /Beer/ }).click()
   await page.getByLabel(/Customer/).fill('Mario')
+
+  // The register (issue #63): cash is the default and brings the change
+  // calculator — a €10 note against a €5 beer gives €5 back; a €20 tapped
+  // on top makes it €25 back. Switching to POS puts the calculator away.
+  await expect(page.getByRole('radio', { name: 'Cash' })).toHaveAttribute('aria-checked', 'true')
+  await page.getByLabel('Received').fill('10')
+  await expect(page.locator('.change-due')).toContainText('Change')
+  await expect(page.locator('.change-due .amount')).toHaveText(/€5[.,]00/)
+  await page.getByRole('button', { name: '+20' }).click()
+  await expect(page.locator('.change-due .amount')).toHaveText(/€25[.,]00/)
+  await page.getByLabel('Received').fill('3')
+  await expect(page.locator('.change-due')).toContainText('Short by')
+  await expect(page.locator('.change-due .amount')).toHaveText(/€2[.,]00/)
+  await page.getByRole('radio', { name: 'Card (POS)' }).click()
+  await expect(page.getByLabel('Received')).toHaveCount(0)
+
   await page.getByRole('button', { name: 'Send order' }).click()
   await expect(page.getByText(/Order #\d+ sent/)).toBeVisible()
+  // The next order starts over from cash.
+  await expect(page.getByRole('radio', { name: 'Cash' })).toHaveAttribute('aria-checked', 'true')
 
-  // ---- the order list shows it ----
+  // ---- the order list shows it, flagged as paid by card ----
   await page.getByRole('link', { name: 'Orders' }).click()
   await expect(page.getByRole('cell', { name: 'Mario' })).toBeVisible()
   await expect(page.getByText('001')).toBeVisible()
+  await expect(page.getByText('Card (POS) ✓')).toBeVisible()
 
   // ---- work it on the kitchen display ----
   await page.getByRole('link', { name: 'Kitchen' }).click()
@@ -94,7 +113,9 @@ test('login → menu → order → kitchen display', async ({ page }) => {
   await page.getByRole('link', { name: 'Orders' }).click()
   await expect(page.getByRole('cell', { name: /Table 9/ })).toBeVisible()
   await expect(page.getByText('to pay')).toBeVisible()
+  // "Mark paid" asks how before it commits: cash here.
   await page.getByRole('button', { name: 'Mark paid' }).click()
+  await page.getByRole('button', { name: 'Cash', exact: true }).click()
   await expect(page.getByText('to pay')).toHaveCount(0)
 
   // ---- now (and only now) the kitchen has it, and the phone catches up ----

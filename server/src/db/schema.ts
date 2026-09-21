@@ -94,11 +94,14 @@ export const orders = sqliteTable(
     publicToken: text('public_token'),
     // Payment: paidAt null = not (yet) paid. Online payments (phase B) set
     // the method and provider reference at creation and hold the order out
-    // of the kitchen until the provider confirms; cash is set when marked
-    // paid at the counter. refundedAt records the automatic refund when a
-    // manager cancels an online-paid order.
+    // of the kitchen until the provider confirms. Counter payments — cash or
+    // the POS terminal — are stamped when the money changes hands: at
+    // creation for a staff order, at "mark paid" for a customer self-order.
+    // Pre-0.2.9 staff orders carry null: paid at the counter, method unknown.
+    // refundedAt records the automatic refund when a manager cancels an
+    // online-paid order.
     paidAt: integer('paid_at'),
-    paymentMethod: text('payment_method', { enum: ['cash', 'stripe', 'paypal'] }),
+    paymentMethod: text('payment_method', { enum: ['cash', 'pos', 'stripe', 'paypal'] }),
     paymentRef: text('payment_ref'),
     refundedAt: integer('refunded_at'),
     createdBy: integer('created_by').references(() => users.id),

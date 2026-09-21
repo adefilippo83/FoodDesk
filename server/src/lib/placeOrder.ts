@@ -48,8 +48,13 @@ export type PlaceOrderInput = {
   createdBy: number | null
   origin: 'staff' | 'customer'
   publicToken: string | null
-  /** Online payments (phase B): stamped at creation, order held until paid. */
-  paymentMethod?: 'stripe' | 'paypal' | null
+  /**
+   * Online payments (phase B): stamped at creation, order held until paid.
+   * Counter payments (cash, POS) on a staff order: the money changed hands
+   * at the register, so the order is born paid — paidAt comes with it.
+   */
+  paymentMethod?: 'cash' | 'pos' | 'stripe' | 'paypal' | null
+  paidAt?: number | null
 }
 
 export type PlaceOrderResult =
@@ -170,6 +175,7 @@ export async function placeOrder(db: Db, input: PlaceOrderInput): Promise<PlaceO
           origin: input.origin,
           publicToken: input.publicToken,
           paymentMethod: input.paymentMethod ?? null,
+          paidAt: input.paidAt ?? null,
           clientKey: input.clientKey,
         })
         .returning()
