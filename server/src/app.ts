@@ -10,6 +10,7 @@ import { SESSION_COOKIE, resolveSession } from './auth/session.js'
 import type { Db } from './db/index.js'
 import { openOrdersStream } from './lib/sse.js'
 import { authRoutes } from './routes/auth.js'
+import { demoResetTokenFromEnv, demoRoutes } from './routes/demo.js'
 import { kitchenRoutes } from './routes/kitchen.js'
 import { menuRoutes } from './routes/menu.js'
 import { orderRoutes } from './routes/orders.js'
@@ -28,6 +29,11 @@ export async function buildApp(
     serveStatic?: boolean
     /** Override for tests; defaults to what the env configures. */
     paymentProviders?: ProviderRegistry
+    /**
+     * Override for tests; defaults to DEMO_RESET_TOKEN from the env. null
+     * means no demo reset endpoint at all — the normal state of a venue box.
+     */
+    demoResetToken?: string | null
   } = {},
 ): Promise<FastifyInstance> {
   const providers = opts.paymentProviders ?? providersFromEnv()
@@ -118,6 +124,11 @@ export async function buildApp(
   await app.register(kitchenRoutes(db))
   await app.register(reportRoutes(db))
   await app.register(settingsRoutes(db, providers))
+  // The public demo only: its scheduled reset calls this instead of running
+  // a second process inside the machine (which got the server OOM-killed).
+  const demoResetToken =
+    opts.demoResetToken === undefined ? demoResetTokenFromEnv(app.log) : opts.demoResetToken
+  if (demoResetToken) await app.register(demoRoutes(db, demoResetToken))
 
   // In production the built React app is served from the same origin as the
   // API, so waiters only ever need one address on the venue Wi-Fi.
