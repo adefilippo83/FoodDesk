@@ -18,11 +18,11 @@
   "dependencies": {
     "@fastify/cookie": "^11.1.5",
     "@fastify/rate-limit": "^11.2.2",
-    "@fastify/static": "^10.1.11",
-    "better-sqlite3": "^13.1.1",
+    "@fastify/static": "^10.1.12",
+    "better-sqlite3": "^13.2.0",
     "drizzle-orm": "^0.45.4",
     "fastify": "^5.12.8",
-    "pdfkit": "^0.20.2",
+    "pdfkit": "^0.21.0",
     "qrcode": "^1.5.4"
   },
   "devDependencies": {
